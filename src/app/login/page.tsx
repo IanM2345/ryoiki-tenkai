@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signInWithEmail } from '@/lib/supabase';
+import { supabase, signInWithEmail } from '@/lib/supabase';
 import s from './login.module.css';
 
 function LoginForm() {
@@ -26,7 +26,7 @@ function LoginForm() {
     setNotice('');
 
     try {
-      // Step 1: server-side email gate (keeps email off the client bundle)
+      // Step 1: server-side email gate
       const res = await fetch('/api/auth/login', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,10 +39,19 @@ function LoginForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? 'Wrong email or password.');
 
-      // Step 2: sign in using the SHARED supabase instance from lib/supabase.ts
-      // This stores the session in localStorage and makes it available
-      // to all db.ts queries immediately — same instance, same storage
+      // Step 2: sign in on the shared supabase instance (writes session to localStorage)
       await signInWithEmail(email.trim().toLowerCase(), password);
+
+      // Step 3: wait for session to actually be available before navigating
+      // Supabase writes to localStorage async — poll until confirmed or timeout
+      let session = null;
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (s) { session = s; break; }
+      }
+
+      if (!session) throw new Error('Session did not initialise. Please try again.');
 
       router.push('/dashboard');
 
