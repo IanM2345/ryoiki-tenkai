@@ -137,27 +137,37 @@ export default function ThemePage() {
 
   // ── Save ──────────────────────────────────────────────────
   const save = async () => {
-    setSaving(true);
-    // Apply immediately
-    applyThemeVars(custom, FONTS[font]);
-    applyFontSize(FONT_SIZES[sizeIdx].px);
-    try {
-      await saveSettings({
-        theme_bg:        custom.bg,
-        theme_accent:    custom.accent,
-        theme_secondary: custom.secondary,
-        theme_text:      custom.text,
-        theme_font:      FONTS[font],
-        theme_font_size: FONT_SIZES[sizeIdx].px,
-      });
-      show('Theme saved! ✓');
-    } catch(e) {
-      console.error('[theme] save error:', e);
-      show('Could not save theme.', '#f87171');
-    } finally {
-      setSaving(false);
-    }
-  };
+  setSaving(true);
+  applyThemeVars(custom, FONTS[font]);
+  applyFontSize(FONT_SIZES[sizeIdx].px);
+
+  // Persist theme to localStorage so it loads instantly on every page visit
+  localStorage.setItem('yw-theme', JSON.stringify({
+    bg:        custom.bg,
+    accent:    custom.accent,
+    secondary: custom.secondary,
+    text:      custom.text,
+    font:      FONTS[font],
+    fontSize:  FONT_SIZES[sizeIdx].px,
+  }));
+
+  try {
+    await saveSettings({
+      theme_bg:        custom.bg,
+      theme_accent:    custom.accent,
+      theme_secondary: custom.secondary,
+      theme_text:      custom.text,
+      theme_font:      FONTS[font],
+      theme_font_size: FONT_SIZES[sizeIdx].px,
+    });
+    show('Theme saved! ✓');
+  } catch(e) {
+    console.error('[theme] save error:', e);
+    show('Could not save theme.', '#f87171');
+  } finally {
+    setSaving(false);
+  }
+};
 
   const currentSize = FONT_SIZES[sizeIdx];
 
