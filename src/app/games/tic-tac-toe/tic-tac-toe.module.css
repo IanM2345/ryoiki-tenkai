@@ -1,0 +1,172 @@
+.page {
+  padding: 2rem;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.back {
+  background: none;
+  border: none;
+  color: #8a6f5a;
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+.back:hover { color: #f5e6d0; }
+
+.scoreboard {
+  display: flex;
+  gap: 1rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+.scoreWin  { color: #4ade80; }
+.scoreLoss { color: #f87171; }
+.scoreDraw { color: #facc15; }
+
+.title {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 1.8rem;
+  color: #f5e6d0;
+  margin: 0 0 1.5rem;
+}
+
+/* Setup */
+.setup { display: flex; flex-direction: column; gap: 1rem; }
+
+.setupLabel {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.85rem;
+  color: #8a6f5a;
+  margin: 0;
+}
+
+.diffRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.diffBtn {
+  padding: 0.6rem 0.4rem;
+  background: #130d1a;
+  border: 1.5px solid #2a1f35;
+  border-radius: 8px;
+  color: #a07a5a;
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+.diffBtn:hover { border-color: #ff8c00; color: #f5e6d0; }
+.diffBtnActive { border-color: #ff8c00 !important; color: #ff8c00 !important; }
+
+.diffHint {
+  font-size: 0.58rem;
+  color: #5a4a6a;
+  font-family: 'Courier New', monospace;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.startBtn {
+  padding: 0.75rem 1.5rem;
+  background: #ff8c00;
+  border: none;
+  border-radius: 10px;
+  color: #0d0a0f;
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  align-self: flex-start;
+}
+.startBtn:hover { opacity: 0.85; }
+
+/* Status */
+.statusBar { margin-bottom: 1.25rem; min-height: 1.5rem; }
+
+.statusText { font-family: 'Comic Sans MS', cursive; font-size: 1rem; color: #a07a5a; }
+.statusWon  { font-family: 'Comic Sans MS', cursive; font-size: 1rem; color: #4ade80; }
+.statusLost { font-family: 'Comic Sans MS', cursive; font-size: 1rem; color: #f87171; }
+.statusDraw { font-family: 'Comic Sans MS', cursive; font-size: 1rem; color: #facc15; }
+
+/* Board */
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 1.5rem;
+  max-width: 320px;
+}
+
+.cell {
+  aspect-ratio: 1;
+  background: #1a1025;
+  border: 1.5px solid #2a1f35;
+  border-radius: 10px;
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 2.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent; /* default — overridden by cellX/cellO */
+}
+
+.cell:hover:not(:disabled) { background: #221535; border-color: #ff8c00; }
+
+.cellX    { color: #ff8c00; }
+.cellO    { color: #a855f7; }
+.cellWin  { background: rgba(255,140,0,0.12) !important; border-color: #ff8c00 !important; }
+.cellDone { cursor: default; }
+
+/* Actions */
+.actions { display: flex; gap: 1rem; align-items: center; }
+
+.diffChange {
+  background: none;
+  border: none;
+  color: #8a6f5a;
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+.diffChange:hover { color: #f5e6d0; }
+
+/* Loading */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+}
+.dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #ff8c00;
+  animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50%       { opacity: 1;   transform: scale(1.2); }
+}

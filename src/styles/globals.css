@@ -1,0 +1,202 @@
+/* ─── DESIGN TOKENS ──────────────────────────────────────── */
+:root {
+  --bg:        #0d0a0f;
+  --surf:      #130d1a;
+  --card:      #1a1025;
+  --card-hov:  #221436;
+  --or:        #ff8c00;
+  --or-l:      #ffb347;
+  --or-d:      #cc6600;
+  --pu:        #7c3aed;
+  --pu-l:      #a855f7;
+  --pu-d:      #4c1d95;
+  --pu-g:      #c084fc;
+  --tx:        #f5e6d0;
+  --tx-s:      #c4a882;
+  --tx-m:      #8a7060;
+  --tx-d:      #4a3830;
+  --bd:        rgba(255,140,0,0.16);
+  --bds:       rgba(255,140,0,0.07);
+  --gr:        #4ade80;
+  --red:       #f87171;
+  --blue:      #60a5fa;
+  --font:      'Comic Sans MS','Comic Sans',cursive;
+  --mono:      'Courier New',monospace;
+  --radius:    10px;
+  --radius-lg: 14px;
+  --sidebar-w: 176px;
+  --bottom-nav-h: 56px;
+  --shadow:    0 4px 20px rgba(0,0,0,0.45);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
+  --speed:     150ms;
+}
+
+/* ─── RESET ───────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html{
+  font-size: 16px;
+}
+html, body {
+  height: 100%;
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--tx);
+  line-height: 1.5;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* KEY FIX: body must be a flex container so appMain's flex:1 actually works */
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+input, textarea, select, button {
+  font-family: var(--font);
+  color: var(--tx);
+}
+
+textarea { resize: vertical; }
+a { color: var(--or-l); text-decoration: none; }
+mark { background: rgba(255,140,0,0.25); color: var(--or-l); border-radius: 2px; padding: 0 2px; }
+
+@media (hover: none) {
+  button, a, [role="button"] { min-height: 40px; }
+}
+
+/* ─── SCROLLBAR ───────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,140,0,0.22); border-radius: 3px; }
+
+/* ─── KEYFRAMES ───────────────────────────────────────────── */
+@keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes pulse  { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+@keyframes spin   { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+@keyframes blink  { 0%,100% { opacity:1; } 50% { opacity:0; } }
+@keyframes slideUp { from { transform:translateY(100%); } to { transform:none; } }
+
+/* ─── ANIMATION HELPERS ───────────────────────────────────── */
+.aFadeUp { animation: fadeUp 0.22s ease both; }
+.aFadeIn { animation: fadeIn 0.18s ease both; }
+.aPulse  { animation: pulse  2s infinite; }
+.aSpin   { animation: spin   1s linear infinite; }
+
+/* ─── APP SHELL ───────────────────────────────────────────── */
+.appShell {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.appMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;       
+  overflow-x: hidden;      
+  position: relative;
+  background: var(--surf);
+  margin-left: 176px;
+  transition: margin-left 0.25s ease;
+  height: 100%;
+}
+
+/* Body class toggled by Sidebar.tsx */
+body.sidebar-closed .appMain { margin-left: 52px; }
+body.sidebar-open   .appMain { margin-left: 176px; }
+
+.leaflet-pane         { z-index: 4 !important; }
+.leaflet-tile-pane    { z-index: 2 !important; }
+.leaflet-overlay-pane { z-index: 5 !important; }
+.leaflet-shadow-pane  { z-index: 6 !important; }
+.leaflet-marker-pane  { z-index: 7 !important; }
+.leaflet-tooltip-pane { z-index: 8 !important; }
+.leaflet-popup-pane   { z-index: 9 !important; }
+.leaflet-top,
+.leaflet-bottom       { z-index: 10 !important; }
+
+.leaflet-popup-content-wrapper {
+  background: #130d1a !important;
+  color: #f5e6d0 !important;
+  border: 1px solid rgba(255,140,0,0.4) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 0 20px rgba(255,140,0,0.15) !important;
+}
+.leaflet-popup-tip { background: #130d1a !important; }
+.leaflet-popup-content { margin: 12px 14px !important; }
+.leaflet-control-zoom a {
+  background: #1a1025 !important;
+  color: #ff8c00 !important;
+  border-color: rgba(255,140,0,0.3) !important;
+}
+.leaflet-control-zoom a:hover {
+  background: #ff8c00 !important;
+  color: #000 !important;
+}
+
+@media (max-width: 1023px) {
+  .appMain,
+  body.sidebar-open   .appMain,
+  body.sidebar-closed .appMain { margin-left: 52px; }
+}
+
+@media (max-width: 767px) {
+  .appMain,
+  body.sidebar-open   .appMain,
+  body.sidebar-closed .appMain {
+    margin-left: 0;
+    padding-top: 60px;
+  }
+}
+
+@media (max-width: 767px) {
+  .appMain > *:first-child {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+}
+
+/* ─── Shimmer skeleton ─────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--card) 25%,
+    #2a1f3a 50%,
+    var(--card) 75%
+  );
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+  border-radius: var(--radius);
+}
+
+/* ─── Modal enter animation ────────────────────────────────────── */
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(6px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);   }
+}
+
+/* ─── Card hover micro-animation (utility) ─────────────────────── */
+.hoverCard {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  cursor: pointer;
+}
+.hoverCard:hover  { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,0.35); }
+.hoverCard:active { transform: scale(0.98); }
+
+/* ─── Unified focus ring ────────────────────────────────────────── */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.4);
+}

@@ -1,0 +1,544 @@
+/* ─── PAGE ───────────────────────────────────────────────── */
+.page {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+}
+
+/* ─── HEADER ─────────────────────────────────────────────── */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  /* left indent clears the hamburger button */
+  padding-left: 48px;
+}
+
+/* On mobile the appMain already has padding-top: 60px so no left indent needed */
+@media (max-width: 767px) {
+  .header { padding-left: 0; }
+}
+
+.greeting {
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--tx);
+}
+
+.date {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--tx-m);
+  letter-spacing: 1px;
+  margin-top: 3px;
+}
+
+/* ─── STATS GRID ─────────────────────────────────────────── */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.statCard {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--bd);
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: background var(--speed), border-color var(--speed), transform var(--speed);
+  text-decoration: none;
+  display: block;
+}
+.statCard:hover { background: var(--card-hov); transform: translateY(-2px); }
+
+.statNum {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.statLabel {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--tx-s);
+  opacity: 0.5;
+  margin-top: 4px;
+}
+
+/* ─── QUICK STATS ROW ────────────────────────────────────── */
+.quickRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quickCard {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--bd);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--speed);
+  flex: 1;
+  min-width: 120px;
+}
+.quickCard:hover { background: var(--card-hov); }
+
+.quickLabel {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--tx-m);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.quickValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--or);
+}
+
+.moodDots { display: flex; gap: 3px; }
+.moodDot  { width: 10px; height: 10px; border-radius: 50%; }
+
+.soulsRow   { display: flex; gap: -4px; }
+.soulAvatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  margin-left: -4px;
+  border: 1px solid var(--bg);
+}
+.soulAvatar:first-child { margin-left: 0; }
+
+/* ─── MAIN GRID ──────────────────────────────────────────── */
+.mainGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* ─── RECENT JOURNAL ─────────────────────────────────────── */
+.widget {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--bd);
+  padding: 12px;
+}
+
+.widgetHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.widgetTitle {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--tx-m);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.widgetLink {
+  font-size: 11px;
+  color: var(--or);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  text-decoration: none;
+}
+.widgetLink:hover { opacity: 0.75; }
+
+.journalEntry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--bds);
+  text-decoration: none;
+  transition: opacity var(--speed);
+}
+.journalEntry:hover { opacity: 0.7; }
+.journalEntry:last-child { border-bottom: none; }
+
+.journalEntryLeft { flex: 1; min-width: 0; }
+
+.journalEntryTitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tx);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.journalEntryDate {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--tx-m);
+  margin-top: 1px;
+}
+
+.journalEntryMood { font-size: 15px; margin-left: 8px; }
+
+/* ─── RIGHT COLUMN ───────────────────────────────────────── */
+.rightCol { display: flex; flex-direction: column; gap: 10px; }
+
+.randomCard {
+  background: linear-gradient(135deg, rgba(255,140,0,0.08), rgba(124,58,237,0.08));
+  border-radius: var(--radius);
+  border: 1px solid var(--bd);
+  padding: 12px;
+}
+
+.randomHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.shuffleBtn {
+  background: none;
+  border: 1px solid var(--bd);
+  border-radius: 5px;
+  padding: 2px 8px;
+  color: var(--tx-s);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  transition: background var(--speed);
+}
+.shuffleBtn:hover { background: rgba(255,140,0,0.07); }
+
+.randomTitle { font-size: 13px; font-weight: 700; color: var(--tx); margin-bottom: 5px; }
+
+.soulsWidget {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--bd);
+  padding: 12px;
+}
+
+.soulsAvatarRow { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.soulBubble {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  cursor: pointer;
+  transition: transform var(--speed);
+  text-decoration: none;
+}
+.soulBubble:hover { transform: scale(1.12); }
+
+/* ─── HEADER ACTIONS ─────────────────────────────────────── */
+.headerActions { display: flex; gap: 7px; align-items: center; }
+
+/* ─── TASK SECTION — three-card grid ────────────────────── */
+.taskSection {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+/* ─── TASK CARD ──────────────────────────────────────────── */
+.taskCard {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--bd);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Overdue card — subtle red tint on the border */
+.taskCardOverdue {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: linear-gradient(160deg, rgba(248,113,113,0.04) 0%, var(--card) 60%);
+}
+
+/* Done card — subtle green tint */
+.taskCardDone {
+  border-color: rgba(74, 222, 128, 0.2);
+  background: linear-gradient(160deg, rgba(74,222,128,0.04) 0%, var(--card) 60%);
+}
+
+.taskCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ─── COUNT BADGES ───────────────────────────────────────── */
+.taskCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 8px;
+  background: rgba(255,140,0,0.18);
+  color: var(--or);
+  border-radius: 10px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  letter-spacing: 0;
+}
+
+.taskCountRed {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 8px;
+  background: rgba(248,113,113,0.18);
+  color: var(--red);
+  border-radius: 10px;
+  padding: 1px 6px;
+  margin-left: 6px;
+}
+
+/* ─── ALL CLEAR / CLEAR ALL BUTTONS ─────────────────────── */
+.allClearBadge {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--gr);
+  opacity: 0.7;
+}
+
+.clearBtn {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--red);
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.25);
+  border-radius: 5px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: background var(--speed);
+}
+.clearBtn:hover { background: rgba(248,113,113,0.18); }
+
+/* ─── PRIORITY CHIPS ─────────────────────────────────────── */
+.prioRow  { display: flex; gap: 4px; }
+
+.prioChip {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all var(--speed);
+  border: 1px solid transparent;
+}
+
+/* ─── TASK LIST ──────────────────────────────────────────── */
+.taskList {
+  flex: 1;
+  max-height: 170px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.taskEmpty {
+  font-size: 11px;
+  color: var(--tx-m);
+  opacity: 0.4;
+  padding: 12px 0;
+  text-align: center;
+}
+
+/* ─── TASK ROW ───────────────────────────────────────────── */
+.taskRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 5px 2px;
+  border-radius: 5px;
+  transition: background var(--speed);
+  position: relative;
+}
+.taskRow:hover         { background: rgba(255,255,255,0.03); }
+.taskRow:hover .taskDel { opacity: 1; }
+
+.taskRowDone { opacity: 0.5; }
+
+/* ─── CHECKBOX ───────────────────────────────────────────── */
+.taskCheck {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: all var(--speed);
+}
+.taskCheckOff { border: 1.5px solid var(--bd); background: transparent; }
+.taskCheckOn  { border: 1.5px solid var(--or); background: var(--or); }
+.taskCheckMark { color: #000; font-size: 9px; font-weight: 900; }
+
+/* ─── PRIORITY DOT ───────────────────────────────────────── */
+.taskPrioDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+/* ─── TASK BODY ──────────────────────────────────────────── */
+.taskBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.taskText     { font-size: 11px; color: var(--tx); line-height: 1.4; }
+.taskTextDone { text-decoration: line-through; }
+
+/* ─── META BADGES ────────────────────────────────────────── */
+.overdueTag {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--red);
+  letter-spacing: 0.5px;
+}
+
+.dueTag {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--tx-m);
+  opacity: 0.55;
+  letter-spacing: 0.5px;
+}
+
+.doneTag {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--gr);
+  opacity: 0.7;
+  letter-spacing: 0.5px;
+}
+
+/* ─── DELETE BUTTON ──────────────────────────────────────── */
+.taskDel {
+  background: none;
+  border: none;
+  color: var(--tx-m);
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity var(--speed);
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* ─── ADD ROW ────────────────────────────────────────────── */
+.addRow {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  padding-top: 6px;
+  border-top: 1px solid var(--bds);
+}
+
+.taskInput {
+  background: rgba(255,140,0,0.06);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  padding: 5px 9px;
+  font-size: 11px;
+  flex: 1;
+  color: var(--tx);
+  outline: none;
+  font-family: var(--font);
+  min-width: 0;
+  transition: border var(--speed);
+}
+.taskInput:focus { border-color: var(--or); }
+.taskInput::placeholder { color: var(--tx-m); }
+
+.dateInput {
+  background: rgba(255,140,0,0.06);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  padding: 5px 7px;
+  font-size: 10px;
+  color: var(--tx-m);
+  outline: none;
+  font-family: var(--mono);
+  width: 110px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: border var(--speed);
+  color-scheme: dark;
+}
+.dateInput:focus { border-color: var(--or); }
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE — iPad (768-1023px) & iPhone (≤767px)
+═══════════════════════════════════════════════════ */
+
+/* iPad */
+@media (max-width: 1023px) {
+  .statsGrid  { grid-template-columns: repeat(2, 1fr); }
+  .taskSection { grid-template-columns: 1fr 1fr; }
+}
+
+/* iPhone */
+@media (max-width: 767px) {
+  .page       { padding: 12px; padding-top: 58px; gap: 10px; }
+  .greeting   { font-size: 17px; }
+  .statsGrid  { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .statNum    { font-size: 20px; }
+  .mainGrid   { grid-template-columns: 1fr; }
+  .rightCol   { flex-direction: row; flex-wrap: wrap; }
+  .randomCard { flex: 1; min-width: 140px; }
+  .soulsWidget{ flex: 1; min-width: 140px; }
+  .taskSection { grid-template-columns: 1fr; }
+  .taskList   { max-height: 130px; }
+  .addRow     { flex-wrap: wrap; }
+  .dateInput  { width: 100%; }
+  /* touch: always show delete btn */
+  .taskDel    { opacity: 0.45; }
+}

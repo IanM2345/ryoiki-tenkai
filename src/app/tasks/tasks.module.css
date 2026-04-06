@@ -1,0 +1,338 @@
+/* ─── PAGE ───────────────────────────────────────────────── */
+.page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ─── FILTER BAR ─────────────────────────────────────────── */
+.filterBar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--bds);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.searchBar   { flex: 1; min-width: 140px; }
+.prioFilters { display: flex; gap: 3px; flex-shrink: 0; }
+
+.clearAllBtn {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--red);
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.25);
+  border-radius: 5px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background var(--speed);
+  flex-shrink: 0;
+}
+.clearAllBtn:hover { background: rgba(248,113,113,0.18); }
+
+/* ─── ADD BAR ────────────────────────────────────────────── */
+.addBar {
+  display: flex;
+  gap: 7px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--bds);
+  align-items: center;
+  background: rgba(255,140,0,0.025);
+  flex-wrap: wrap;
+}
+
+.addInput {
+  background: rgba(255,140,0,0.07);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  padding: 7px 11px;
+  font-size: 12px;
+  color: var(--tx);
+  outline: none;
+  font-family: var(--font);
+  flex: 1;
+  min-width: 160px;
+  transition: border var(--speed);
+}
+.addInput:focus { border-color: var(--or); }
+.addInput::placeholder { color: var(--tx-m); }
+
+.dateInput {
+  background: rgba(255,140,0,0.06);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  padding: 7px 8px;
+  font-size: 10px;
+  color: var(--tx-m);
+  outline: none;
+  font-family: var(--mono);
+  width: 120px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: border var(--speed);
+  color-scheme: dark;
+}
+.dateInput:focus { border-color: var(--or); }
+
+.addPrioRow { display: flex; gap: 4px; flex-shrink: 0; }
+
+.addPrioChip {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--speed);
+}
+
+/* ─── TASK LIST ──────────────────────────────────────────── */
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ─── EMPTY STATE ────────────────────────────────────────── */
+.empty {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--tx-m);
+  opacity: 0.4;
+}
+.emptyIcon { font-size: 26px; margin-bottom: 10px; }
+.emptyMsg  { font-size: 13px; line-height: 1.8; }
+
+/* ─── TASK ROW ───────────────────────────────────────────── */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--bds);
+  background: var(--card);
+  transition: background var(--speed), border-color var(--speed);
+}
+.row:hover { background: var(--card-hov); }
+.row:hover .rowActions { opacity: 1; }
+
+/* Overdue row — red left border */
+.rowOverdue {
+  border-left: 3px solid rgba(248, 113, 113, 0.6);
+  background: linear-gradient(90deg, rgba(248,113,113,0.04) 0%, var(--card) 40%);
+}
+
+/* Done row — muted */
+.rowDone { opacity: 0.5; }
+
+/* ─── CHECKBOX ───────────────────────────────────────────── */
+.check {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: all var(--speed);
+}
+.checkOff { border: 1.5px solid var(--bd); background: transparent; }
+.checkOn  { border: 1.5px solid var(--or); background: var(--or); }
+.checkMark { color: #000; font-size: 9px; font-weight: 900; }
+
+/* ─── PRIORITY DOT ───────────────────────────────────────── */
+.prioDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+/* ─── ROW BODY ───────────────────────────────────────────── */
+.rowBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rowText {
+  font-size: 12px;
+  color: var(--tx);
+  line-height: 1.4;
+  font-weight: 700;
+}
+.rowTextDone { text-decoration: line-through; }
+
+/* ─── META ROW ───────────────────────────────────────────── */
+.rowMeta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.overdueTag {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--red);
+  letter-spacing: 0.5px;
+}
+
+.dueTag {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--tx-m);
+  opacity: 0.6;
+}
+
+.doneTag {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--gr);
+  opacity: 0.8;
+}
+
+.createdTag {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--tx-m);
+  opacity: 0.35;
+}
+
+/* ─── PRIORITY LABEL ─────────────────────────────────────── */
+.prioLabel {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+/* ─── ROW ACTIONS ────────────────────────────────────────── */
+.rowActions {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+  opacity: 0;
+  transition: opacity var(--speed);
+  flex-shrink: 0;
+}
+
+.editBtn {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  background: none;
+  border: 1px solid var(--bd);
+  border-radius: 5px;
+  padding: 2px 8px;
+  color: var(--tx-s);
+  cursor: pointer;
+  transition: background var(--speed);
+}
+.editBtn:hover { background: rgba(255,140,0,0.08); }
+
+.delBtn {
+  background: rgba(248,113,113,0.1);
+  border: 1px solid rgba(248,113,113,0.3);
+  color: var(--red);
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--speed);
+  font-family: var(--font);
+}
+.delBtn:hover { background: rgba(248,113,113,0.2); }
+
+/* ─── EDIT MODAL ─────────────────────────────────────────── */
+.modalTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tx);
+  margin-bottom: 14px;
+}
+
+.modalField {
+  margin-bottom: 11px;
+}
+
+.modalLabel {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--tx-m);
+  display: block;
+  margin-bottom: 5px;
+}
+
+.modalInput {
+  background: rgba(255,140,0,0.06);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  font-size: 12px;
+  width: 100%;
+  color: var(--tx);
+  outline: none;
+  font-family: var(--font);
+  transition: border var(--speed);
+}
+.modalInput:focus { border-color: var(--or); }
+
+.editPrioRow  { display: flex; gap: 6px; }
+.editPrioChip {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--speed);
+}
+
+.modalFooter {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bds);
+}
+
+@media (max-width: 767px) {
+  .filterBar  { flex-wrap: wrap; padding: 7px 10px; gap: 6px; }
+  .prioFilters { flex-wrap: wrap; }
+  .addBar     { flex-wrap: wrap; padding: 8px 10px; gap: 6px; }
+  .addInput   { min-width: 100%; }
+  .dateInput  { width: 100%; }
+  .addPrioRow { flex-wrap: wrap; }
+  .list       { padding: 6px 10px; }
+  .rowActions { opacity: 1; }
+  .prioLabel  { display: none; }
+}

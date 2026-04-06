@@ -1,0 +1,190 @@
+/* ═══════════════════════════════════
+   THEME — theme.module.css
+═══════════════════════════════════ */
+.page { flex:1; overflow-y:auto; padding:18px; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 14px; }
+
+/* presets */
+.presetGrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 18px; }
+
+.presetItem { cursor: pointer; text-align: center; }
+
+.presetSwatch {
+  padding-top: 65%;
+  border-radius: 9px;
+  border: 2px solid var(--bd);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 5px;
+  transition: border-color var(--speed);
+}
+.presetSwatchActive { border-color: var(--or); }
+
+.presetDots {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.presetDot { width: 10px; height: 10px; border-radius: 50%; }
+
+.presetCheck { position: absolute; top: 4px; right: 6px; font-size: 12px; color: var(--or); }
+
+.presetName { font-family: var(--mono); font-size: 9px; color: var(--tx-s); opacity: 0.6; }
+
+/* custom colours */
+.colorRow { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; }
+.colorLabel { font-size: 12px; color: var(--tx-s); }
+.colorRight { display: flex; align-items: center; gap: 7px; }
+
+.colorSwatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--bd);
+  position: relative;
+  cursor: pointer;
+}
+.colorSwatchInput { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+.colorHex { font-family: var(--mono); font-size: 9px; color: var(--tx-m); }
+
+/* font row */
+.fontRow { display: flex; gap: 5px; flex-wrap: wrap; }
+.fontChip {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  border: 1px solid var(--bd);
+  background: transparent;
+  color: var(--tx-s);
+  transition: all var(--speed);
+}
+.fontChipActive { background: var(--or); border-color: var(--or); color: #000; }
+
+/* live preview */
+.preview { border-radius: 12px; padding: 14px; border: 1px solid rgba(255,255,255,0.08); }
+
+.previewBar { border-radius: 8px; padding: 9px 12px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.07); }
+.previewLogo { font-size: 13px; font-weight: 700; }
+
+.previewStats { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-bottom: 9px; }
+.previewStat { background: rgba(255,255,255,0.05); border-radius: 7px; padding: 8px; border: 1px solid rgba(255,255,255,0.06); }
+.previewStatNum { font-size: 20px; font-weight: 700; line-height: 1; }
+.previewStatLabel { font-family: var(--mono); font-size: 7px; letter-spacing: 1px; text-transform: uppercase; margin-top: 3px; opacity: 0.35; }
+
+.previewBtn { border-radius: 6px; padding: 7px; text-align: center; font-size: 12px; font-weight: 700; }
+
+.previewCard { margin-top: 9px; background: rgba(255,255,255,0.04); border-radius: 7px; padding: 9px; }
+.previewCardTitle { font-size: 12px; font-weight: 700; margin-bottom: 3px; }
+.previewCardText { font-size: 10px; opacity: 0.4; line-height: 1.5; }
+
+.saveNote { font-family: var(--mono); font-size: 8px; color: var(--tx-m); text-align: center; margin-top: 7px; opacity: 0.45; }
+
+/* ─── FONT SIZE SECTION ──────────────────────────────────── */
+.sizeSection {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--bds);
+}
+
+.sizeLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.sizeValue {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--or);
+  letter-spacing: 1px;
+}
+
+/* Step buttons — each rendered at its own font size so you see the difference */
+.sizeSteps {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.sizeStep {
+  flex: 1;
+  padding: 6px 4px;
+  border-radius: var(--radius);
+  border: 1px solid var(--bd);
+  background: transparent;
+  color: var(--tx-s);
+  cursor: pointer;
+  text-align: center;
+  font-family: var(--font);
+  transition: all var(--speed);
+  line-height: 1.2;
+}
+.sizeStep:hover      { background: rgba(255,140,0,0.07); border-color: var(--or); }
+.sizeStepActive      { background: var(--or); border-color: var(--or); color: #000; font-weight: 700; }
+
+/* Slider row */
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.sliderA {
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--tx-m);
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.sliderB {
+  font-family: var(--font);
+  font-size: 18px;
+  color: var(--tx-m);
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.sizeSlider {
+  flex: 1;
+  accent-color: var(--or);
+  cursor: pointer;
+  height: 4px;
+}
+
+.sizeHint {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--tx-m);
+  opacity: 0.4;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+/* ─── PREVIEW SIZE TAG ───────────────────────────────────── */
+.previewSizeTag {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-align: right;
+  margin-top: 8px;
+  opacity: 0.5;
+}
+
+@media (max-width: 1023px) {
+  .grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 767px) {
+  .page { padding: 12px; }
+  .grid { gap: 14px; }
+  .presetGrid { grid-template-columns: repeat(3, 1fr); }
+}

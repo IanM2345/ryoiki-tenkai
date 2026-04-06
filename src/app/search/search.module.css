@@ -1,0 +1,122 @@
+.page { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+.header { padding: 22px 22px 10px; }
+
+.pageTitle {
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--tx);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.searchWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,140,0,0.08);
+  border: 1.5px solid var(--or);
+  border-radius: 12px;
+  padding: 12px 16px;
+  box-shadow: 0 0 0 5px rgba(255,140,0,0.06);
+  margin-bottom: 10px;
+}
+
+.searchIcon { font-size: 20px; color: var(--or); opacity: 0.5; }
+
+.searchInput {
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 16px;
+  color: var(--tx);
+  outline: none;
+  flex: 1;
+}
+.searchInput::placeholder { color: var(--tx-m); }
+
+.resultCount {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--or);
+  background: rgba(255,140,0,0.12);
+  padding: 3px 9px;
+  border-radius: 4px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.clearBtn {
+  background: none;
+  border: none;
+  color: var(--tx-m);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.clearBtn:hover { color: var(--tx-s); }
+
+.sectionFilters {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ─── RESULTS ────────────────────────────────────────────── */
+.results { flex:1; overflow-y:auto; padding:0 22px 18px; }
+
+.resultGroup { margin-bottom: 18px; }
+
+.groupLabel {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--tx-m);
+  opacity: 0.4;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.resultCard {
+  background: var(--card);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  padding: 11px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  transition: background var(--speed);
+}
+.resultCard:hover { background: var(--card-hov); }
+
+.resultTop {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  margin-bottom: 3px;
+}
+
+.resultTitle {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tx);
+  line-height: 1.3;
+}
+
+.resultPreview {
+  font-size: 11px;
+  color: var(--tx-s);
+  opacity: 0.6;
+  line-height: 1.5;
+}
+
+@media (max-width: 767px) {
+  .header     { padding: 14px 14px 8px; }
+  .pageTitle  { font-size: 17px; margin-bottom: 12px; }
+  .searchWrap { padding: 10px 12px; }
+  .searchInput { font-size: 14px; }
+  .results    { padding: 0 12px 80px; }
+}

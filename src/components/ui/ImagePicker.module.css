@@ -1,0 +1,95 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 0.75rem;
+  color: var(--text-muted, #a89abc);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Drop zone (empty state) ─────────────────────────────── */
+.dropZone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px 16px;
+  border: 2px dashed rgba(255, 140, 0, 0.35);
+  border-radius: 10px;
+  background: rgba(255, 140, 0, 0.04);
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+  min-height: 110px;
+}
+
+.dropZone:hover,
+.dropZone:focus-visible {
+  border-color: rgba(255, 140, 0, 0.7);
+  background: rgba(255, 140, 0, 0.08);
+  outline: none;
+}
+
+.dropIcon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.dropText {
+  font-size: 0.85rem;
+  color: var(--text, #f5e6d0);
+  font-family: 'Comic Sans MS', cursive;
+}
+
+.dropSub {
+  font-size: 0.72rem;
+  color: var(--text-muted, #a89abc);
+}
+
+/* ── Preview (filled state) ──────────────────────────────── */
+.preview {
+  position: relative;
+  display: inline-block;
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 180px;
+}
+
+.previewImg {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.clearBtn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(13, 10, 15, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text, #f5e6d0);
+  font-size: 0.7rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.clearBtn:hover {
+  background: rgba(200, 50, 50, 0.75);
+}
+
+/* ── Hidden file input ───────────────────────────────────── */
+.hiddenInput {
+  display: none;
+}

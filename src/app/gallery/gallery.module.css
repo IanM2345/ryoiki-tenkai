@@ -1,0 +1,483 @@
+/* ============================================================
+   gallery.module.css — scattered memory board
+   ============================================================ */
+
+/* ── Page shell ─────────────────────────────────────────────── */
+.page {
+  padding: 32px 32px 64px;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--text, #f5e6d0);
+  letter-spacing: -0.02em;
+  margin: 0;
+  /* Warm handwritten glow */
+  text-shadow: 0 0 40px rgba(255, 140, 0, 0.25);
+}
+
+.sub {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.85rem;
+  color: rgba(245, 230, 208, 0.45);
+  margin: 0;
+}
+
+/* ── Filter pills ───────────────────────────────────────────── */
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterBtn {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(245, 230, 208, 0.65);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.filterBtn:hover {
+  background: rgba(255, 140, 0, 0.12);
+  border-color: rgba(255, 140, 0, 0.3);
+  color: var(--text, #f5e6d0);
+}
+
+.filterActive {
+  background: rgba(255, 140, 0, 0.18);
+  border-color: rgba(255, 140, 0, 0.55);
+  color: #ff8c00;
+}
+
+/* ── Scattered board ────────────────────────────────────────── */
+.board {
+  columns: 4;
+  column-gap: 0;           /* gaps handled by padding on each photo */
+  padding-top: 12px;
+}
+
+@media (max-width: 1100px) { .board { columns: 3; } }
+@media (max-width: 750px)  { .board { columns: 2; } }
+@media (max-width: 460px)  { .board { columns: 1; } }
+
+/* ── Individual photo (polaroid card) ───────────────────────── */
+.photo {
+  display: inline-block;          /* required for columns layout */
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 18px 10px 10px;        /* extra padding so rotation doesn't clip siblings */
+  cursor: pointer;
+  break-inside: avoid;
+
+  /* Apply the deterministic rotation via CSS var set inline */
+  transform: rotate(var(--rot, 0deg));
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter 0.18s ease;
+  will-change: transform;
+  position: relative;
+}
+
+.photo:hover {
+  transform: rotate(0deg) scale(1.04);
+  z-index: 10;
+  filter: brightness(1.06);
+}
+
+.photo:active {
+  transform: rotate(0deg) scale(0.97);
+}
+
+/* The white polaroid backing */
+.photo::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  background: #f8f0e3;           /* warm off-white paper */
+  border-radius: 3px;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  z-index: 0;
+}
+
+.photoImg {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 2px;
+  /* Slight inner vignette */
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Caption strip below image (polaroid bottom white area) */
+.photoCaption {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 4px 2px;
+}
+
+.photoEmoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.photoTitle {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.72rem;
+  color: #2a1a0e;               /* dark brown on the paper */
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.photoSub {
+  font-family: 'Courier New', monospace;
+  font-size: 0.6rem;
+  color: #7a5a3a;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Tiny shadow dot at top — simulates a thumbtack */
+.photoPinShadow {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ff8c00, #c05000);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  z-index: 2;
+}
+
+/* ── Empty state ────────────────────────────────────────────── */
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 80px 0;
+}
+
+.emptyIcon {
+  font-size: 3.5rem;
+  opacity: 0.4;
+}
+
+.emptyText {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 1.05rem;
+  color: rgba(245, 230, 208, 0.6);
+  margin: 0;
+}
+
+.emptySub {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.8rem;
+  color: rgba(245, 230, 208, 0.35);
+  margin: 0;
+  text-align: center;
+  max-width: 320px;
+}
+
+/* ── Loading shimmer grid ───────────────────────────────────── */
+.shimmerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 20px;
+  width: 100%;
+  padding-top: 12px;
+}
+
+.shimmerCard {
+  aspect-ratio: 3 / 4;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite ease-in-out;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* ── Lightbox ───────────────────────────────────────────────── */
+.lightboxBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(5, 3, 8, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.18s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.lightboxCard {
+  background: #1a1025;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  max-width: min(90vw, 720px);
+  width: 100%;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.7);
+  animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes popIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.lightboxImg {
+  display: block;
+  width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  background: #0d0a0f;
+}
+
+.lightboxFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.lightboxMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.lightboxTitle {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.95rem;
+  color: var(--text, #f5e6d0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lightboxSource {
+  font-family: 'Courier New', monospace;
+  font-size: 0.65rem;
+  color: rgba(245, 230, 208, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+}
+
+.lightboxActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.lightboxNav {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text, #f5e6d0);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.lightboxNav:hover {
+  background: rgba(255, 140, 0, 0.18);
+  border-color: rgba(255, 140, 0, 0.4);
+}
+
+.lightboxGo {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.78rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 140, 0, 0.15);
+  border: 1px solid rgba(255, 140, 0, 0.35);
+  color: #ff8c00;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.lightboxGo:hover {
+  background: rgba(255, 140, 0, 0.28);
+}
+
+.lightboxClose {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(245, 230, 208, 0.55);
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.lightboxClose:hover {
+  background: rgba(200, 50, 50, 0.2);
+  color: #f87171;
+}
+
+/* ── Header row with upload button ─────────────────────────── */
+.headerTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.uploadBtn {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.82rem;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: rgba(255, 140, 0, 0.15);
+  border: 1px solid rgba(255, 140, 0, 0.4);
+  color: #ff8c00;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.uploadBtn:hover:not(:disabled) {
+  background: rgba(255, 140, 0, 0.28);
+}
+
+.uploadBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Caption editor in lightbox ─────────────────────────────── */
+.captionRow {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  padding: 0 18px 10px;
+}
+
+.captionInput {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--text, #f5e6d0);
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.captionInput:focus {
+  border-color: rgba(255, 140, 0, 0.5);
+}
+
+.captionInput::placeholder {
+  color: rgba(245, 230, 208, 0.3);
+}
+
+.captionSave {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 140, 0, 0.15);
+  border: 1px solid rgba(255, 140, 0, 0.3);
+  color: #ff8c00;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.captionSave:hover:not(:disabled) {
+  background: rgba(255, 140, 0, 0.28);
+}
+
+/* ── Delete button in lightbox ──────────────────────────────── */
+.lightboxDelete {
+  font-family: 'Comic Sans MS', cursive;
+  font-size: 0.78rem;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(220, 50, 50, 0.12);
+  border: 1px solid rgba(220, 50, 50, 0.3);
+  color: #f87171;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.lightboxDelete:hover {
+  background: rgba(220, 50, 50, 0.25);
+}

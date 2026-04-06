@@ -1,0 +1,305 @@
+/* ═══════════════════════════════════════════════════════════
+   HAMBURGER TOGGLE BUTTON
+   Now lives inside the sidebar — no more fixed overlap
+═══════════════════════════════════════════════════════════ */
+.toggleBtn {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  align-self: flex-start;
+  flex-shrink: 0;
+  margin: 10px 0 0 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(13, 10, 15, 0.92);
+  border: 1px solid rgba(255, 140, 0, 0.2);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0;
+  transition: background var(--speed), border-color var(--speed);
+}
+.toggleBtn:hover {
+  background: rgba(255, 140, 0, 0.12);
+  border-color: rgba(255, 140, 0, 0.45);
+}
+
+/* Collapsed: centre the button since sidebar is narrow */
+.sidebarClosed .toggleBtn {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Three bars that animate into an × when open */
+.bar {
+  display: block;
+  width: 16px;
+  height: 1.5px;
+  background: var(--tx-s);
+  border-radius: 2px;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+  transform-origin: center;
+}
+
+.barTopOpen { transform: translateY(6.5px) rotate(45deg); background: var(--or); }
+.barMidOpen { opacity: 0; transform: scaleX(0); }
+.barBotOpen { transform: translateY(-6.5px) rotate(-45deg); background: var(--or); }
+
+/* ═══════════════════════════════════════════════════════════
+   BACKDROP — dims the page on mobile when sidebar is open
+═══════════════════════════════════════════════════════════ */
+.backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 98;
+  animation: fadeIn 0.2s ease both;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SIDEBAR PANEL
+═══════════════════════════════════════════════════════════ */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg);
+  border-right: 1px solid var(--bd);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  z-index: 99;
+  transition: width 0.25s ease, transform 0.25s ease;
+  will-change: width, transform;
+}
+.sidebar::-webkit-scrollbar { display: none; }
+
+/* Open state — full width with labels */
+.sidebarOpen  { width: 176px; }
+
+/* Closed state — icon-only strip */
+.sidebarClosed { width: 52px; }
+
+/* ─── LOGO ───────────────────────────────────────────────── */
+.logo {
+  padding: 10px 14px 14px 14px;
+  border-bottom: 1px solid var(--bds);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.logoText {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tx);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logoOr { color: var(--or); }
+.logoPu { color: var(--pu-l); }
+.logoSub {
+  font-family: var(--mono);
+  font-size: 8px;
+  color: var(--tx-m);
+  letter-spacing: 1px;
+  margin-top: 3px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+/* Hide logo entirely when collapsed */
+.sidebarClosed .logo    { display: none; }
+
+/* ─── SECTION LABEL ──────────────────────────────────────── */
+.sectionLabel {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255, 140, 0, 0.22);
+  padding: 12px 14px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.2s, height 0.2s;
+}
+
+.sidebarClosed .sectionLabel {
+  opacity: 0;
+  height: 0;
+  padding: 0;
+}
+
+/* ─── NAV ITEM ───────────────────────────────────────────── */
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  font-size: 11px;
+  color: rgba(245, 230, 208, 0.3);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: color var(--speed), background var(--speed);
+  text-decoration: none;
+  min-height: 38px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.navItem:hover {
+  color: rgba(245, 230, 208, 0.65);
+  background: rgba(255, 140, 0, 0.04);
+}
+.navItemActive {
+  color: var(--or);
+  background: rgba(255, 140, 0, 0.10);
+  border-left-color: var(--or);
+}
+.navItemActive:hover { color: var(--or); }
+
+.navIcon {
+  font-size: 14px;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+  transition: margin 0.2s;
+}
+.navLabel { flex: 1; }
+.navCount {
+  font-family: var(--mono);
+  font-size: 8px;
+  background: rgba(255, 140, 0, 0.2);
+  color: var(--or);
+  padding: 1px 5px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+/* Closed: centre the icon, hide text */
+.sidebarClosed .navItem  { padding: 9px 0; justify-content: center; }
+.sidebarClosed .navLabel { display: none; }
+.sidebarClosed .navCount { display: none; }
+
+/* ─── LOGOUT BUTTON ──────────────────────────────────────── */
+.logoutBtn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  font-size: 11px;
+  color: rgba(248, 113, 113, 0.5);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  width: 100%;
+  text-align: left;
+  transition: color var(--speed), background var(--speed);
+  min-height: 38px;
+  white-space: nowrap;
+  overflow: hidden;
+  border-top: 1px solid var(--bds);
+  margin-top: auto;
+}
+.logoutBtn:hover {
+  color: var(--red);
+  background: rgba(248, 113, 113, 0.06);
+}
+
+.sidebarClosed .logoutBtn { padding: 9px 0; justify-content: center; }
+.sidebarClosed .logoutBtn .navLabel { display: none; }
+
+.sidebarOpen .logoutBtn { padding: 10px 14px; justify-content: flex-start; }
+.sidebarOpen .logoutBtn .navLabel { display: block; }
+
+/* ─── FOOTER ─────────────────────────────────────────────── */
+.sidebarFooter {
+  padding: 10px 14px;
+  border-top: 1px solid var(--bds);
+  font-family: var(--mono);
+  font-size: 7px;
+  color: var(--tx-m);
+  opacity: 0.4;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sidebarClosed .sidebarFooter { display: none; }
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════════ */
+
+/* ── iPad (768–1023px) ──────────────────────────────────── */
+@media (max-width: 1023px) {
+  .sidebarOpen {
+    width: 176px;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.6);
+  }
+  .sidebarClosed { width: 52px; }
+  .backdrop { display: block; }
+}
+
+/* ── iPhone (≤767px) ────────────────────────────────────── */
+@media (max-width: 767px) {
+  .sidebarClosed {
+    width: 176px;
+    transform: translateX(-100%);
+  }
+  .sidebarOpen {
+    width: 80vw;
+    max-width: 260px;
+    transform: translateX(0);
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.7);
+  }
+
+  .sidebarOpen .navItem  { padding: 10px 14px; justify-content: flex-start; }
+  .sidebarOpen .navLabel { display: block; }
+  .sidebarOpen .navCount { display: inline-flex; }
+  .sidebarOpen .sectionLabel { opacity: 1; height: auto; padding: 12px 14px 4px; }
+  .sidebarOpen .sidebarFooter { display: block; opacity: 0.4; }
+  .sidebarOpen .logo { display: block; }
+  .sidebarOpen .logoText { font-size: 15px; }
+  .sidebarOpen .logoSub  { opacity: 0.6; height: auto; margin-top: 3px; }
+
+  .backdrop { display: block; }
+
+  .toggleBtn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+.mobileBurger {
+  display: none;
+  position: fixed;
+  top: 0.875rem;
+  left: 0.875rem;
+  z-index: 200;
+  background: var(--bg);
+  border: 1px solid rgba(255, 140, 0, 0.2);
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 1023px) {
+  .mobileBurger {
+    display: flex;
+  }
+
+  /* Hide the desktop toggle button on mobile — the floating one takes over */
+  .toggleBtn {
+    display: none;
+  }
+}

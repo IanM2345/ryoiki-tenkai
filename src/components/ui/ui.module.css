@@ -1,0 +1,431 @@
+/* ─── BUTTON ─────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity var(--speed), transform var(--speed);
+  border: none;
+  padding: 8px 16px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.btn:hover  { opacity: 0.82; transform: translateY(-1px); }
+.btn:active { opacity: 0.7;  transform: translateY(0); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+.btnOr     { background: linear-gradient(135deg, var(--or), var(--or-d)); color: #000; }
+.btnPurple { background: linear-gradient(135deg, var(--pu), var(--pu-d)); color: #fff; }
+.btnGhost  { background: transparent; border: 1px solid var(--bd); color: var(--tx-s); }
+.btnGhost:hover { background: rgba(255,140,0,0.06); opacity: 1; transform: none; }
+.btnDanger { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); color: var(--red); }
+
+.btnSm   { padding: 5px 11px; font-size: 11px; }
+.btnFull { width: 100%; }
+
+/* ─── LABEL ──────────────────────────────────────────────── */
+.lbl {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--tx-m);
+  display: block;
+  margin-bottom: 5px;
+}
+
+/* ─── TAG ────────────────────────────────────────────────── */
+.tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 3px;
+  margin-right: 4px;
+  margin-bottom: 3px;
+}
+
+.tagRemoveBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-left: 3px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 0;
+  opacity: 0.8;
+}
+.tagRemoveBtn:hover { opacity: 1; }
+
+/* ─── PILL ───────────────────────────────────────────────── */
+.pill {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  margin-right: 5px;
+  margin-bottom: 5px;
+  transition: all var(--speed);
+  border: 1px solid var(--bd);
+  color: var(--tx-s);
+  background: transparent;
+  font-weight: 400;
+}
+.pill:hover { opacity: 0.8; }
+
+/* ─── STARS ──────────────────────────────────────────────── */
+.stars { display: inline-flex; gap: 1px; }
+.star  { cursor: default; transition: color 0.1s; line-height: 1; }
+.starClickable { cursor: pointer; }
+
+/* ─── PROGRESS BAR ───────────────────────────────────────── */
+.barTrack { background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; margin-top: 5px; }
+.barFill  { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+
+/* ─── BADGE ──────────────────────────────────────────────── */
+.badge {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+  display: inline-block;
+}
+
+/* ─── DIVIDER ────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--bds); margin: 10px 0; }
+
+/* ─── CARD ───────────────────────────────────────────────── */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--bd);
+  padding: 12px;
+  transition: background var(--speed), border-color var(--speed);
+}
+.cardHov:hover { background: var(--card-hov); }
+
+/* ─── TOAST ──────────────────────────────────────────────── */
+.toast {
+  position: absolute;
+  bottom: 18px;
+  right: 18px;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 200;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  animation: fadeUp 0.22s ease both;
+}
+
+/* ─── MODAL OVERLAY ──────────────────────────────────────── */
+.overlay {
+  /* fixed = covers full viewport regardless of scroll position */
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  padding: 16px;
+  animation: fadeIn 0.18s ease both;
+  overflow-y: auto;
+}
+
+.modalBox {
+  background: var(--card);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  width: 100%;
+  max-width: 480px;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  animation: fadeUp 0.22s ease both;
+  position: relative;
+  margin: auto;
+}
+
+.modalTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tx);
+  margin-bottom: 14px;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bds);
+}
+
+/* ─── CONFIRM DIALOG ─────────────────────────────────────── */
+.confirm        { text-align: center; padding: 8px 0; }
+.confirmIcon    { font-size: 28px; margin-bottom: 10px; }
+.confirmTitle   { font-size: 15px; font-weight: 700; color: var(--tx); margin-bottom: 8px; }
+.confirmMsg     { font-size: 12px; color: var(--tx-s); line-height: 1.7; margin-bottom: 16px; max-width: 280px; margin-left: auto; margin-right: auto; }
+.confirmActions { display: flex; gap: 10px; justify-content: center; }
+
+/* ─── FIELD INPUT ────────────────────────────────────────── */
+.fieldWrap  { margin-bottom: 10px; }
+.fieldInput {
+  background: rgba(255,140,0,0.06);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  font-size: 12px;
+  width: 100%;
+  outline: none;
+  color: var(--tx);
+  font-family: var(--font);
+  transition: border var(--speed), box-shadow var(--speed);
+}
+.fieldInput:focus {
+  background: rgba(255,140,0,0.10);
+  border-color: var(--or);
+  border-width: 1.5px;
+  box-shadow: 0 0 0 3px rgba(255,140,0,0.10);
+}
+.fieldInput::placeholder { color: var(--tx-m); }
+
+.fieldArea {
+  background: rgba(255,140,0,0.06);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+  font-size: 12px;
+  width: 100%;
+  outline: none;
+  color: var(--tx);
+  font-family: var(--font);
+  line-height: 1.8;
+  transition: border var(--speed), box-shadow var(--speed);
+  resize: vertical;
+}
+.fieldArea:focus {
+  background: rgba(255,140,0,0.10);
+  border-color: var(--or);
+  border-width: 1.5px;
+  box-shadow: 0 0 0 3px rgba(255,140,0,0.10);
+}
+.fieldArea::placeholder { color: var(--tx-m); }
+
+/* ─── TAG INPUT ──────────────────────────────────────────── */
+.tagInputWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.tagInlineInput {
+  background: rgba(255,140,0,0.06);
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  padding: 3px 9px;
+  font-size: 11px;
+  width: 90px;
+  outline: none;
+  color: var(--tx);
+  font-family: var(--font);
+  transition: border var(--speed);
+}
+.tagInlineInput:focus { border-color: var(--or); }
+.tagInlineInput::placeholder { color: var(--tx-m); }
+
+/* ─── SEARCH BAR ─────────────────────────────────────────── */
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,140,0,0.05);
+  border: 1px solid var(--bds);
+  border-radius: 9px;
+  padding: 8px 12px;
+}
+
+.searchIcon  { color: var(--or); opacity: 0.5; font-size: 14px; flex-shrink: 0; }
+
+.searchInput {
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--tx);
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
+.searchInput::placeholder { color: var(--tx-m); }
+
+.searchClear {
+  background: none;
+  border: none;
+  color: var(--tx-m);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.searchClear:hover { color: var(--tx-s); }
+
+/* ─── INNER TABS ─────────────────────────────────────────── */
+.innerTabs {
+  display: flex;
+  border-bottom: 1px solid var(--bds);
+  background: rgba(0,0,0,0.2);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.innerTabs::-webkit-scrollbar { display: none; }
+
+.innerTab {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 9px 13px;
+  color: var(--tx-s);
+  opacity: 0.4;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--speed), opacity var(--speed);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.innerTab:hover { opacity: 0.7; }
+.innerTabActive {
+  color: var(--or);
+  opacity: 1;
+  border-bottom-color: var(--or);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ─── TOPBAR ─────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* left indent clears the hamburger button on desktop/iPad */
+  padding: 14px 20px 14px 60px;
+  border-bottom: 1px solid var(--bds);
+  flex-shrink: 0;
+}
+
+/* On mobile the hamburger is above the content (padding-top on appMain),
+   so topbar doesn't need the left indent */
+@media (max-width: 767px) {
+  .topbar { padding: 12px 14px; }
+}
+
+.topbarLeft   { display: flex; flex-direction: column; gap: 2px; }
+.topbarTitle  { font-size: 17px; font-weight: 700; color: var(--tx); }
+.topbarSub    { font-family: var(--mono); font-size: 9px; color: var(--tx-m); letter-spacing: 1px; }
+
+/* ─── EMPTY STATE ────────────────────────────────────────── */
+.emptyState {
+  text-align: center;
+  padding: 44px 20px;
+  color: var(--tx-m);
+  opacity: 0.4;
+}
+.emptyIcon { font-size: 30px; margin-bottom: 10px; }
+.emptyMsg  { font-size: 13px; line-height: 1.8; }
+
+/* ─── TOGGLE SWITCH ──────────────────────────────────────── */
+.toggle {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+.toggleOff { background: rgba(255,255,255,0.1); }
+.toggleOn  { background: var(--or); }
+
+.toggleThumb {
+  position: absolute;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  transition: left 0.2s;
+}
+.toggleThumbOff { left: 2px; }
+.toggleThumbOn  { left: 18px; }
+
+/* ─── SECTION LABEL (sidebar) ────────────────────────────── */
+.sectionLabel {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255,140,0,0.22);
+  padding: 12px 14px 4px;
+}
+
+/* ─── RESPONSIVE ─────────────────────────────────────────── */
+
+/* Topbar on small screens */
+@media (max-width: 767px) {
+  .topbar       { padding: 58px 14px 10px 14px; }
+  .topbarTitle  { font-size: 15px; }
+
+  /* Modals: slide up from bottom on mobile */
+  .overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modalBox {
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: 88dvh;
+    margin: 0;
+    animation: slideUp 0.25s ease both;
+  }
+
+  /* Inner tabs: scroll horizontally */
+  .innerTabs    { gap: 0; }
+  .innerTab     { padding: 10px 12px; font-size: 9px; }
+
+  /* Search bar: bigger tap area */
+  .searchBar    { padding: 10px 12px; }
+  .searchInput  { font-size: 13px; }
+
+  /* Buttons: min tap target */
+  .btn          { min-height: 38px; padding: 8px 14px; font-size: 13px; }
+  .btnSm        { min-height: 34px; padding: 6px 12px; font-size: 11px; }
+
+  /* Field inputs: font-size 16px to prevent iOS zoom */
+  .fieldInput   { font-size: 16px !important; }
+  .fieldArea    { font-size: 15px !important; }
+}
