@@ -51,7 +51,7 @@ function LoginForm() {
       // Step 4: wait for session to actually be available before navigating
       let session = null;
       for (let i = 0; i < 10; i++) {
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 1000));
         const { data: { session: s } } = await supabase.auth.getSession();
         if (s) { session = s; break; }
       }
