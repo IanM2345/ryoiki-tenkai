@@ -4,6 +4,7 @@ import '@/styles/globals.css';
 import Sidebar from '@/components/layout/Sidebar';
 import SessionMonitor from '@/components/SessionMonitor';
 import SessionRestore from '@/components/SessionRestore';
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   title: 'yourworld',
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="appMain">
           {children}
         </main>
+        <Analytics/>
       </body>
     </html>
   );

@@ -10,6 +10,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Email and password are required.' }, { status: 400 });
     }
 
+    // ── Dev bypass ──────────────────────────────────────────────────────────
+    // Set DEV_PASSWORD in .env.local to unlock a magic password in development.
+    // This branch is never reachable in production.
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      process.env.DEV_PASSWORD &&
+      password === process.env.DEV_PASSWORD
+    ) {
+      return NextResponse.json({ ok: true, access_token: 'dev', refresh_token: 'dev' });
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     const authorisedEmail = process.env.USER_EMAIL?.toLowerCase();
     if (!authorisedEmail) {
       return NextResponse.json({ message: 'Server misconfigured.' }, { status: 500 });
@@ -33,8 +45,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Wrong email or password.' }, { status: 401 });
     }
 
-    // Ensure user_settings row exists — insert if not present, leave existing values alone.
-    // This is the only place we can guarantee a row exists before the client hits any page.
     const authedSupabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -53,8 +63,6 @@ export async function POST(request: NextRequest) {
         { user_id: data.session.user.id },
         { onConflict: 'user_id', ignoreDuplicates: true }
       );
-    // Intentionally not throwing on error here — a settings row failure
-    // should never block login. It'll be created on next login if it fails.
 
     const { access_token, refresh_token } = data.session;
     const isProd = process.env.NODE_ENV === 'production';

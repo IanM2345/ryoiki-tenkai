@@ -26,7 +26,7 @@ function LoginForm() {
     setNotice('');
 
     try {
-      // Step 1: server-side email gate
+      // Step 1: server-side email gate (+ dev bypass lives here)
       const res = await fetch('/api/auth/login', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,11 +39,16 @@ function LoginForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message ?? 'Wrong email or password.');
 
-      // Step 2: sign in on the shared supabase instance (writes session to localStorage)
+      // Step 2: dev bypass — skip Supabase client sign-in entirely
+      if (data.access_token === 'dev') {
+        router.push('/dashboard');
+        return;
+      }
+
+      // Step 3: sign in on the shared supabase instance (writes session to localStorage)
       await signInWithEmail(email.trim().toLowerCase(), password);
 
-      // Step 3: wait for session to actually be available before navigating
-      // Supabase writes to localStorage async — poll until confirmed or timeout
+      // Step 4: wait for session to actually be available before navigating
       let session = null;
       for (let i = 0; i < 10; i++) {
         await new Promise(r => setTimeout(r, 100));
