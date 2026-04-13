@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase, signInWithEmail } from '@/lib/supabase';
+import { restoreSession } from '@/lib/supabase';
 import s from './login.module.css';
 
 function LoginForm() {
@@ -26,7 +26,7 @@ function LoginForm() {
     setNotice('');
 
     try {
-      // Step 1: server-side email gate (+ dev bypass lives here)
+      console.log('[1] Hitting /api/auth/login...');
       const res = await fetch('/api/auth/login', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -37,30 +37,26 @@ function LoginForm() {
       });
 
       const data = await res.json();
+      console.log('[2] API response:', res.status, data.ok, 'has token:', !!data.access_token);
       if (!res.ok) throw new Error(data.message ?? 'Wrong email or password.');
 
-      // Step 2: dev bypass — skip Supabase client sign-in entirely
       if (data.access_token === 'dev') {
+        console.log('[dev] Bypassing Supabase, going to dashboard');
         router.push('/dashboard');
         return;
       }
 
-      // Step 3: sign in on the shared supabase instance (writes session to localStorage)
-      await signInWithEmail(email.trim().toLowerCase(), password);
-
-      // Step 4: wait for session to actually be available before navigating
-      let session = null;
-      for (let i = 0; i < 10; i++) {
-        await new Promise(r => setTimeout(r, 1000));
-        const { data: { session: s } } = await supabase.auth.getSession();
-        if (s) { session = s; break; }
-      }
+      console.log('[3] Restoring session from tokens...');
+      const session = await restoreSession(data.access_token, data.refresh_token);
+      console.log('[4] Session restored:', !!session);
 
       if (!session) throw new Error('Session did not initialise. Please try again.');
 
+      console.log('[5] Navigating to dashboard');
       router.push('/dashboard');
 
     } catch (err: unknown) {
+      console.error('[ERR]', err);
       setError(err instanceof Error ? err.message : 'Wrong email or password.');
     } finally {
       setLoading(false);

@@ -13,16 +13,13 @@ export const supabase = createClient(url, key, {
 });
 
 /**
- * Sign in using the SHARED supabase instance so the session is
- * available to all db.ts queries immediately after.
+ * Restore session from tokens returned by the API route.
+ * Avoids a second Supabase auth call — no rate limiting risk.
  */
-export async function signInWithEmail(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+export async function restoreSession(access_token: string, refresh_token: string) {
+  const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
   if (error) throw error;
-  return data;
+  return data.session;
 }
 
 /**
