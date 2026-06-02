@@ -65,8 +65,8 @@ export async function getSettings(): Promise<DbUserSettings | null> {
     .from('user_settings')
     .select('*')
     .single();
-  if (error && error.code === 'PGRST116') return null; // no row yet
-  return unwrap(data, error);
+    if (error && error.code === 'PGRST116') return null;
+    return unwrap(data, error);
 }
 
 export async function saveSettings(settings: Partial<Omit<DbUserSettings, 'user_id'>>) {
