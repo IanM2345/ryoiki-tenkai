@@ -22,7 +22,6 @@ export function middleware(req: NextRequest) {
     req.cookies.has('sb-refresh-token') ||
     allCookies.some(c => c.name.startsWith('sb-') && c.name.endsWith('-auth-token'));
 
-  console.log('MW hit:', pathname, '| hasSession:', hasSession, '| cookies:', allCookies.map(c => c.name).join(', '));
 
   if (!hasSession) {
     return NextResponse.redirect(new URL('/login', req.url));
@@ -33,4 +32,4 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
-};
+};

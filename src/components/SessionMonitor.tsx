@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 // ─── CONFIG ───────────────────────────────────────────────────
 // How long before auto-logout due to inactivity (in milliseconds)
@@ -19,6 +20,7 @@ export default function SessionMonitor() {
 
   const logout = useCallback(async (reason: 'inactivity' | 'session_expired') => {
     // Clear the auth cookies via API
+    await supabase.auth.signOut().catch(() => {});
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     // Redirect to login with reason so we can show a message
     router.push(`/login?reason=${reason}`);
@@ -45,7 +47,7 @@ export default function SessionMonitor() {
 
   useEffect(() => {
     // Don't run on the login page itself
-    if (pathname.startsWith('/login')) return;
+    if (pathname.startsWith('/login') || pathname.startsWith('/reset-password')) return;
 
     // Start the inactivity timer
     resetTimer();

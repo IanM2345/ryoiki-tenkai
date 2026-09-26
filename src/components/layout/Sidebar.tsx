@@ -1,4 +1,5 @@
 'use client';
+import { supabase } from '@/lib/supabase';
 import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -87,10 +88,8 @@ export default function Sidebar() {
   }
 
   async function handleLogout() {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('yw-session');
-    }
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await supabase.auth.signOut().catch(() => {});
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     router.push('/login');
   }
 
@@ -183,4 +182,4 @@ export default function Sidebar() {
       </aside>
     </>
   );
-}
+}

@@ -56,6 +56,7 @@ export interface DbUserSettings {
   theme_text:           string;
   theme_font:           string;
   theme_font_size:      number;
+  
   password_reset_done:  boolean;
   first_login_done:     boolean;
 }
@@ -1070,4 +1071,17 @@ export async function getAllImages(): Promise<GalleryImage[]> {
   }
 
   return images;
+}
+
+export async function devPasswordCheck(password: string): Promise<boolean> {
+if(process.env.NODE_ENV !== 'development') return false;
+
+const { data, error } = await supabase
+  .from('dev_config')
+  .select('value')
+  .eq('key', 'dev_password')
+  .single();
+
+  if(error) return false;
+  return data?.value === password;
 }
