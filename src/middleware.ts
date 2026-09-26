@@ -24,7 +24,9 @@ export function middleware(req: NextRequest) {
 
 
   if (!hasSession) {
-    return NextResponse.redirect(new URL('/login', req.url));
+    const url = new URL('/login', req.url);
+    if (pathname !== '/') url.searchParams.set('next', pathname);
+    return NextResponse.redirect(url);
   }
 
   return NextResponse.next();

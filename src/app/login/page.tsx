@@ -1,11 +1,10 @@
 'use client';
 import React, { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { restoreSession } from '@/lib/supabase';
 import s from './login.module.css';
 
 function LoginForm() {
-  const router       = useRouter();
   const searchParams = useSearchParams();
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +25,6 @@ function LoginForm() {
     setNotice('');
 
     try {
-      console.log('[1] Hitting /api/auth/login...');
       const res = await fetch('/api/auth/login', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -37,26 +35,24 @@ function LoginForm() {
       });
 
       const data = await res.json();
-      console.log('[2] API response:', res.status, data.ok, 'has token:', !!data.access_token);
       if (!res.ok) throw new Error(data.message ?? 'Wrong email or password.');
 
       if (data.access_token === 'dev') {
-        console.log('[dev] Bypassing Supabase, going to dashboard');
-        router.push('/dashboard');
+        // Hard navigation: a client-side push can reuse a cached
+      // "redirect to /login" response prefetched before the cookie existed.
+      const next = searchParams.get('next');
+      window.location.replace(next && next.startsWith('/') ? next : '/dashboard');
         return;
       }
-
-      console.log('[3] Restoring session from tokens...');
       const session = await restoreSession(data.access_token, data.refresh_token);
-      console.log('[4] Session restored:', !!session);
 
       if (!session) throw new Error('Session did not initialise. Please try again.');
-
-      console.log('[5] Navigating to dashboard');
-      router.push('/dashboard');
+      // Hard navigation: a client-side push can reuse a cached
+      // "redirect to /login" response prefetched before the cookie existed.
+      const next = searchParams.get('next');
+      window.location.replace(next && next.startsWith('/') ? next : '/dashboard');
 
     } catch (err: unknown) {
-      console.error('[ERR]', err);
       setError(err instanceof Error ? err.message : 'Wrong email or password.');
     } finally {
       setLoading(false);

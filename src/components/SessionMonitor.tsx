@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 // ─── CONFIG ───────────────────────────────────────────────────
@@ -13,7 +13,6 @@ const SESSION_CHECK_INTERVAL_MS = 60 * 1000; // every 1 minute
 // ─────────────────────────────────────────────────────────────
 
 export default function SessionMonitor() {
-  const router      = useRouter();
   const pathname    = usePathname();
   const timerRef    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
@@ -23,8 +22,8 @@ export default function SessionMonitor() {
     await supabase.auth.signOut().catch(() => {});
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     // Redirect to login with reason so we can show a message
-    router.push(`/login?reason=${reason}`);
-  }, [router]);
+    window.location.replace(`/login?reason=${reason}`);
+  }, []);
 
   // ── Reset the inactivity timer on any user activity ──────────
   const resetTimer = useCallback(() => {

@@ -10,18 +10,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Email and password are required.' }, { status: 400 });
     }
 
-    // ── Dev bypass ──────────────────────────────────────────────────────────
-    // Set DEV_PASSWORD in .env.local to unlock a magic password in development.
-    // This branch is never reachable in production.
-    if (
-      process.env.NODE_ENV !== 'production' &&
-      process.env.DEV_PASSWORD &&
-      password === process.env.DEV_PASSWORD
-    ) {
-      return NextResponse.json({ ok: true, access_token: 'dev', refresh_token: 'dev' });
-    }
-    // ────────────────────────────────────────────────────────────────────────
-
     const authorisedEmail = process.env.USER_EMAIL?.toLowerCase();
     if (!authorisedEmail) {
       return NextResponse.json({ message: 'Server misconfigured.' }, { status: 500 });

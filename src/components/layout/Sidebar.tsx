@@ -2,7 +2,7 @@
 import { supabase } from '@/lib/supabase';
 import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import s from './sidebar.module.css';
 
 interface NavItem { icon: string; label: string; href: string; count?: number; }
@@ -41,7 +41,6 @@ function applyOpen(open: boolean) {
 
 export default function Sidebar() {
   const pathname       = usePathname();
-  const router         = useRouter();
   const sidebarRef     = useRef<HTMLElement>(null);
   const btnRef         = useRef<HTMLButtonElement>(null);
   const mobileBurgerRef = useRef<HTMLButtonElement>(null);
@@ -90,7 +89,7 @@ export default function Sidebar() {
   async function handleLogout() {
     await supabase.auth.signOut().catch(() => {});
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    router.push('/login');
+    window.location.replace('/login');
   }
 
   useEffect(() => {
@@ -108,6 +107,8 @@ export default function Sidebar() {
 
   const isMobile = () => window.innerWidth < 1024;
 
+  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/reset-password');
+
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + '/');
 
@@ -122,6 +123,8 @@ export default function Sidebar() {
       {!!count && count > 0 && <span className={s.navCount}>{count}</span>}
     </Link>
   );
+
+  if (isAuthPage) return null;
 
   return (
     <>
