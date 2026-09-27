@@ -3,31 +3,36 @@ import { supabase } from '@/lib/supabase';
 import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import {
+  House, LibraryBig, NotebookPen, ListChecks, Lightbulb, ListVideo, MapPin,
+  Search, Star, Cloudy, Gamepad2, Palette, Users, Images, ChartColumn, KeyRound,
+  LogOut, Sparkles, type LucideIcon,
+} from 'lucide-react';
 import s from './sidebar.module.css';
 
-interface NavItem { icon: string; label: string; href: string; count?: number; }
+interface NavItem { icon: LucideIcon; label: string; href: string; count?: number; }
 
 const SPACES: NavItem[] = [
-  { icon: '⌂', label: 'Dashboard', href: '/dashboard' },
-  { icon: '◫', label: 'Library',   href: '/library'   },
-  { icon: '✐', label: 'Journal',   href: '/journal'   },
-  { icon: '✓', label: 'Tasks',     href: '/tasks'     },
-  { icon: '💡',label: 'Ideas',     href: '/ideas'     },
-  { icon: '▷', label: 'Queue',     href: '/queue'     },
-  { icon: '◎', label: 'Places',    href: '/places'    },
+  { icon: House,       label: 'Dashboard', href: '/dashboard' },
+  { icon: LibraryBig,  label: 'Library',   href: '/library'   },
+  { icon: NotebookPen, label: 'Journal',   href: '/journal'   },
+  { icon: ListChecks,  label: 'Tasks',     href: '/tasks'     },
+  { icon: Lightbulb,   label: 'Ideas',     href: '/ideas'     },
+  { icon: ListVideo,   label: 'Queue',     href: '/queue'     },
+  { icon: MapPin,      label: 'Places',    href: '/places'    },
 ];
 const TOOLS: NavItem[] = [
-  { icon: '⌕', label: 'Search',      href: '/search'  },
-  { icon: '★', label: 'Ratings',     href: '/ratings' },
-  { icon: '☁', label: 'Mood Bubble', href: '/mood'    },
-  { icon: '🎮',label: 'Arcade',      href: '/games'   },
+  { icon: Search,   label: 'Search',      href: '/search'  },
+  { icon: Star,     label: 'Ratings',     href: '/ratings' },
+  { icon: Cloudy,   label: 'Mood Bubble', href: '/mood'    },
+  { icon: Gamepad2, label: 'Arcade',      href: '/games'   },
 ];
 const YOU: NavItem[] = [
-  { icon: '◑', label: 'Theme',    href: '/theme'          },
-  { icon: '👁', label: 'Souls',    href: '/souls'          },
-  { icon: '🖼', label: 'Gallery',  href: '/gallery'        },
-  { icon: '📊', label: 'Stats',    href: '/stats'          },
-  { icon: '🔑', label: 'Password', href: '/reset-password' },
+  { icon: Palette,     label: 'Theme',    href: '/theme'          },
+  { icon: Users,       label: 'Souls',    href: '/souls'          },
+  { icon: Images,      label: 'Gallery',  href: '/gallery'        },
+  { icon: ChartColumn, label: 'Stats',    href: '/stats'          },
+  { icon: KeyRound,    label: 'Password', href: '/reset-password' },
 ];
 
 function isDesktop() {
@@ -64,9 +69,10 @@ export default function Sidebar() {
       bars[1].className = `${s.bar} ${open ? s.barMidOpen : ''}`;
       bars[2].className = `${s.bar} ${open ? s.barBotOpen : ''}`;
     }
-    // Hide mobile burger when sidebar is open, show when closed
+    // Phones: floating menu button shows only while the drawer is closed
     if (mobileBurgerRef.current) {
-      mobileBurgerRef.current.style.display = mobile && !open ? 'flex' : 'none';
+      const phone = window.innerWidth < 768;
+      mobileBurgerRef.current.style.display = phone && !open ? 'flex' : 'none';
     }
     if (backdropRef.current) {
       backdropRef.current.style.display = open && mobile ? 'block' : 'none';
@@ -109,16 +115,23 @@ export default function Sidebar() {
 
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/reset-password');
 
+  // Auth pages have no sidebar, so the main area shouldn't reserve space for it.
+  useEffect(() => {
+    document.body.classList.toggle('no-sidebar', isAuthPage);
+  }, [isAuthPage]);
+
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + '/');
 
-  const NavLink = ({ icon, label, href, count }: NavItem) => (
+  const NavLink = ({ icon: Icon, label, href, count }: NavItem) => (
     <Link
       href={href}
+      title={label}
+      aria-current={isActive(href) ? 'page' : undefined}
       className={`${s.navItem} ${isActive(href) ? s.navItemActive : ''}`}
       onClick={() => { if (isMobile()) close(); }}
     >
-      <span className={s.navIcon}>{icon}</span>
+      <span className={s.navIcon}><Icon size={18} strokeWidth={1.75} aria-hidden /></span>
       <span className={s.navLabel}>{label}</span>
       {!!count && count > 0 && <span className={s.navCount}>{count}</span>}
     </Link>
@@ -135,7 +148,7 @@ export default function Sidebar() {
         onClick={close}
       />
 
-      {/* Mobile burger — hidden via syncDOM when sidebar opens */}
+      {/* Mobile burger, hidden by syncDOM while the sidebar is open */}
       <button
         ref={mobileBurgerRef}
         className={s.mobileBurger}
@@ -148,7 +161,7 @@ export default function Sidebar() {
         <span className={s.bar} />
       </button>
 
-      <aside ref={sidebarRef} className={`${s.sidebar} ${s.sidebarClosed}`}>
+      <aside ref={sidebarRef} aria-label="Main navigation" className={`${s.sidebar} ${s.sidebarClosed}`}>
         <button
           ref={btnRef}
           className={s.toggleBtn}
@@ -162,7 +175,8 @@ export default function Sidebar() {
 
         <div className={s.logo}>
           <div className={s.logoText}>
-            ✦ <span className={s.logoOr}>Malevolent</span><span className={s.logoPu}>Shrine</span>
+            <Sparkles size={16} strokeWidth={2} className={s.logoMark} aria-hidden />
+            <span className={s.logoOr}>Malevolent</span><span className={s.logoPu}>Shrine</span>
           </div>
           <div className={s.logoSub}>private &amp; just for you</div>
         </div>
@@ -177,11 +191,11 @@ export default function Sidebar() {
         {YOU.map(i => <NavLink key={i.href} {...i} />)}
 
         <button className={s.logoutBtn} onClick={handleLogout}>
-          <span className={s.navIcon}>⎋</span>
+          <span className={s.navIcon}><LogOut size={18} strokeWidth={1.75} aria-hidden /></span>
           <span className={s.navLabel}>Log out</span>
         </button>
 
-        <div className={s.sidebarFooter}>yourworld · v1.0</div>
+        <div className={s.sidebarFooter}>yourworld</div>
       </aside>
     </>
   );

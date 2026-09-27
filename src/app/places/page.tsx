@@ -1,353 +1,258 @@
-// src/app/places/page.tsx
-
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { colors as C, fonts } from '../../lib/token';
+import { Plus, MapPin, List, Map as MapIcon, Navigation, Pencil, Trash2, Footprints, CalendarDays, MapPinOff } from 'lucide-react';
+import s from './places.module.css';
 import {
-  Btn, Lbl, Tag, Stars, TagInput, SearchBar, Topbar, Modal,
-  ModalTitle, ModalFooter, Confirm, FInput, FArea, EmptyState, Toast, useToast, SoulPicker,
+  Btn, Lbl, Tag, Stars, TagInput, SearchBar, Topbar, Modal, ModalTitle, ModalFooter, Confirm,
+  FInput, FArea, EmptyState, Toast, useToast,
 } from '@/components/ui';
-import { getPlaces, addPlace, updatePlace, deletePlace, getSoulLinksForItem, setSoulLinks, getSouls } from '@/lib/db';
-import { ensureSession } from '@/lib/supabase';
-import { uploadImage, deleteImage } from '@/lib/upload';
 import ImagePicker from '@/components/ui/ImagePicker';
+import StoredImage from '@/components/ui/StoredImage';
+import SoulLinkField from '@/components/ui/SoulLinkField';
+import {
+  getPlaces, addPlace, updatePlace, deletePlace, getSoulLinksForItem, setSoulLinks, deleteSoulLinksForItem, getSouls,
+} from '@/lib/db';
 import type { DbPlace, DbSoul } from '@/lib/db';
-import { geocodeAddress } from '../../lib/geocode';
+import { ensureSession } from '@/lib/supabase';
+import { prepareImage, deleteImage, preloadSignedUrls } from '@/lib/upload';
+import { geocodeAddress, directionsUrl } from '@/lib/geocode';
+import { fmtDate } from '@/lib/dates';
 
-const MapView = dynamic(() => import('../places/MapView'), { ssr: false, loading: () => (
-  <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'#8a7060', fontFamily:'monospace', fontSize:11 }}>Loading map...</div>
-)});
+const MapView = dynamic(() => import('./MapView'), {
+  ssr: false,
+  loading: () => <div className={`${s.mapWrap} skeleton`} />,
+});
 
-const EMPTY_FORM = {
-  name: '', address: '', visit_date: '', rating: 0,
-  notes: '', tags: [] as string[], visits: 1,
-};
-type FormState = typeof EMPTY_FORM;
-const card = () => ({ background: C.card, borderRadius: 8, border: `1px solid ${C.bd}`, padding: 10 });
+const EMPTY = { name: '', address: '', visit_date: '', rating: 0, notes: '', tags: [] as string[], visits: 1 };
+type Form = typeof EMPTY;
+
+function PlaceActions({ p, onVisit, onEdit, onDelete }: {
+  p: DbPlace; onVisit: (p: DbPlace) => void; onEdit: (p: DbPlace) => void; onDelete: (p: DbPlace) => void;
+}) {
+  return (
+    <div className={s.actions}>
+      <button type="button" className={s.actBtn} onClick={() => onVisit(p)}><Footprints size={14} strokeWidth={2} /> Visited again</button>
+      {p.lat != null && p.lng != null && (
+        <a className={s.actBtn} href={directionsUrl({ lat: p.lat, lng: p.lng })} target="_blank" rel="noopener noreferrer"><Navigation size={14} strokeWidth={2} /> Directions</a>
+      )}
+      <button type="button" className={s.iconBtn} onClick={() => onEdit(p)} aria-label={`Edit ${p.name}`}><Pencil size={15} strokeWidth={2} /></button>
+      <button type="button" className={`${s.iconBtn} ${s.danger}`} onClick={() => onDelete(p)} aria-label={`Delete ${p.name}`}><Trash2 size={15} strokeWidth={2} /></button>
+    </div>
+  );
+}
 
 export default function PlacesPage() {
-  const [places,           setPlaces]           = useState<DbPlace[]>([]);
-  const [souls,            setSouls]            = useState<DbSoul[]>([]);
-  const [loading,          setLoading]          = useState(true);
-  const [viewMode,         setViewMode]         = useState<'list' | 'map'>('list');
-  const [modal,            setModal]            = useState<'form' | 'delete' | null>(null);
-  const [form,             setForm]             = useState<FormState>(EMPTY_FORM);
-  const [editItem,         setEditItem]         = useState<DbPlace | null>(null);
-  const [selected,         setSelected]         = useState<DbPlace | null>(null);
-  const [search,           setSearch]           = useState('');
-  const [linkedSoulIds,    setLinkedSoulIds]    = useState<string[]>([]);
-  const [soulPickerActive, setSoulPickerActive] = useState(false);
-  // ── image state ──────────────────────────────────────────
-  const [imageFile,        setImageFile]        = useState<File | null>(null);
-  const [imagePreview,     setImagePreview]     = useState<string | null>(null);
-  const [toast,            show]                = useToast();
+  const [places, setPlaces]   = useState<DbPlace[]>([]);
+  const [souls, setSouls]     = useState<DbSoul[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView]       = useState<'list' | 'map'>('list');
+  const [search, setSearch]   = useState('');
+  const [selected, setSelected] = useState<DbPlace | null>(null);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editItem, setEditItem] = useState<DbPlace | null>(null);
+  const [form, setForm]         = useState<Form>(EMPTY);
+  const [soulIds, setSoulIds]   = useState<string[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [saving, setSaving]     = useState(false);
+  const [delItem, setDelItem]   = useState<DbPlace | null>(null);
+  const [toast, show] = useToast();
 
   useEffect(() => {
-    async function load() {
-      await new Promise(r => setTimeout(r, 100));
-      const ready = await ensureSession();
-      if (!ready) { setLoading(false); return; }
+    (async () => {
       try {
-        const [data, soulData] = await Promise.all([getPlaces(), getSouls()]);
+        if (!(await ensureSession())) return;
+        const [data, soulData] = await Promise.all([getPlaces(), getSouls().catch(() => [] as DbSoul[])]);
+        await preloadSignedUrls(data.map(p => p.image_url)).catch(() => {});
         setPlaces(data);
         setSouls(soulData);
-      } catch (err) {
-        console.error('Places load error:', err);
-        show('Could not load places.');
+      } catch {
+        show('Could not load your places.', 'var(--red)');
       } finally {
         setLoading(false);
       }
-    }
-    load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    })();
+  }, [show]);
 
-  const filtered = places.filter(p =>
-    !search ||
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    (p.address ?? '').toLowerCase().includes(search.toLowerCase())
-  );
+  const q = search.trim().toLowerCase();
+  const filtered = useMemo(() => places
+    .filter(p => !q || `${p.name} ${p.address ?? ''} ${p.notes ?? ''} ${(p.tags ?? []).join(' ')}`.toLowerCase().includes(q))
+    .sort((a, b) => (b.visit_date ?? b.created_at).localeCompare(a.visit_date ?? a.created_at)),
+  [places, q]);
+  const unpinned = filtered.filter(p => p.lat == null || p.lng == null);
 
-  const resetImageState = () => { setImageFile(null); setImagePreview(null); };
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(f => ({ ...f, [k]: v }));
 
   const openAdd = () => {
-    setForm({ ...EMPTY_FORM, tags: [] });
-    setEditItem(null);
-    setLinkedSoulIds([]);
-    setSoulPickerActive(false);
-    resetImageState();
-    setModal('form');
+    setEditItem(null); setForm({ ...EMPTY, tags: [] }); setSoulIds([]); setImageFile(null); setImagePreview(null); setFormOpen(true);
   };
-
-  const openEdit = async (p: DbPlace) => {
-    setForm({
-      name:       p.name,
-      address:    p.address    ?? '',
-      visit_date: p.visit_date ?? '',
-      rating:     p.rating     ?? 0,
-      notes:      p.notes      ?? '',
-      tags:       [...(p.tags  ?? [])],
-      visits:     p.visits     ?? 1,
-    });
+  const openEdit = (p: DbPlace) => {
     setEditItem(p);
-    setLinkedSoulIds([]);
-    setSoulPickerActive(false);
-    resetImageState();
-    setImagePreview((p as DbPlace & { image_url?: string }).image_url ?? null);
-    setModal('form');
-    try {
-      const links = await getSoulLinksForItem('places', p.id);
-      setLinkedSoulIds(links.map(l => l.soul_id));
-      if (links.length > 0) setSoulPickerActive(true);
-    } catch { /* non-fatal */ }
+    setForm({ name: p.name, address: p.address ?? '', visit_date: p.visit_date ?? '', rating: p.rating ?? 0, notes: p.notes ?? '', tags: [...(p.tags ?? [])], visits: p.visits ?? 1 });
+    setSoulIds([]); setImageFile(null); setImagePreview(p.image_url ?? null);
+    setFormOpen(true);
+    getSoulLinksForItem('places', p.id).then(l => setSoulIds(l.map(x => x.soul_id))).catch(() => {});
   };
 
   const save = async () => {
-    if (!form.name.trim()) return;
-
-    // ── resolve image URL ────────────────────────────────
-    const existingImageUrl = editItem
-      ? ((editItem as DbPlace & { image_url?: string }).image_url ?? null)
-      : null;
-
-    let finalImageUrl: string | null = existingImageUrl;
-
-    if (imageFile) {
-      if (existingImageUrl) await deleteImage(existingImageUrl).catch(() => {});
-      finalImageUrl = await uploadImage(imageFile, 'places');
-    } else if (!imagePreview && existingImageUrl) {
-      await deleteImage(existingImageUrl).catch(() => {});
-      finalImageUrl = null;
-    }
-
-    let lat: number | null = null;
-    let lng: number | null = null;
-    if (editItem?.lat && editItem?.lng && form.address === (editItem.address ?? '')) {
-      lat = editItem.lat;
-      lng = editItem.lng;
-    } else if (form.address) {
-      const coords = await geocodeAddress(form.address);
-      if (coords) { lat = coords.lat; lng = coords.lng; }
-    }
-
-    const payload = {
-      name:       form.name.trim(),
-      address:    form.address    || null,
-      visit_date: form.visit_date || null,
-      rating:     form.rating,
-      notes:      form.notes      || null,
-      tags:       form.tags,
-      visits:     form.visits,
-      lat,
-      lng,
-      image_url:  finalImageUrl,
-    };
-
-    if (editItem) {
-      setPlaces(l => l.map(x => x.id === editItem.id ? { ...x, ...payload } : x));
-      if (selected?.id === editItem.id) setSelected(s => s ? { ...s, ...payload } : s);
-      setModal(null);
-      try {
-        await updatePlace(editItem.id, payload);
-        if (soulPickerActive) {
-          await setSoulLinks('places', editItem.id, payload.name, payload.address, linkedSoulIds);
-        }
-        show('Updated!');
-      } catch {
-        setPlaces(l => l.map(x => x.id === editItem.id ? editItem : x));
-        show('Could not update.');
+    if (!form.name.trim() || saving) return;
+    setSaving(true);
+    let img: Awaited<ReturnType<typeof prepareImage>> | null = null;
+    try {
+      // Only look the address up again when it changed
+      const address = form.address.trim();
+      let lat = editItem?.lat ?? null, lng = editItem?.lng ?? null, notFound = false;
+      if (address !== (editItem?.address ?? '')) {
+        const c = address ? await geocodeAddress(address) : null;
+        lat = c?.lat ?? null; lng = c?.lng ?? null;
+        notFound = !!address && !c;
       }
-    } else {
-      setModal(null);
-      try {
-        const created = await addPlace(payload);
-        setPlaces(l => [created, ...l]);
-        if (soulPickerActive) {
-          await setSoulLinks('places', created.id, created.name, created.address ?? null, linkedSoulIds);
-        }
-        show('Place logged!');
-      } catch {
-        show('Could not save place.');
-      }
+      img = await prepareImage({ current: editItem?.image_url, file: imageFile, cleared: !imagePreview, folder: 'places' });
+      const payload = {
+        name: form.name.trim(), address: address || null, visit_date: form.visit_date || null,
+        rating: form.rating, notes: form.notes.trim() || null, tags: form.tags,
+        visits: Math.max(1, form.visits || 1), lat, lng, image_url: img.value,
+      };
+      const saved = editItem ? await updatePlace(editItem.id, payload) : await addPlace(payload);
+      setPlaces(l => editItem ? l.map(x => x.id === saved.id ? saved : x) : [saved, ...l]);
+      if (selected?.id === saved.id) setSelected(saved);
+      await img.cleanup();
+      await setSoulLinks('places', saved.id, saved.name, saved.address ?? null, soulIds).catch(() => {});
+      setFormOpen(false);
+      show(notFound ? "Saved. We couldn't find that address, so it isn't on the map yet." : editItem ? 'Changes saved' : 'Place saved', notFound ? 'var(--yellow)' : undefined);
+    } catch {
+      await img?.rollback();
+      show('Could not save that place.', 'var(--red)');
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const logVisit = async (p: DbPlace) => {
+    const visits = (p.visits ?? 1) + 1;
+    setPlaces(l => l.map(x => x.id === p.id ? { ...x, visits } : x));
+    if (selected?.id === p.id) setSelected({ ...p, visits });
+    try { await updatePlace(p.id, { visits }); show(`Visit number ${visits} logged`); }
+    catch { setPlaces(l => l.map(x => x.id === p.id ? p : x)); show('Could not log that visit.', 'var(--red)'); }
   };
 
   const doDelete = async () => {
-    if (!selected) return;
-    const imgUrl = (selected as DbPlace & { image_url?: string }).image_url;
-    const snapshot = [...places];
-    setPlaces(l => l.filter(x => x.id !== selected.id));
-    setSelected(null); setModal(null);
+    const item = delItem; if (!item) return;
+    const snapshot = places;
+    setPlaces(l => l.filter(x => x.id !== item.id));
+    if (selected?.id === item.id) setSelected(null);
+    setDelItem(null); setFormOpen(false);
     try {
-      await deletePlace(selected.id);
-      if (imgUrl) await deleteImage(imgUrl).catch(() => {});
-      show('Deleted.');
-    } catch { setPlaces(snapshot); show('Could not delete.'); }
-  };
-
-  const incVisit = async (place: DbPlace) => {
-    const newVisits = (place.visits ?? 1) + 1;
-    setPlaces(l => l.map(x => x.id === place.id ? { ...x, visits: newVisits } : x));
-    if (selected?.id === place.id) setSelected(s => s ? { ...s, visits: newVisits } : s);
-    try { await updatePlace(place.id, { visits: newVisits }); show('Visit logged!'); }
-    catch { setPlaces(l => l.map(x => x.id === place.id ? place : x)); show('Could not log visit.'); }
+      await deletePlace(item.id);
+      await Promise.allSettled([deleteImage(item.image_url), deleteSoulLinksForItem('places', item.id)]);
+      show('Place removed');
+    } catch { setPlaces(snapshot); show('Could not delete that place.', 'var(--red)'); }
   };
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', position:'relative', zIndex:0 }} className="animate-fade-up">
+    <div className={s.page}>
       <Topbar
-        title="Places ◎"
-        sub={loading ? 'Loading...' : `${places.length} visited`}
-        action={
-          <div style={{ display:'flex', gap:7 }}>
-            <Btn variant="ghost" sm onClick={() => setViewMode(v => v === 'map' ? 'list' : 'map')}>
-              {viewMode === 'map' ? '≡ List' : '◉ Map'}
-            </Btn>
-            <Btn onClick={openAdd}>+ Log Place</Btn>
-          </div>
-        }
+        title="Places"
+        sub={loading ? 'Loading your places' : places.length ? `${places.length} ${places.length === 1 ? 'place' : 'places'} you've been` : 'Everywhere worth remembering'}
+        action={<Btn onClick={openAdd}><Plus size={16} strokeWidth={2.25} /> Add place</Btn>}
       />
 
-      <div style={{ display:'flex', gap:8, padding:'8px 14px', borderBottom:`1px solid ${C.bds}` }}>
-        <div style={{ flex:1 }}><SearchBar value={search} onChange={setSearch} placeholder="Search places..." /></div>
-        <span style={{ fontFamily:fonts.mono, fontSize:9, color:C.txm, alignSelf:'center' }}>{filtered.length}</span>
+      <div className={s.wrap}>
+        {places.length > 0 && (
+          <div className={s.toolbar}>
+            <SearchBar value={search} onChange={setSearch} placeholder="Search places" className={s.search} />
+            <div className={s.viewSwitch} role="tablist" aria-label="View">
+              <button type="button" role="tab" aria-selected={view === 'list'} className={view === 'list' ? s.viewOn : ''} onClick={() => setView('list')}><List size={16} /> List</button>
+              <button type="button" role="tab" aria-selected={view === 'map'} className={view === 'map' ? s.viewOn : ''} onClick={() => setView('map')}><MapIcon size={16} /> Map</button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div className={s.grid}>{[0, 1, 2].map(i => <div key={i} className={`skeleton ${s.skel}`} />)}</div>
+        ) : places.length === 0 ? (
+          <EmptyState icon={<MapPin size={26} />} msg="No places yet. Add the first spot you want to remember." action={<Btn sm onClick={openAdd}><Plus size={15} /> Add a place</Btn>} />
+        ) : view === 'map' ? (
+          <>
+            <MapView places={filtered} selected={selected} onSelect={setSelected} />
+            {selected && (
+              <div className={s.detail}>
+                {selected.image_url && <StoredImage src={selected.image_url} alt="" className={s.detailImg} />}
+                <div className={s.detailBody}>
+                  <h2 className={s.detailName}>{selected.name}</h2>
+                  {selected.address && <p className={s.muted}>{selected.address}</p>}
+                  {selected.rating > 0 && <Stars n={selected.rating} size={14} />}
+                  {selected.notes && <p className={s.detailNotes}>{selected.notes}</p>}
+                  <PlaceActions p={selected} onVisit={logVisit} onEdit={openEdit} onDelete={setDelItem} />
+                </div>
+              </div>
+            )}
+            {unpinned.length > 0 && (
+              <p className={s.unpinned}>
+                <MapPinOff size={15} /> Not on the map yet: {unpinned.map(p => p.name).join(', ')}. Add an address to pin them.
+              </p>
+            )}
+          </>
+        ) : filtered.length === 0 ? (
+          <EmptyState icon={<MapPin size={26} />} msg="No places match that search." />
+        ) : (
+          <div className={s.grid}>
+            {filtered.map(p => (
+              <article key={p.id} className={s.card}>
+                <button type="button" className={s.cardMain} onClick={() => openEdit(p)} aria-label={`Edit ${p.name}`}>
+                  {p.image_url
+                    ? <StoredImage src={p.image_url} alt="" className={s.cardImg} />
+                    : <span className={s.cardIcon}><MapPin size={22} strokeWidth={1.75} /></span>}
+                  <span className={s.cardBody}>
+                    <span className={s.cardName}>{p.name}</span>
+                    {p.address && <span className={s.muted}>{p.address}</span>}
+                    <span className={s.cardMeta}>
+                      {p.rating > 0 && <Stars n={p.rating} size={13} />}
+                      {p.visit_date && <span><CalendarDays size={13} /> {fmtDate(p.visit_date)}</span>}
+                      {(p.visits ?? 1) > 1 && <span><Footprints size={13} /> {p.visits} visits</span>}
+                    </span>
+                    {p.notes && <span className={s.cardNotes}>{p.notes}</span>}
+                    {(p.tags?.length ?? 0) > 0 && <span>{p.tags.map(t => <Tag key={t}>{t}</Tag>)}</span>}
+                  </span>
+                </button>
+                <PlaceActions p={p} onVisit={logVisit} onEdit={openEdit} onDelete={setDelItem} />
+              </article>
+            ))}
+          </div>
+        )}
       </div>
 
-      {viewMode === 'map' ? (
-        <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          <MapView places={filtered} selected={selected} onSelect={setSelected} onAdd={openAdd} />
-          {selected && (
-            <div style={{ ...card(), margin:'8px 12px', display:'flex', gap:10, alignItems:'flex-start' }}>
-              {/* Show image thumbnail in map detail panel if available */}
-              {(selected as DbPlace & { image_url?: string }).image_url && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={(selected as DbPlace & { image_url?: string }).image_url!}
-                  alt={selected.name}
-                  style={{ width:54, height:54, borderRadius:6, objectFit:'cover', flexShrink:0 }}
-                />
-              )}
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:14, fontWeight:700, color:C.tx, marginBottom:2 }}>{selected.name}</div>
-                <div style={{ fontFamily:fonts.mono, fontSize:9, color:C.txm, marginBottom:5 }}>{selected.address} · {selected.visit_date}</div>
-                <Stars n={selected.rating ?? 0} size={13} />
-                {selected.notes && <div style={{ fontSize:11, color:C.txs, marginTop:5, lineHeight:1.6 }}>{selected.notes}</div>}
-              </div>
-              <div style={{ display:'flex', gap:5, flexShrink:0 }}>
-                <Btn variant="ghost" sm onClick={() => incVisit(selected)}>+visit</Btn>
-                <Btn variant="ghost" sm onClick={() => openEdit(selected)}>edit</Btn>
-                <Btn variant="danger" sm onClick={() => setModal('delete')}>del</Btn>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div style={{ flex:1, overflowY:'auto', padding:'8px 12px', display:'flex', flexDirection:'column', gap:7 }}>
-          {loading ? (
-            <EmptyState icon="◎" msg="Loading your places..." />
-          ) : filtered.length === 0 ? (
-            <EmptyState icon="◎" msg="No places logged yet." />
-          ) : filtered.map(p => {
-            const imgUrl = (p as DbPlace & { image_url?: string }).image_url;
-            return (
-              <div
-                key={p.id}
-                style={{ ...card(), display:'flex', gap:10, alignItems:'flex-start', cursor:'pointer' }}
-                onClick={() => openEdit(p)}
-                onMouseEnter={ev => { ev.currentTarget.style.background = C.cardHov; (ev.currentTarget.querySelector('.p-actions') as HTMLElement | null)?.style && ((ev.currentTarget.querySelector('.p-actions') as HTMLElement).style.opacity = '1'); }}
-                onMouseLeave={ev => { ev.currentTarget.style.background = C.card;    (ev.currentTarget.querySelector('.p-actions') as HTMLElement | null)?.style && ((ev.currentTarget.querySelector('.p-actions') as HTMLElement).style.opacity = '0'); }}
-              >
-                {/* Place thumbnail or icon */}
-                {imgUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={imgUrl} alt={p.name}
-                    style={{ width:42, height:42, borderRadius:6, objectFit:'cover', flexShrink:0 }} />
-                ) : (
-                  <div style={{ width:32, height:32, borderRadius:6, background:`${C.or}18`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:17, flexShrink:0 }}>📍</div>
-                )}
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:C.tx, marginBottom:2 }}>{p.name}</div>
-                  <div style={{ fontFamily:fonts.mono, fontSize:9, color:C.txm, marginBottom:4 }}>{p.address} · {p.visit_date}</div>
-                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                    <Stars n={p.rating ?? 0} size={11} />
-                    {(p.visits ?? 1) > 1 && <span style={{ fontFamily:fonts.mono, fontSize:8, color:C.txm }}>{p.visits}× visited</span>}
-                  </div>
-                  {p.notes && <div style={{ fontSize:11, color:C.txs, opacity:.65, marginTop:3, lineHeight:1.4, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:1, WebkitBoxOrient:'vertical' }}>{p.notes}</div>}
-                  <div style={{ marginTop:4 }}>{(p.tags ?? []).map(t => <Tag key={t} color={C.or}>{t}</Tag>)}</div>
-                </div>
-                <div className="p-actions" style={{ display:'flex', gap:4, opacity:0, transition:'opacity .15s', flexShrink:0 }}>
-                  <button onClick={e => { e.stopPropagation(); incVisit(p); }} style={{ background:'none', border:`1px solid ${C.bd}`, borderRadius:5, padding:'3px 8px', fontSize:9, cursor:'pointer', color:C.txs, fontFamily:fonts.main }}>+visit</button>
-                  <button onClick={e => { e.stopPropagation(); setSelected(p); setModal('delete'); }} style={{ background:'rgba(248,113,113,.1)', border:'1px solid rgba(248,113,113,.3)', color:C.red, borderRadius:5, padding:'3px 7px', fontSize:9, cursor:'pointer', fontFamily:fonts.main }}>×</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {modal === 'form' && (
-        <Modal onClose={() => setModal(null)}>
-          <ModalTitle>{editItem ? 'Edit Place' : 'Log a Place ◎'}</ModalTitle>
-          <FInput label="Place Name"         value={form.name}       onChange={v => setForm(f => ({ ...f, name: v }))} />
-          <FInput label="Address / Location" value={form.address}    onChange={v => setForm(f => ({ ...f, address: v }))} placeholder="e.g. Temple Bar, Dublin" />
-          <div style={{ fontFamily:fonts.mono, fontSize:8, color:C.txm, marginTop:-6, marginBottom:10, opacity:.6 }}>
-            💡 Just type the address — the pin will be placed automatically
+      {formOpen && (
+        <Modal onClose={() => !saving && setFormOpen(false)}>
+          <ModalTitle>{editItem ? 'Edit place' : 'Add a place'}</ModalTitle>
+          <FInput label="Name" value={form.name} onChange={v => set('name', v)} placeholder="The little cafe by the station" />
+          <FInput label="Address" value={form.address} onChange={v => set('address', v)} placeholder="Street, town or landmark" />
+          <p className={s.hint}>Type an address and the pin drops itself on the map.</p>
+          <div className={s.twoCol}>
+            <FInput label="Date visited" type="date" value={form.visit_date} onChange={v => set('visit_date', v)} />
+            <FInput label="Times visited" type="number" value={String(form.visits)} onChange={v => set('visits', Math.max(1, parseInt(v) || 1))} />
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-            <FInput label="Visit Date"    value={form.visit_date}    onChange={v => setForm(f => ({ ...f, visit_date: v }))} type="date" />
-            <FInput label="Times Visited" value={String(form.visits)} onChange={v => setForm(f => ({ ...f, visits: parseInt(v) || 1 }))} type="number" />
-          </div>
-          <div style={{ marginBottom:10 }}><Lbl>Rating</Lbl><Stars n={form.rating} onSet={r => setForm(f => ({ ...f, rating: r }))} size={22} /></div>
-          <FArea label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} rows={3} placeholder="What made this place special?" />
-          <div style={{ marginBottom:10 }}>
+          <div className={s.field}><Lbl>Your rating</Lbl><Stars n={form.rating} onSet={r => set('rating', r)} size={24} /></div>
+          <FArea label="Notes" value={form.notes} onChange={v => set('notes', v)} rows={3} placeholder="What made it special?" />
+          <div className={s.field}>
             <Lbl>Tags</Lbl>
-            <TagInput tags={form.tags} color={C.or}
-              onAdd={t => setForm(f => ({ ...f, tags: [...f.tags, t] }))}
-              onRemove={t => setForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) }))}
-            />
+            <TagInput tags={form.tags} onAdd={t => set('tags', [...form.tags, t])} onRemove={t => set('tags', form.tags.filter(x => x !== t))} />
           </div>
-
-          {/* Image picker */}
-          <div style={{ marginBottom:10 }}>
-            <ImagePicker
-              label="Photo"
-              value={imagePreview}
-              onChange={(file, preview) => { setImageFile(file); setImagePreview(preview); }}
-              onClear={() => { setImageFile(null); setImagePreview(null); }}
-            />
-          </div>
-
-          <div style={{ marginBottom: 10 }}>
-            {!soulPickerActive ? (
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); setSoulPickerActive(true); }}
-                style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: 6, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 11, padding: '5px 10px', width: '100%' }}
-              >+ Link souls</button>
-            ) : (
-              <>
-                <Lbl>Linked Souls</Lbl>
-                <SoulPicker
-                  souls={souls}
-                  linkedIds={linkedSoulIds}
-                  onToggle={id => setLinkedSoulIds(prev =>
-                    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-                  )}
-                />
-              </>
-            )}
-          </div>
-
-          <ModalFooter onCancel={() => setModal(null)} onSave={save} saveLabel={editItem ? 'Update' : 'Save Place'} />
+          <ImagePicker label="Photo" value={imagePreview} onChange={(f, p) => { setImageFile(f); setImagePreview(p); }} onClear={() => { setImageFile(null); setImagePreview(null); }} />
+          <SoulLinkField souls={souls} value={soulIds} onChange={setSoulIds} label="Who were you with?" />
+          <ModalFooter onCancel={() => setFormOpen(false)} onSave={save} saveLabel={saving ? 'Saving' : editItem ? 'Save changes' : 'Save place'} />
         </Modal>
       )}
 
-      {modal === 'delete' && selected && (
-        <Modal onClose={() => setModal(null)}>
-          <Confirm msg={`Remove "${selected.name}"?`} onConfirm={doDelete} onCancel={() => setModal(null)} />
+      {delItem && (
+        <Modal onClose={() => setDelItem(null)}>
+          <Confirm msg={`"${delItem.name}" will be removed from your places.`} onConfirm={doDelete} onCancel={() => setDelItem(null)} />
         </Modal>
       )}
-      {toast !== null && <Toast msg={toast.msg} color={toast.color} />}
+
+      {toast && <Toast msg={toast.msg} color={toast.color} />}
     </div>
   );
 }

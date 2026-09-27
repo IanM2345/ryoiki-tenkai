@@ -1,0 +1,295 @@
+# Ryoiki Tenkai – revamp progress log
+
+## Session 1 (26 Sep 2026, 20:00–20:15)
+**Done**
+- Copied the project into Claude's workspace, set a git baseline, and confirmed `next build` passes.
+- Audited every page, the DB layer, the Supabase schema and the auth flow (findings below).
+- Fixed four clear-cut bugs:
+  - Logout (sidebar and auto-logout) now calls `supabase.auth.signOut()`, so the session really ends.
+  - Removed stray debug code in `api/auth/check` that logged the email and token on server start.
+  - `api/auth/check` accepts the 30-day refresh cookie, like the middleware. Before, you were force-logged-out after 7 days.
+  - Removed the middleware's per-request cookie logging. The auto-logout monitor no longer runs on `/reset-password`.
+
+**Key findings still to fix**
+- Games: chess AI corrupts the board (hard/medium), the battleship AI never targets, tic-tac-toe double-scores and lets you move twice, Kadi/Matatu jokers stall the game, sudoku can mark correct answers wrong, and no game saves results.
+- Images are stored as 1-year signed URLs, so every photo breaks after a year. They also get lost if a save fails.
+- Dates use UTC instead of local time, so "today" and overdue are wrong around midnight.
+- Themes only partly apply, and some CSS variables and animation classes are undefined.
+- Security: the DB functions `decrypt_val`, `encrypt_val` and `seed_mood_defs` are callable with the public key. The storage bucket isn't in the migrations. The dev login is broken.
+- Lots of duplicated code: the soul-link picker, image upload, page loading and task rows.
+
+**Next**
+- Dev environment guide.
+- Design direction.
+- Shared components refactor.
+- Page-by-page redesign and bug fixes.
+- Playwright screenshots and checks.
+
+## Session 2 (26 Sep 2026, 22:46–23:01)
+**Done**
+- Fixed the baseline migration so `supabase db push` works on a fresh project (removed 3 auto-generated lines).
+- **Login fix:** logging in with correct details no longer bounces back to the login page.
+  - Cause: the sidebar also rendered on /login and prefetched /dashboard before you were logged in. Next.js cached that "redirect to /login" answer and reused it after you logged in.
+  - Now the sidebar doesn't render on auth pages, and login/logout do a full page load.
+- Login keeps where you were going: `/login?next=/journal` returns you to /journal after login.
+- Removed the broken dev-password bypass and all auth console logging.
+- Added a site icon (fixes the favicon 404).
+- New migration `20260926220000_security_and_storage.sql`:
+  - The `decrypt_val`, `encrypt_val`, `enc` and `seed_mood_defs` functions can no longer be called from the API.
+  - `dev_config` can no longer be reached from the API.
+  - Logged-out visitors can't read any table.
+  - Creates the private `yourworld` photo bucket with per-user folder rules.
+  - It's safe to apply to production later: it doesn't read or change any data.
+- Reviewed OmniRoute (an AI model gateway, not applicable to this site) and transitions.dev (will use its modal, dropdown, number and error-shake transitions).
+
+**Next:** design tokens and shared components; then page-by-page redesign and fixes, starting with the dashboard, sidebar, tasks and journal.
+
+## Session 3 (26 Sep 2026, 23:00–23:16)
+**Done: design foundation (identity kept: dark, orange and purple, playful)**
+- **New colour system** in `globals.css`. Only 4 theme colours are set (background, accent, secondary, text); every other shade is derived from them. Every theme now reaches every page.
+  - Added spacing, type, radius and shadow tokens.
+  - Added motion tokens (Emil Kowalski curves, UI motion under 300ms).
+  - Added a light-theme mode, a visible keyboard focus ring and reduced-motion support.
+- Converted 319 hard-coded colours across all stylesheets to theme variables. Text on accent-coloured buttons now picks black or white automatically for readability.
+- **New `src/lib/theme.ts`** is the single source for presets, fonts, sizes and applying a theme. The head script (no colour flash), the Theme page and app start-up all use it.
+- **Theme sync:** the saved theme now syncs from the database on every app load. Before, it only synced if you opened the Theme page on that device.
+- **Comic font:** now bundled (Comic Neue via `@fontsource/comic-neue`), so it looks the same on iPhone and Android, where Comic Sans doesn't exist.
+- **Font sizes:** the scale is now 13–19px with a 15px default; the old default was 13px. Old saved sizes map to the nearest new size.
+- **Pinch-zoom:** no longer blocked on mobile (accessibility).
+- **Undefined names fixed:** the `animate-fade-up`/`animate-fade-in` classes and the `--text`/`--border`/`--accent` variables are now defined.
+
+**Action for you:** run `npm install` once (new font package).
+
+**Next:** shared components (buttons, inputs, modal, cards, empty states, toasts) with transitions.dev motion. Then the sidebar and dashboard redesign.
+
+## Session 4 (26 Sep 2026, 23:14–23:32)
+**Done**
+- **Icons:** added Lucide icons (`lucide-react`) and replaced the symbol/emoji icons in the sidebar and all shared components. `components/ui/icons.tsx` maps the old symbols (✐ ◎ ★ …) to real icons, so pages can convert gradually.
+- **Shared components rebuilt** in `components/ui/index.tsx`, with the same names and props so every page picked up the changes without edits:
+  - Readable sizes; there's no more 8–9px text.
+  - Real buttons and switches for keyboard and screen readers.
+  - Modals close with Esc, move focus inside, lock page scroll, and open as a bottom sheet on phones.
+  - Toast pops in (transitions.dev style); the star rating shows a hover preview and clicking the same star again clears it.
+  - Search bar, tabs and fields got clearer focus styles.
+- **Sidebar redesign:**
+  - Lucide icons with an accent bar on the active page.
+  - Smooth drawer curve.
+  - Collapsed rail on tablets; the floating menu button no longer covers it.
+  - Phone drawer with full labels.
+- **Text:** removed every em/en dash from on-screen text across 17 pages and rewrote those lines as natural sentences.
+
+**Action for you:** `npm install` (new package: lucide-react), then restart `npm run dev`.
+
+**Next:** page-by-page redesign, starting with the dashboard, tasks and journal: convert each page's remaining symbols to icons and fix its logic bugs.
+
+## Session 5 (26 Sep 2026, 23:23–23:35)
+**Done**
+- **Shared helpers:**
+  - `lib/dates.ts` uses local dates. The old UTC dates made "today" and "overdue" wrong around midnight.
+  - `lib/tasks.ts` holds priorities, sorting and the overdue/today/upcoming checks.
+  - `components/tasks/TaskRow` is one task row used by both pages. It has an animated check, strike-through when done, and icon edit/delete buttons that show on hover (always visible on touch).
+- **Tasks page redesign:**
+  - A composer card: "What needs doing?", priority buttons, due date and Add.
+  - New **Upcoming** tab. Today now really means due today; before, it also showed future tasks.
+  - Tasks are sorted by due date and priority.
+  - Every edit, delete and "clear finished" rolls back if the database refuses it.
+  - "Clear finished" now asks for confirmation.
+  - Loading placeholders while tasks load.
+- **Dashboard redesign:**
+  - Greeting with a sun or moon icon and a live clock.
+  - Stat cards with icons.
+  - One "Today" card: quick add, overdue at the top, then due today, then a "finished today" count.
+  - Recent journal with the mood and "Today"/"Yesterday" dates.
+  - A library pick with a shuffle button, and a souls avatar row.
+  - If one section fails to load, the rest still show.
+- **Preview harness:** Playwright with fake data (`/tmp` only, never touches a database) to screenshot pages with content.
+
+**Next:** journal list and editor, then library, ideas and queue.
+
+## Session 6 (26 Sep 2026, 23:30–23:45)
+**Done: journal**
+- **`lib/journal.tsx`:** one list of moods, plus @mention highlighting that uses her real souls and their colours. It works with names that have spaces. Before, mention colours came from hard-coded sample names (Sofia, Mum…).
+- **Journal list:**
+  - Pinned entries get their own section, then the rest are grouped by month.
+  - Cards show "Today, 18:20"-style times, the mood, a 3-line preview with highlighted mentions, and tags.
+  - Pin and delete are icon buttons.
+  - Mood filters only show moods she has actually used.
+  - Search also looks at tags.
+  - Month grouping now uses local dates.
+- **Writing page:**
+  - Distraction-free layout with a sticky top bar.
+  - Honest status: Unsaved changes, Saving, Saved. It was a fake timer before.
+  - Ctrl/Cmd+S saves.
+  - Leaving with unsaved changes asks "Save and leave" or "Discard". Closing the tab warns too.
+  - Editing keeps the entry's original time; before, every edit overwrote it.
+  - New entries stay open after the first save.
+  - @mention picker: arrow keys, Enter or Tab to pick, Esc to close; linked souls show as removable chips.
+  - Word count, and the text box grows as you write.
+
+**Next:** library, ideas, queue (shared soul-link field and image handling).
+
+## Session 7 (26 Sep 2026, 23:35–23:48)
+**Done**
+- **Photos no longer expire.** New uploads save the file's storage location, not a 1-year signed link.
+  - Photos are shown through `StoredImage`, which makes a fresh short-lived link on demand.
+  - Old rows that hold 1-year links are read automatically, so her existing photos will keep working after the year is up.
+  - Photos on a page load in one batch.
+  - Uploads check the file type and size (15 MB max).
+- **Safer photo saving:** the new photo uploads first, and the old one is deleted only after the database save succeeds. If the save fails, the new upload is removed. Before, the old photo was deleted first, so a failed save lost it.
+- **Soul links:**
+  - `setSoulLinks` only adds or removes what changed. Before, it deleted everything and re-inserted, so a failure wiped all links.
+  - Link titles stay in sync with the item.
+  - New `deleteSoulLinksForItem`, so deleting an item no longer leaves stale links on soul profiles.
+- Added `image_url` to the Library, Place and Soul database types, so no more type casts.
+- **Shared components:**
+  - `SoulLinkField`: chips for linked people, plus "Link someone" to open the picker.
+  - `ImagePicker` redesign: icon, drag highlight, clean remove button.
+- **Library redesign:**
+  - Cards show a type badge with an icon, photo, stars, notes preview and tags.
+  - A link on a card opens in a new tab and shows the site name.
+  - Tabs only appear for types she has used. Sorting: Newest, Top rated, A to Z.
+  - The add/edit window has an icon type picker and stays open while saving.
+  - Deleting an item also removes its photo and soul links.
+- Every other page that shows photos (places, souls, gallery, dashboard) now uses `StoredImage`.
+
+**Next:** Ideas and Queue (same pattern), then Places and Souls.
+
+## Session 8 (26 Sep 2026, 23:41–23:55)
+**Done**
+- **Ideas becomes a board:** four columns (Thinking, Planning, Doing, Done), swipeable sideways on phones.
+  - Each card shows priority, title, notes preview, tags and date.
+  - A "Move to next stage" button replaces the hidden click-the-badge trick. Done ideas can be reopened.
+  - A + button on each column adds an idea straight into that stage.
+  - The add/edit window has icon pickers for stage and priority, plus the "Connected people" field.
+  - Search appears once there are more than 3 ideas.
+  - Deleting an idea removes its soul links.
+- **Queue redesign:** Watch, Listen, Read and Explore tabs, each row with a coloured icon tile.
+  - The progress slider saves once when you let go. Before, it saved at every 5% step, and the saves could arrive out of order.
+  - Start, Finish and Again buttons replace the cryptic badge cycling.
+  - Dragging the slider to 100% marks the item finished.
+  - The `notes` column (it was in the database but unused) is now editable and shown.
+  - Delete asks for confirmation, and items in progress are listed first.
+  - The page opens on the tab with the most unfinished items.
+  - The database types now match the table: `notes` can be empty, and `due_date` is included.
+
+**Next:** Places (map), Souls (list and profile), then Ratings, Mood, Search, Stats, Gallery, Theme, Login and the Games.
+
+## Session 9 (26 Sep 2026, 23:45–23:58)
+**Done**
+- **Places:**
+  - List of cards (photo or pin icon, stars, visit date, number of visits, notes, tags), with a List/Map switch.
+  - Each card has "Visited again", "Directions" (only when the place is on the map), edit and delete.
+  - Map:
+    - Uses free CARTO tiles when no Mapbox token is set. Before, the map was blank without a token.
+    - Tiles are dark or light to match the theme.
+    - Zooms to fit every pin; pins are theme-coloured and grow when selected.
+    - A detail panel shows below the map, and places without an address are listed with a hint.
+  - The address is only looked up again when it changes. If it can't be found, the save tells you it won't be on the map.
+  - Directions use Apple Maps on Apple devices (a link that works on Mac too) and Google Maps elsewhere.
+  - Photos use the safe replace from session 7, and deleting a place also removes its photo and soul links.
+  - Moved `directionsUrl` to `lib/geocode.ts`. Importing it from `MapView` pulled the map library into server rendering and broke the build; caught while building before delivery.
+- **Souls:**
+  - New shared `components/souls/SoulForm.tsx`, one form for the list and profile pages:
+    - A live preview card, then emoji and colour pickers, role, since, about, private notes, tags and photo.
+    - Saves the photo safely and can remove the person.
+  - New `SoulAvatar`: their photo if they have one, otherwise their emoji on their colour.
+  - List page: centred cards sorted by name with a glow in each person's colour, an edit button, and an "Add someone" card. Search appears once there are more than 6 people.
+
+**Next:** soul profile page, then Ratings, Mood, Search, Stats, Gallery, Theme, Login and the Games.
+
+## Session 10 (26–27 Sep 2026, 23:52–00:08)
+**Done**
+- **Profile photos are the main way to show people.**
+  - In the add/edit form, the avatar at the top is the photo picker: tap to add or change a photo, with "Remove photo, use emoji" underneath. The emoji is labelled as the fallback.
+  - Photos now appear everywhere a person does: Souls cards, the profile page, the dashboard, the "Connected people" picker and chips, and the journal @mention menu and chips (new `SoulAvatar` usage).
+- **Soul profile page rebuilt:**
+  - Header with a large photo or emoji avatar, glowing in their colour, plus name, role, since, about, tags and Edit (the shared `SoulForm`).
+  - Tabs:
+    - **Journal:** a timeline of entries that mention them.
+    - **Favourites:** music, films and shows, places, each with an inline add form.
+    - **Connected:** linked library, places, ratings, queue and ideas, grouped.
+    - **Notes.**
+  - Journal mentions come from the real `journal_entry_souls` links plus older entries with @Name in the text. Before, it was text-only and also matched titles loosely.
+  - New `getJournalEntryIdsForSoul()` in `db.ts`.
+  - Removing someone also deletes their photo.
+
+**Next:** Ratings, Mood, Search, Stats, Gallery, Theme, Login and Reset password, then the Games.
+
+## Session 11 (27 Sep 2026, 00:00–00:18)
+Seven pages redesigned: three helpers worked in parallel under one set of conventions, then everything was reviewed, built and screenshotted.
+- **Ratings:**
+  - All 7 categories, including the missing Experience tab, each with an icon.
+  - An average card for every category (only 5 showed before).
+  - Group-by-stars view, plus Newest and A to Z sorts.
+  - Delete is always visible and asks first. Soul links are cleaned up on delete.
+- **Search:**
+  - Debounced as you type, results grouped by section with highlighted matches.
+  - Links go to the exact journal entry or soul.
+  - "/" focuses the search box, Enter opens the top result, Esc clears.
+  - Before typing, a card per section shows what's searchable.
+- **Stats:**
+  - A "This month" row.
+  - Tiles with icons and accessible bar charts.
+  - Mood colours come from her real moods; before they were hard-coded.
+- **Gallery:**
+  - Masonry polaroid board.
+  - Upload several photos at once with progress, or drag and drop them onto the page.
+  - The lightbox is a proper dialog: Esc, arrow keys, swipe, and a "3 of 12" counter.
+  - Photos from other sections show a badge linking back and can't be deleted from here.
+  - Load errors are reported instead of swallowed.
+- **Mood Bubble:**
+  - The canvas is sharp on high-resolution screens and resizes with the sidebar.
+  - Animation stops when you leave the page, pauses in hidden tabs and respects reduced motion.
+  - Safe colour maths, and tooltips work on touch.
+  - Starter moods can no longer be added twice.
+  - Logging panel with an intensity slider, and history grouped by day.
+- **Theme:**
+  - Preset cards show real previews.
+  - Colour swatches with hex fields and a contrast check.
+  - Save/Reset bar for unsaved changes. Leaving without saving reverts the preview and warns on tab close.
+  - Only saved locally after the database save succeeds.
+- **Login:**
+  - Now centred properly (the hidden sidebar used to push it right).
+  - Show/hide password, and a gentle shake on a wrong password (transitions.dev).
+  - Friendlier messages, and it keeps where you were going.
+- **Change password:**
+  - Asks for the current password first.
+  - Strength meter and a "Back to your world" link. Before there was no way back, because the sidebar is hidden on this page.
+  - Clear success state.
+- **Global:** the `no-sidebar` body class for auth pages, the shared `t-shake` animation, and no double focus rings.
+
+**Next:** Games (logic bugs in chess, battleship, tic-tac-toe, kadi, matatu, sudoku; saving wins), the Arcade page, then a final pass (mobile check, remove leftover legacy code like `lib/token.ts` and `types/index.ts`) and deployment steps.
+
+## Session 12 (27 Sep 2026, 00:50–01:05)
+**Note:** the game rewrites below were found in the workspace, made between 00:18 and 00:23 by a run of this session that was never reported or saved. Nothing had been written to your PC. Before shipping I reviewed the fixes and played every game in a browser (no errors), then fixed the two problems I found.
+
+**Done: games**
+- **Shared pieces:**
+  - `lib/games.ts`: `recordResult()` saves every finished game (it never breaks the game if saving fails), and `getGameStats()` returns totals, per-game records and the current streak.
+  - `lib/cards.ts` and `components/games/PlayingCard` are shared by Kadi and Matatu.
+  - `components/games/GameShell` gives every game the same header, difficulty switch, score and "How to play" section.
+- **Arcade:** total wins, win streak, games played and win rate, plus each game's win/loss/draw record, all from real saved results. Before, it always showed 0 because nothing was ever saved. Removed an invented "Coming soon" section.
+- **Chess:**
+  - The computer undoes its trial moves properly. The broken `move('--')` trick corrupted the board it was thinking about.
+  - The move history is kept, so threefold repetition works.
+  - No duplicate `<script>`.
+  - **Engine now bundled** (`chess.js@0.10.3` from npm) instead of downloaded from an outside website when the page opens, so chess can't fail to load.
+  - Fixed squashed board ranks.
+- **Battleship:**
+  - Medium and hard now hunt around their hits. Before, the AI never switched into targeting mode.
+  - Ship placement with rotate and shuffle, and an accuracy stat.
+- **Tic-tac-toe:** you can't move while the computer is thinking. Scores no longer double. "Impossible" is saved as hard.
+- **Sudoku:** every puzzle has exactly one solution, so a correct board can't be marked wrong.
+- **Kadi and Matatu:** jokers no longer freeze the game. Question cards are answered by suit, and skips and penalties follow the rules.
+  - Matatu: cutting with the 7 of the cut suit is correct, and penalties don't stack.
+- `npm install` needed (new package: chess.js).
+
+## Session 13 (27 Sep 2026, 09:43–10:00): final pass
+- Checked all 26 pages at phone width (390px) with test data: no page scrolls sideways and there are no runtime errors.
+- Fixed a hydration error when opening a new journal entry (the date was rendered differently on the server and in the browser).
+- Kadi and Matatu: "Diamonds Or 7" now reads "Diamonds or any 7".
+- **Cleanup:**
+  - Removed 148 lines of dead code from `db.ts` and `supabase.ts`: old sign-in helpers, the dev password check, the old game session functions (replaced by `lib/games.ts`), and unused soul link and gallery helpers.
+  - Deleted `lib/token.ts` and `types/index.ts` here. They're unused; delete them on your PC too.
+- Lint: 0 errors, 0 warnings. Types: clean. Production build: passes.
+- Added **DEPLOY.md** with step-by-step go-live instructions, including the one critical step: mark the baseline migration as applied on her database so it never re-runs.

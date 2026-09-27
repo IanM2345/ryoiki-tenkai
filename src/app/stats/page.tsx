@@ -1,267 +1,274 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import s from './stats.module.css';
-import { Stars, Bar, Divider } from '@/components/ui';
-import { fonts } from '../../lib/token';
 import {
-  getTasks, getJournalEntries, getRatings,
-  getMoodLogs, getIdeas, getQueue, getPlaces, getLibrary, getSouls,
+  BookOpen, MapPin, NotebookPen, Star, Smile, Lightbulb, Users, CircleCheck, ListVideo,
+  PenLine, CalendarDays, Trophy, LibraryBig, Heart, ChartColumn,
+} from 'lucide-react';
+import s from './stats.module.css';
+import { Stars, Topbar, EmptyState, Toast, useToast } from '@/components/ui';
+import {
+  getTasks, getJournalEntries, getRatings, getMoodLogs, getMoodDefs,
+  getIdeas, getQueue, getPlaces, getLibrary, getSouls,
 } from '@/lib/db';
+import type { DbIdea, DbLibraryEntry, DbMoodDef } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { localDateStr } from '@/lib/dates';
 
-const CAT_COLORS: Record<string, string> = {
-  link:'#c084fc', media:'#ff8c00', place:'#ffb347', idea:'#a855f7', note:'#8a7060',
+const MAX_W = 1100;
+
+type LibType = DbLibraryEntry['type'];
+const LIB_META: Record<LibType, { label: string; color: string }> = {
+  link:  { label: 'Links',  color: 'var(--pu-l)' },
+  media: { label: 'Media',  color: 'var(--or)' },
+  place: { label: 'Places', color: 'var(--or-l)' },
+  note:  { label: 'Notes',  color: 'var(--pu-g)' },
+  idea:  { label: 'Ideas',  color: 'var(--yellow)' },
 };
+
+type IStatus = DbIdea['status'];
+const IDEA_ORDER: IStatus[] = ['thinking', 'planning', 'doing', 'done'];
+const IDEA_META: Record<IStatus, { label: string; color: string }> = {
+  thinking: { label: 'Thinking', color: 'var(--pu-l)' },
+  planning: { label: 'Planning', color: 'var(--or)' },
+  doing:    { label: 'Doing',    color: 'var(--gr)' },
+  done:     { label: 'Done',     color: 'var(--tx-m)' },
+};
+
+interface BarRow { key: string; label: string; value: number; color: string; note?: string }
 
 interface Stats {
-  libraryCount:  number;
-  placesCount:   number;
-  journalCount:  number;
-  ratingsCount:  number;
-  moodCount:     number;
-  ideasCount:    number;
-  soulsCount:    number;
-  tasksCount:    number;
-  queueCount:    number;
-  wordCount:     number;
-  avgRating:     string;
-  topRated:      { title: string; category: string; rating: number }[];
-  libraryByType: Record<string, number>;
-  ideasByStatus: Record<string, number>;
-  moodFreq:      { name: string; color: string; count: number }[];
-  tasksDone:     number;
-  tasksPending:  number;
+  counts: { library: number; places: number; journal: number; ratings: number; moods: number; ideas: number; souls: number; queue: number };
+  words: number;
+  avgRating: number | null;
+  topRated: { id: string; title: string; category: string; rating: number }[];
+  tasksDone: number;
+  tasksOpen: number;
+  library: BarRow[];
+  ideas: BarRow[];
+  moods: BarRow[];
+  month: { entries: number; tasks: number; places: number };
 }
 
-const MOOD_COLORS: Record<string, string> = {
-  happy:'#f59e0b', calm:'#3b82f6', energised:'#ef4444', loved:'#ec4899',
-  anxious:'#a855f7', sad:'#6366f1', tired:'#8a7060', frustrated:'#f97316',
-};
+const fmt = (n: number) => n.toLocaleString();
+const plural = (n: number, one: string, many = `${one}s`) => `${fmt(n)} ${n === 1 ? one : many}`;
+
+/** Horizontal bar chart. Values are shown as text; the bar itself is decorative. */
+function BarList({ rows, total, emptyMsg, unit }: { rows: BarRow[]; total?: number; emptyMsg: string; unit: [string, string] }) {
+  if (rows.length === 0) return <p className={s.empty}>{emptyMsg}</p>;
+  const max = Math.max(...rows.map(r => r.value), 1);
+  return (
+    <ul className={s.bars}>
+      {rows.map(r => {
+        const pct = total ? Math.round((r.value / total) * 100) : null;
+        return (
+          <li key={r.key} className={s.barRow} style={{ ['--c' as string]: r.color }}>
+            <span className={s.barLabel}>{r.label}</span>
+            <span className={s.barValue}>
+              {r.value === 1 ? `1 ${unit[0]}` : `${fmt(r.value)} ${unit[1]}`}
+              {pct !== null && <span className={s.barPct}> ({pct}%)</span>}
+            </span>
+            <span className={s.barTrack} aria-hidden>
+              <span className={s.barFill} style={{ ['--w' as string]: `${(r.value / max) * 100}%` }} />
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Tile({ icon, label, value, color, hint }: { icon: React.ReactNode; label: string; value: string; color: string; hint?: string }) {
+  return (
+    <div className={s.tile} style={{ ['--c' as string]: color }}>
+      <span className={s.tileIcon} aria-hidden>{icon}</span>
+      <span className={s.tileBody}>
+        <span className={s.tileValue}>{value}</span>
+        <span className={s.tileLabel}>{label}</span>
+        {hint && <span className={s.tileHint}>{hint}</span>}
+      </span>
+    </div>
+  );
+}
+
+function Panel({ title, icon, children, className = '' }: { title: string; icon: React.ReactNode; children: React.ReactNode; className?: string }) {
+  return (
+    <section className={`${s.panel} ${className}`} aria-label={title}>
+      <h2 className={s.panelTitle}><span aria-hidden>{icon}</span>{title}</h2>
+      {children}
+    </section>
+  );
+}
 
 export default function StatsPage() {
-  const [stats,   setStats]   = useState<Stats | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [toast, show] = useToast();
 
   useEffect(() => {
-    async function load() {
-      await new Promise(r => setTimeout(r, 100));
-      const ready = await ensureSession();
-      if (!ready) { setLoading(false); return; }
+    (async () => {
       try {
-        const [library, places, journals, ratings, moodLogs, ideas, queue, tasks, souls] =
-          await Promise.all([
-            getLibrary(), getPlaces(), getJournalEntries(), getRatings(),
-            getMoodLogs(), getIdeas(), getQueue(), getTasks(), getSouls(),
-          ]);
+        if (!(await ensureSession())) return;
+        const [library, places, journals, ratings, moodLogs, moodDefs, ideas, queue, tasks, souls] = await Promise.all([
+          getLibrary(), getPlaces(), getJournalEntries(), getRatings(), getMoodLogs(),
+          getMoodDefs().catch(() => [] as DbMoodDef[]),
+          getIdeas(), getQueue(), getTasks(), getSouls(),
+        ]);
 
-        // Word count from journal bodies
-        const wordCount = journals.reduce((acc, j) =>
-          acc + (j.body?.split(/\s+/).filter(Boolean).length ?? 0), 0);
-
-        // Avg rating
-        const avgRating = ratings.length
-          ? (ratings.reduce((a, b) => a + b.rating, 0) / ratings.length).toFixed(1)
-          : '—';
-
-        // Top rated (up to 5)
+        const words = journals.reduce((acc, j) => acc + (j.body?.split(/\s+/).filter(Boolean).length ?? 0), 0);
+        const avgRating = ratings.length ? ratings.reduce((a, b) => a + b.rating, 0) / ratings.length : null;
         const topRated = [...ratings]
-          .sort((a, b) => b.rating - a.rating)
+          .sort((a, b) => b.rating - a.rating || b.updated_at.localeCompare(a.updated_at))
           .slice(0, 5)
-          .map(r => ({ title: r.title, category: r.category, rating: r.rating }));
+          .map(r => ({ id: r.id, title: r.title, category: r.category, rating: r.rating }));
 
-        // Library by type
-        const libraryByType: Record<string, number> = {};
-        library.forEach(l => {
-          libraryByType[l.type] = (libraryByType[l.type] ?? 0) + 1;
-        });
-
-        // Ideas by status
-        const ideasByStatus: Record<string, number> = {};
-        ideas.forEach(i => {
-          ideasByStatus[i.status] = (ideasByStatus[i.status] ?? 0) + 1;
-        });
-
-        // Mood frequency
-        const moodMap: Record<string, number> = {};
-        moodLogs.forEach(m => {
-          moodMap[m.feeling_name] = (moodMap[m.feeling_name] ?? 0) + 1;
-        });
-        const moodFreq = Object.entries(moodMap)
+        const libCounts = new Map<LibType, number>();
+        library.forEach(l => libCounts.set(l.type, (libCounts.get(l.type) ?? 0) + 1));
+        const libRows: BarRow[] = [...libCounts.entries()]
           .sort((a, b) => b[1] - a[1])
-          .slice(0, 6)
-          .map(([name, count]) => ({
-            name, count,
-            color: MOOD_COLORS[name] ?? '#ff8c00',
+          .map(([type, value]) => ({
+            key: type, value,
+            label: LIB_META[type]?.label ?? type,
+            color: LIB_META[type]?.color ?? 'var(--or)',
           }));
 
-        // Tasks
-        const tasksDone    = tasks.filter(t => t.done).length;
-        const tasksPending = tasks.filter(t => !t.done).length;
+        const ideaRows: BarRow[] = IDEA_ORDER
+          .map(st => ({ key: st, label: IDEA_META[st].label, color: IDEA_META[st].color, value: ideas.filter(i => i.status === st).length }))
+          .filter(r => r.value > 0);
+
+        const defById = new Map(moodDefs.map(d => [d.id, d]));
+        const defByName = new Map(moodDefs.map(d => [d.name.toLowerCase(), d]));
+        const moodMap = new Map<string, BarRow>();
+        moodLogs.forEach(m => {
+          const key = m.feeling_name.toLowerCase();
+          const row = moodMap.get(key);
+          if (row) { row.value += 1; return; }
+          const def = (m.mood_def_id && defById.get(m.mood_def_id)) || defByName.get(key);
+          moodMap.set(key, { key, label: m.feeling_name, value: 1, color: def?.color || m.feeling_color || 'var(--pu-l)' });
+        });
+        const moodRows = [...moodMap.values()].sort((a, b) => b.value - a.value).slice(0, 8);
+
+        const month = localDateStr().slice(0, 7);
+        const inMonth = (d: string | null | undefined) => !!d && d.slice(0, 7) === month;
 
         setStats({
-          libraryCount:  library.length,
-          placesCount:   places.length,
-          journalCount:  journals.length,
-          ratingsCount:  ratings.length,
-          moodCount:     moodLogs.length,
-          ideasCount:    ideas.length,
-          soulsCount:    souls.length,
-          tasksCount:    tasks.length,
-          queueCount:    queue.length,
-          wordCount,
+          counts: {
+            library: library.length, places: places.length, journal: journals.length, ratings: ratings.length,
+            moods: moodLogs.length, ideas: ideas.length, souls: souls.length, queue: queue.length,
+          },
+          words,
           avgRating,
           topRated,
-          libraryByType,
-          ideasByStatus,
-          moodFreq,
-          tasksDone,
-          tasksPending,
+          tasksDone: tasks.filter(t => t.done).length,
+          tasksOpen: tasks.filter(t => !t.done).length,
+          library: libRows,
+          ideas: ideaRows,
+          moods: moodRows,
+          month: {
+            entries: journals.filter(j => inMonth(j.entry_date)).length,
+            tasks: tasks.filter(t => t.done && inMonth(t.done_at)).length,
+            places: places.filter(p => inMonth(p.visit_date)).length,
+          },
         });
-      } catch(e) {
-        console.error('[stats] load error:', e);
+      } catch {
+        show('Could not load your stats.', 'var(--red)');
       } finally {
         setLoading(false);
       }
-    }
-    load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    })();
+  }, [show]);
 
-  if (loading) return (
-    <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <span style={{ fontFamily: fonts.main, color:'#8a7060', fontSize:13 }}>Counting everything…</span>
-    </div>
-  );
-
-  if (!stats) return (
-    <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center' }}>
-      <span style={{ fontFamily: fonts.main, color:'#8a7060', fontSize:13 }}>Could not load stats.</span>
-    </div>
-  );
-
-  const libraryTotal = Object.values(stats.libraryByType).reduce((a, b) => a + b, 0) || 1;
-  const maxMood = Math.max(...stats.moodFreq.map(m => m.count), 1);
+  const monthName = new Date().toLocaleDateString('en-GB', { month: 'long' });
 
   return (
-    <div className={`${s.page} aFadeUp`}>
-      <div className={s.pageTitle}>Your World, in Numbers 📊</div>
-      <div className={s.pageSub}>All time · updates as you add things</div>
+    <div className={s.page}>
+      <Topbar title="Stats" sub="Your world in numbers, all time" maxWidth={MAX_W} />
 
-      {/* Primary stats */}
-      <div className={s.primaryGrid}>
-        {([
-          ['Library',  stats.libraryCount,  '#ff8c00'],
-          ['Places',   stats.placesCount,   '#a855f7'],
-          ['Journal',  stats.journalCount,  '#ffb347'],
-          ['Rated',    stats.ratingsCount,  '#c084fc'],
-        ] as [string, number, string][]).map(([l, n, c]) => (
-          <div key={l} className={s.statCard}>
-            <div className={s.statNum} style={{ color: c }}>{n}</div>
-            <div className={s.statLabel}>{l}</div>
-          </div>
-        ))}
+      <div className={s.wrap}>
+        {loading ? (
+          <>
+            <div className={s.monthRow}>{[0, 1, 2].map(i => <div key={i} className={`skeleton ${s.skelTile}`} />)}</div>
+            <div className={s.tiles}>{Array.from({ length: 10 }, (_, i) => <div key={i} className={`skeleton ${s.skelTile}`} />)}</div>
+            <div className={s.panels}>{[0, 1, 2, 3].map(i => <div key={i} className={`skeleton ${s.skelPanel}`} />)}</div>
+          </>
+        ) : !stats ? (
+          <EmptyState icon={<ChartColumn size={26} />} msg="Your stats could not load right now. Try again in a moment." />
+        ) : (
+          <>
+            <section className={s.month} aria-labelledby="month-title">
+              <h2 id="month-title" className={s.sectionTitle}><CalendarDays size={16} strokeWidth={2} aria-hidden /> This month, {monthName}</h2>
+              <div className={s.monthRow}>
+                <Tile icon={<NotebookPen size={18} />} color="var(--or)" value={fmt(stats.month.entries)}
+                  label={stats.month.entries === 1 ? 'entry written' : 'entries written'} />
+                <Tile icon={<CircleCheck size={18} />} color="var(--gr)" value={fmt(stats.month.tasks)}
+                  label={stats.month.tasks === 1 ? 'task finished' : 'tasks finished'} />
+                <Tile icon={<MapPin size={18} />} color="var(--pu-l)" value={fmt(stats.month.places)}
+                  label={stats.month.places === 1 ? 'place visited' : 'places visited'} />
+              </div>
+            </section>
+
+            <h2 className={s.sectionTitle}><ChartColumn size={16} strokeWidth={2} aria-hidden /> All time</h2>
+            <div className={s.tiles}>
+              <Tile icon={<BookOpen size={18} />}    color="var(--or)"     value={fmt(stats.counts.library)} label="Library" />
+              <Tile icon={<MapPin size={18} />}      color="var(--pu-l)"   value={fmt(stats.counts.places)}  label="Places" />
+              <Tile icon={<NotebookPen size={18} />} color="var(--or-l)"   value={fmt(stats.counts.journal)} label="Journal entries" />
+              <Tile icon={<PenLine size={18} />}     color="var(--or)"     value={fmt(stats.words)}          label="Words written" />
+              <Tile icon={<Star size={18} />}        color="var(--yellow)" value={fmt(stats.counts.ratings)} label="Things rated" />
+              <Tile icon={<Smile size={18} />}       color="var(--blue)"   value={fmt(stats.counts.moods)}   label="Moods logged" />
+              <Tile icon={<Lightbulb size={18} />}   color="var(--pu-g)"   value={fmt(stats.counts.ideas)}   label="Ideas" />
+              <Tile icon={<Users size={18} />}       color="var(--pu-l)"   value={fmt(stats.counts.souls)}   label="Souls" />
+              <Tile icon={<CircleCheck size={18} />} color="var(--gr)"     value={fmt(stats.tasksDone)}      label="Tasks done"
+                hint={stats.tasksOpen ? `${fmt(stats.tasksOpen)} still open` : 'All caught up'} />
+              <Tile icon={<ListVideo size={18} />}   color="var(--or-l)"   value={fmt(stats.counts.queue)}   label="In the queue" />
+            </div>
+
+            <div className={s.panels}>
+              <Panel title="Top rated" icon={<Trophy size={16} strokeWidth={2} />}>
+                {stats.topRated.length === 0 ? (
+                  <p className={s.empty}>Nothing rated yet. Rate something and it will show up here.</p>
+                ) : (
+                  <>
+                    <ol className={s.rated}>
+                      {stats.topRated.map((r, i) => (
+                        <li key={r.id} className={s.ratedRow}>
+                          <span className={s.ratedRank} aria-hidden>{i + 1}</span>
+                          <span className={s.ratedText}>
+                            <span className={s.ratedName}>{r.title}</span>
+                            {r.category && <span className={s.ratedCat}>{r.category}</span>}
+                          </span>
+                          <Stars n={r.rating} size={13} />
+                        </li>
+                      ))}
+                    </ol>
+                    <p className={s.avg}>
+                      Average rating <strong>{stats.avgRating?.toFixed(1)}</strong> out of 5
+                    </p>
+                  </>
+                )}
+              </Panel>
+
+              <Panel title="Library breakdown" icon={<LibraryBig size={16} strokeWidth={2} />}>
+                <BarList rows={stats.library} total={stats.counts.library} unit={['item', 'items']}
+                  emptyMsg="Your library is empty so far." />
+              </Panel>
+
+              <Panel title="Ideas pipeline" icon={<Lightbulb size={16} strokeWidth={2} />}>
+                <BarList rows={stats.ideas} total={stats.counts.ideas} unit={['idea', 'ideas']}
+                  emptyMsg="No ideas yet. The first one is always the hardest." />
+              </Panel>
+
+              <Panel title="Mood frequency" icon={<Heart size={16} strokeWidth={2} />}>
+                <BarList rows={stats.moods} unit={['time', 'times']}
+                  emptyMsg="No moods logged yet." />
+                {stats.counts.moods > 0 && (
+                  <p className={s.avg}>{plural(stats.counts.moods, 'check in')} in total</p>
+                )}
+              </Panel>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Secondary stats */}
-      <div className={s.secondaryGrid}>
-        {([
-          ['Mood Logs', stats.moodCount,    '#60a5fa'],
-          ['Ideas',     stats.ideasCount,   '#c084fc'],
-          ['Souls',     stats.soulsCount,   '#a855f7'],
-          ['Words',     stats.wordCount.toLocaleString(), '#ff8c00'],
-          ['Tasks done',stats.tasksDone,    '#4ade80'],
-          ['Queue',     stats.queueCount,   '#ffb347'],
-        ] as [string, number | string, string][]).map(([l, n, c]) => (
-          <div key={l} className={s.statCard}>
-            <div className={s.statNum} style={{ color: c, fontSize: 20 }}>{n}</div>
-            <div className={s.statLabel}>{l}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className={s.detailGrid}>
-
-        {/* Top rated */}
-        <div className={s.detailCard}>
-          <div className={s.detailTitle}>Top Rated</div>
-          {stats.topRated.length === 0 ? (
-            <div style={{ fontSize:11, color:'#8a7060', opacity:.5 }}>No ratings yet.</div>
-          ) : stats.topRated.map(r => (
-            <div key={r.title} className={s.ratedItem}>
-              <div className={s.ratedRow}>
-                <span className={s.ratedName}>{r.title}</span>
-                <Stars n={r.rating} size={10} />
-              </div>
-              <Bar pct={r.rating * 20} />
-            </div>
-          ))}
-          <Divider />
-          <div className={s.avgRow}>
-            <span className={s.detailTitle} style={{ marginBottom: 0 }}>Avg Rating</span>
-            <span className={s.avgNum}>{stats.avgRating} ★</span>
-          </div>
-          <Divider />
-          <div className={s.detailTitle} style={{ marginTop: 8 }}>Tasks</div>
-          <div className={s.avgRow}>
-            <span style={{ fontSize:11, color:'#4ade80' }}>✓ Done</span>
-            <span className={s.avgNum} style={{ color:'#4ade80' }}>{stats.tasksDone}</span>
-          </div>
-          <div className={s.avgRow}>
-            <span style={{ fontSize:11, color:'#8a7060' }}>○ Pending</span>
-            <span className={s.avgNum} style={{ color:'#8a7060' }}>{stats.tasksPending}</span>
-          </div>
-        </div>
-
-        {/* Library breakdown */}
-        <div className={s.detailCard}>
-          <div className={s.detailTitle}>Library Breakdown</div>
-          {Object.keys(stats.libraryByType).length === 0 ? (
-            <div style={{ fontSize:11, color:'#8a7060', opacity:.5 }}>No library entries yet.</div>
-          ) : Object.entries(stats.libraryByType).map(([type, count]) => {
-            const pct = Math.round(count / libraryTotal * 100);
-            return (
-              <div key={type} className={s.breakdownItem}>
-                <div className={s.breakdownRow}>
-                  <span>{type}</span>
-                  <span className={s.breakdownPct} style={{ color: CAT_COLORS[type] ?? '#ff8c00' }}>
-                    {count} · {pct}%
-                  </span>
-                </div>
-                <Bar pct={pct} color={CAT_COLORS[type] ?? '#ff8c00'} />
-              </div>
-            );
-          })}
-          <Divider />
-          <div className={s.detailTitle}>Ideas Pipeline</div>
-          {Object.keys(stats.ideasByStatus).length === 0 ? (
-            <div style={{ fontSize:11, color:'#8a7060', opacity:.5 }}>No ideas yet.</div>
-          ) : Object.entries(stats.ideasByStatus).map(([st, n]) => (
-            <div key={st} className={s.pipelineRow}>
-              <span className={s.pipelineStatus}>{st}</span>
-              <span className={s.pipelineCount}>{n}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Mood freq + words */}
-        <div className={s.detailCard}>
-          <div className={s.detailTitle}>Mood Frequency</div>
-          {stats.moodFreq.length === 0 ? (
-            <div style={{ fontSize:11, color:'#8a7060', opacity:.5 }}>No mood logs yet.</div>
-          ) : stats.moodFreq.map(m => (
-            <div key={m.name} className={s.moodItem}>
-              <div className={s.moodRow}>
-                <span style={{ color: m.color }}>{m.name}</span>
-                <span className={s.moodCount}>×{m.count}</span>
-              </div>
-              <Bar pct={Math.round(m.count / maxMood * 100)} color={m.color} />
-            </div>
-          ))}
-          <div className={s.wordsCard}>
-            <div className={s.wordsNum}>{stats.wordCount.toLocaleString()}</div>
-            <div className={s.wordsLabel}>Words Written</div>
-          </div>
-        </div>
-      </div>
+      {toast && <Toast msg={toast.msg} color={toast.color} />}
     </div>
   );
 }

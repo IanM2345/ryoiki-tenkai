@@ -1,287 +1,260 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { colors as C, fonts, QUEUE_STATUS } from '../../lib/token';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Tv, Headphones, BookOpen, Compass, Play, Check, RotateCcw, Trash2, ListVideo } from 'lucide-react';
+import s from './queue.module.css';
 import {
-  Btn, Pill, Bar, InnerTabs, SearchBar, Topbar, Modal, ModalTitle,
-  ModalFooter, FInput, EmptyState, Toast, useToast, SoulPicker, Lbl,
+  Btn, Pill, InnerTabs, SearchBar, Topbar, Modal, ModalTitle, ModalFooter, FInput, FArea,
+  EmptyState, Toast, useToast, Lbl, Confirm,
 } from '@/components/ui';
-import { getQueue, addQueueItem, updateQueueItem, deleteQueueItem, getSoulLinksForItem, setSoulLinks, getSouls } from '@/lib/db';
-import { ensureSession } from '@/lib/supabase';
+import SoulLinkField from '@/components/ui/SoulLinkField';
+import {
+  getQueue, addQueueItem, updateQueueItem, deleteQueueItem, getSoulLinksForItem, setSoulLinks,
+  deleteSoulLinksForItem, getSouls,
+} from '@/lib/db';
 import type { DbQueueItem, DbSoul } from '@/lib/db';
+import { ensureSession } from '@/lib/supabase';
+import { localDateStr, fmtDate } from '@/lib/dates';
 
-type QStatus = 'todo' | 'progress' | 'done';
-type QTab    = 'watch' | 'listen' | 'read' | 'explore';
+type QStatus = DbQueueItem['status'];
+type QTab = DbQueueItem['tab'];
 
-const TAB_ICON: Record<QTab, string> = { watch:'▷', listen:'♬', read:'📖', explore:'🗺' };
-const COLORS = ['#4a6d8a','#8a6a4a','#7a4a8a','#4a7a7a','#6a4a8a','#4a8a6a','#8a4a4a','#5a6a8a'];
-const card = () => ({ padding:'10px 12px', borderRadius:8, background:C.card, border:`1px solid ${C.bds}` });
+const TABS: Record<QTab, { label: string; verb: string; Icon: typeof Tv; hint: string }> = {
+  watch:   { label: 'Watch',   verb: 'watch',        Icon: Tv,         hint: 'Films, shows, videos' },
+  listen:  { label: 'Listen',  verb: 'listen to',    Icon: Headphones, hint: 'Albums, podcasts, playlists' },
+  read:    { label: 'Read',    verb: 'read',         Icon: BookOpen,   hint: 'Books, articles, comics' },
+  explore: { label: 'Explore', verb: 'explore',      Icon: Compass,    hint: 'Places, hobbies, experiences' },
+};
+const TAB_KEYS = Object.keys(TABS) as QTab[];
+const STATUS: Record<QStatus, { label: string; color: string }> = {
+  todo:     { label: 'Up next',     color: 'var(--tx-m)' },
+  progress: { label: 'In progress', color: 'var(--or)' },
+  done:     { label: 'Finished',    color: 'var(--pu-l)' },
+};
+const TILE_COLORS = ['#4a6d8a', '#8a6a4a', '#7a4a8a', '#4a7a7a', '#6a4a8a', '#4a8a6a', '#8a4a4a', '#5a6a8a'];
+
+const EMPTY = { title: '', meta: '', notes: '', status: 'todo' as QStatus };
+type Form = typeof EMPTY;
+
+/** One row. Progress is kept locally while dragging and saved once on release. */
+function QueueRow({ item, onOpen, onStatus, onPct, onDelete }: {
+  item: DbQueueItem;
+  onOpen: () => void;
+  onStatus: (s: QStatus) => void;
+  onPct: (pct: number) => void;
+  onDelete: () => void;
+}) {
+  const [pct, setPct] = useState(item.pct);
+  const [dragging, setDragging] = useState(false);
+  const shown = dragging ? pct : item.pct;
+  const T = TABS[item.tab];
+  const commit = () => { setDragging(false); if (pct !== item.pct) onPct(pct); };
+
+  return (
+    <article className={`${s.row} ${item.status === 'done' ? s.rowDone : ''}`}>
+      <button type="button" className={s.rowMain} onClick={onOpen} aria-label={`Edit ${item.title}`}>
+        <span className={s.tile} style={{ background: `linear-gradient(145deg, ${item.color}, color-mix(in oklab, ${item.color} 55%, #000))` }}>
+          <T.Icon size={20} strokeWidth={1.75} />
+        </span>
+        <span className={s.rowText}>
+          <span className={s.rowTitle}>{item.title}</span>
+          <span className={s.rowMeta}>
+            {item.meta && <span>{item.meta}</span>}
+            <span>Added {fmtDate(item.added_date)}</span>
+          </span>
+          {item.notes && <span className={s.rowNotes}>{item.notes}</span>}
+        </span>
+      </button>
+
+      {item.status === 'progress' && (
+        <div className={s.progress}>
+          <input
+            type="range" min={0} max={100} step={5}
+            value={shown}
+            aria-label={`Progress on ${item.title}`}
+            className={s.slider}
+            style={{ ['--p' as string]: `${shown}%` }}
+            onPointerDown={() => { setPct(item.pct); setDragging(true); }}
+            onChange={e => { setDragging(true); setPct(+e.target.value); }}
+            onPointerUp={commit}
+            onKeyUp={commit}
+            onBlur={() => dragging && commit()}
+          />
+          <span className={s.pct}>{shown}%</span>
+        </div>
+      )}
+
+      <div className={s.rowActions}>
+        {item.status === 'todo' && <button type="button" className={s.stateBtn} onClick={() => onStatus('progress')}><Play size={13} strokeWidth={2.5} /> Start</button>}
+        {item.status === 'progress' && <button type="button" className={`${s.stateBtn} ${s.stateDone}`} onClick={() => onStatus('done')}><Check size={14} strokeWidth={2.5} /> Finish</button>}
+        {item.status === 'done' && <button type="button" className={s.stateBtn} onClick={() => onStatus('todo')}><RotateCcw size={13} strokeWidth={2.5} /> Again</button>}
+        <button type="button" className={s.delBtn} onClick={onDelete} aria-label={`Remove ${item.title}`}><Trash2 size={15} strokeWidth={2} /></button>
+      </div>
+    </article>
+  );
+}
 
 export default function QueuePage() {
-  const [items,            setItems]            = useState<DbQueueItem[]>([]);
-  const [souls,            setSouls]            = useState<DbSoul[]>([]);
-  const [loading,          setLoading]          = useState(true);
-  const [tab,              setTab]              = useState<QTab>('watch');
-  const [statusF,          setStatusF]          = useState<'all' | QStatus>('all');
-  const [search,           setSearch]           = useState('');
-  const [modal,            setModal]            = useState(false);
-  const [editItem,         setEditItem]         = useState<DbQueueItem | null>(null);
-  const [form,             setForm]             = useState({ title:'', meta:'', status:'todo' as QStatus });
-  const [linkedSoulIds,    setLinkedSoulIds]    = useState<string[]>([]);
-  const [soulPickerActive, setSoulPickerActive] = useState(false);
-  const [toast,            show]                = useToast();
+  const [items, setItems]   = useState<DbQueueItem[]>([]);
+  const [souls, setSouls]   = useState<DbSoul[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab]       = useState<QTab>('watch');
+  const [statusF, setStatusF] = useState<'all' | QStatus>('all');
+  const [search, setSearch] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [editItem, setEditItem] = useState<DbQueueItem | null>(null);
+  const [form, setForm]     = useState<Form>(EMPTY);
+  const [soulIds, setSoulIds] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [delItem, setDelItem] = useState<DbQueueItem | null>(null);
+  const [toast, show] = useToast();
 
   useEffect(() => {
-    async function load() {
-      await new Promise(r => setTimeout(r, 100));
-      const ready = await ensureSession();
-      if (!ready) { setLoading(false); return; }
+    (async () => {
       try {
-        const [data, soulData] = await Promise.all([getQueue(), getSouls()]);
+        if (!(await ensureSession())) return;
+        const [data, soulData] = await Promise.all([getQueue(), getSouls().catch(() => [] as DbSoul[])]);
         setItems(data);
         setSouls(soulData);
-      } catch (err) {
-        console.error('Queue load error:', err);
-        show('Could not load queue.');
+        // Open on the busiest tab
+        const busiest = TAB_KEYS.map(k => [k, data.filter(d => d.tab === k && d.status !== 'done').length] as const).sort((a, b) => b[1] - a[1])[0];
+        if (busiest && busiest[1] > 0) setTab(busiest[0]);
+      } catch {
+        show('Could not load your queue.', 'var(--red)');
       } finally {
         setLoading(false);
       }
-    }
-    load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    })();
+  }, [show]);
 
-  const tabItems = items
+  const q = search.trim().toLowerCase();
+  const order: Record<QStatus, number> = { progress: 0, todo: 1, done: 2 };
+  const visible = useMemo(() => items
     .filter(i => i.tab === tab)
     .filter(i => statusF === 'all' || i.status === statusF)
-    .filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()));
+    .filter(i => !q || `${i.title} ${i.meta ?? ''} ${i.notes ?? ''}`.toLowerCase().includes(q))
+    .sort((a, b) => order[a.status] - order[b.status] || b.created_at.localeCompare(a.created_at)),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [items, tab, statusF, q]);
 
-  const countFor = (t: QTab) => items.filter(i => i.tab === t).length;
-  const tabs: [string, string][] = [
-    ['watch',   `Watch (${countFor('watch')})`  ],
-    ['listen',  `Listen (${countFor('listen')})`],
-    ['read',    `Read (${countFor('read')})`    ],
-    ['explore', `Explore (${countFor('explore')})`],
-  ];
+  const openCount = (t: QTab) => items.filter(i => i.tab === t && i.status !== 'done').length;
+  const tabs: [string, string][] = TAB_KEYS.map(k => [k, `${TABS[k].label}${openCount(k) ? ` ${openCount(k)}` : ''}`]);
 
-  const openAdd = () => {
-    setForm({ title:'', meta:'', status:'todo' });
-    setEditItem(null);
-    setLinkedSoulIds([]);
-    setSoulPickerActive(false);
-    setModal(true);
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(f => ({ ...f, [k]: v }));
+  const patch = async (item: DbQueueItem, updates: Partial<DbQueueItem>, okMsg?: string) => {
+    setItems(l => l.map(x => x.id === item.id ? { ...x, ...updates } : x));
+    try { await updateQueueItem(item.id, updates); if (okMsg) show(okMsg); }
+    catch { setItems(l => l.map(x => x.id === item.id ? item : x)); show('Could not update that.', 'var(--red)'); }
   };
 
-  const openEdit = async (item: DbQueueItem) => {
-    setForm({ title: item.title, meta: item.meta ?? '', status: item.status });
+  const setStatus = (item: DbQueueItem, status: QStatus) => patch(item, {
+    status,
+    pct: status === 'done' ? 100 : status === 'todo' ? 0 : Math.max(item.pct, 5),
+  }, status === 'done' ? `Finished "${item.title}"` : undefined);
+
+  const openAdd = () => { setEditItem(null); setForm(EMPTY); setSoulIds([]); setFormOpen(true); };
+  const openEdit = (item: DbQueueItem) => {
     setEditItem(item);
-    setLinkedSoulIds([]);
-    setSoulPickerActive(false);
-    setModal(true);
-    try {
-      const links = await getSoulLinksForItem('queue', item.id);
-      setLinkedSoulIds(links.map(l => l.soul_id));
-      if (links.length > 0) setSoulPickerActive(true);
-    } catch { /* non-fatal */ }
+    setForm({ title: item.title, meta: item.meta ?? '', notes: item.notes ?? '', status: item.status });
+    setSoulIds([]);
+    setFormOpen(true);
+    getSoulLinksForItem('queue', item.id).then(l => setSoulIds(l.map(x => x.soul_id))).catch(() => {});
   };
 
   const save = async () => {
-    if (!form.title.trim()) return;
-
-    if (editItem) {
-      const payload = {
-        title:  form.title.trim(),
-        meta:   form.meta || null,
-        status: form.status,
-        pct:    form.status === 'done' ? 100 : editItem.pct,
-      };
-      setItems(l => l.map(x => x.id === editItem.id ? { ...x, ...payload } : x));
-      setModal(false);
-      try {
-        await updateQueueItem(editItem.id, payload);
-        if (soulPickerActive) {
-          await setSoulLinks('queue', editItem.id, payload.title, payload.meta, linkedSoulIds);
-        }
-        show('Updated!');
-      } catch {
-        setItems(l => l.map(x => x.id === editItem.id ? editItem : x));
-        show('Could not update.');
-      }
-    } else {
-      const payload = {
-        tab,
-        title:      form.title.trim(),
-        meta:       form.meta || null,
-        status:     form.status,
-        pct:        form.status === 'done' ? 100 : 0,
-        color:      COLORS[Math.floor(Math.random() * COLORS.length)],
-        added_date: new Date().toISOString().split('T')[0],
-      };
-      setModal(false);
-      setForm({ title:'', meta:'', status:'todo' });
-      try {
-        const created = await addQueueItem(payload);
-        setItems(l => [created, ...l]);
-        if (soulPickerActive) {
-          await setSoulLinks('queue', created.id, created.title, created.meta ?? null, linkedSoulIds);
-        }
-        show('Added!');
-      } catch {
-        show('Could not add item.');
-      }
+    if (!form.title.trim() || saving) return;
+    setSaving(true);
+    try {
+      const base = { title: form.title.trim(), meta: form.meta.trim() || null, notes: form.notes.trim() || null, status: form.status };
+      const saved = editItem
+        ? await updateQueueItem(editItem.id, { ...base, pct: form.status === 'done' ? 100 : form.status === 'todo' ? 0 : editItem.pct })
+        : await addQueueItem({ ...base, tab, pct: form.status === 'done' ? 100 : 0, color: TILE_COLORS[Math.floor(Math.random() * TILE_COLORS.length)], added_date: localDateStr() });
+      setItems(l => editItem ? l.map(x => x.id === saved.id ? saved : x) : [saved, ...l]);
+      await setSoulLinks('queue', saved.id, saved.title, saved.meta ?? null, soulIds).catch(() => show('Saved, but the people links did not update.', 'var(--red)'));
+      setFormOpen(false);
+      show(editItem ? 'Changes saved' : `Added to ${TABS[tab].label}`);
+    } catch {
+      show('Could not save that.', 'var(--red)');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const del = async (item: DbQueueItem) => {
-    const snapshot = [...items];
+  const doDelete = async () => {
+    const item = delItem; if (!item) return;
+    const snapshot = items;
     setItems(l => l.filter(x => x.id !== item.id));
-    try {
-      await deleteQueueItem(item.id);
-      show('Removed.');
-    } catch {
-      setItems(snapshot);
-      show('Could not remove.');
-    }
+    setDelItem(null);
+    try { await deleteQueueItem(item.id); await deleteSoulLinksForItem('queue', item.id).catch(() => {}); show('Removed from your queue'); }
+    catch { setItems(snapshot); show('Could not remove that.', 'var(--red)'); }
   };
 
-  const cycle = async (item: DbQueueItem) => {
-    const order: QStatus[] = ['todo', 'progress', 'done'];
-    const nextStatus = order[(order.indexOf(item.status) + 1) % order.length];
-    const nextPct    = nextStatus === 'done' ? 100 : nextStatus === 'progress' ? 50 : 0;
-    setItems(l => l.map(x => x.id === item.id ? { ...x, status: nextStatus, pct: nextPct } : x));
-    try {
-      await updateQueueItem(item.id, { status: nextStatus, pct: nextPct });
-      show(`Marked as ${QUEUE_STATUS[nextStatus].label}`);
-    } catch {
-      setItems(l => l.map(x => x.id === item.id ? item : x));
-      show('Could not update status.');
-    }
-  };
-
-  const setPct = async (item: DbQueueItem, pct: number) => {
-    setItems(l => l.map(x => x.id === item.id ? { ...x, pct } : x));
-    try {
-      await updateQueueItem(item.id, { pct });
-    } catch {
-      setItems(l => l.map(x => x.id === item.id ? item : x));
-      show('Could not update progress.');
-    }
-  };
-
-  const modalTitle = editItem
-    ? `Edit — ${editItem.title}`
-    : `Add to ${tab.charAt(0).toUpperCase() + tab.slice(1)}`;
+  const T = TABS[editItem?.tab ?? tab];
+  const total = items.filter(i => i.status !== 'done').length;
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', position:'relative' }} className="animate-fade-up">
-      <Topbar title="Queue ▷" action={<Btn onClick={openAdd}>+ Add</Btn>} />
+    <div className={s.page}>
+      <Topbar
+        title="Queue"
+        sub={loading ? 'Loading your queue' : total ? `${total} things to look forward to` : 'Things to watch, hear, read and try'}
+        maxWidth={860}
+        action={<Btn onClick={openAdd}><Plus size={16} strokeWidth={2.25} /> Add</Btn>}
+      />
 
-      <InnerTabs tabs={tabs} active={tab} onTab={t => setTab(t as QTab)} />
-
-      <div style={{ display:'flex', gap:7, padding:'8px 14px', borderBottom:`1px solid ${C.bds}`, alignItems:'center' }}>
-        <div style={{ flex:1 }}>
-          <SearchBar value={search} onChange={setSearch} placeholder={`Search ${tab}...`} />
+      <div className={s.wrap}>
+        <InnerTabs tabs={tabs} active={tab} onTab={t => setTab(t as QTab)} />
+        <div className={s.filters}>
+          <SearchBar value={search} onChange={setSearch} placeholder={`Search ${TABS[tab].label.toLowerCase()}`} className={s.search} />
+          <div className={s.statusPills}>
+            <Pill active={statusF === 'all'} onClick={() => setStatusF('all')}>All</Pill>
+            {(['todo', 'progress', 'done'] as QStatus[]).map(st => (
+              <Pill key={st} active={statusF === st} color={STATUS[st].color} onClick={() => setStatusF(st)}>{STATUS[st].label}</Pill>
+            ))}
+          </div>
         </div>
-        <Pill active={statusF==='all'}      onClick={() => setStatusF('all')}>All</Pill>
-        <Pill active={statusF==='todo'}     color={QUEUE_STATUS.todo.color}     onClick={() => setStatusF('todo')}>Not Started</Pill>
-        <Pill active={statusF==='progress'} color={QUEUE_STATUS.progress.color} onClick={() => setStatusF('progress')}>In Progress</Pill>
-        <Pill active={statusF==='done'}     color={QUEUE_STATUS.done.color}     onClick={() => setStatusF('done')}>Done</Pill>
+
+        <div className={s.list}>
+          {loading ? (
+            [0, 1, 2].map(i => <div key={i} className={`skeleton ${s.skel}`} />)
+          ) : visible.length === 0 ? (
+            <EmptyState
+              icon={<ListVideo size={26} />}
+              msg={q || statusF !== 'all' ? 'Nothing matches those filters.' : `Nothing to ${TABS[tab].verb} yet. ${TABS[tab].hint} go here.`}
+              action={!q && statusF === 'all' ? <Btn sm onClick={openAdd}><Plus size={15} /> Add something</Btn> : undefined}
+            />
+          ) : visible.map(item => (
+            <QueueRow
+              key={item.id}
+              item={item}
+              onOpen={() => openEdit(item)}
+              onStatus={st => setStatus(item, st)}
+              onPct={pct => patch(item, { pct, ...(pct === 100 ? { status: 'done' as QStatus } : {}) }, pct === 100 ? `Finished "${item.title}"` : undefined)}
+              onDelete={() => setDelItem(item)}
+            />
+          ))}
+        </div>
       </div>
 
-      <div style={{ flex:1, overflowY:'auto', padding:'8px 14px', display:'flex', flexDirection:'column', gap:7 }}>
-        {loading ? (
-          <EmptyState icon="▷" msg="Loading your queue..." />
-        ) : tabItems.length === 0 ? (
-          <EmptyState icon="▷" msg="Nothing here yet — add something!" />
-        ) : tabItems.map(item => (
-          <div
-            key={item.id}
-            style={{ ...card(), display:'flex', alignItems:'center', gap:10, position:'relative', cursor:'pointer' }}
-            onClick={() => openEdit(item)}
-            onMouseEnter={ev => { const el = ev.currentTarget.querySelector('.q-del') as HTMLElement | null; if (el) el.style.opacity = '1'; }}
-            onMouseLeave={ev => { const el = ev.currentTarget.querySelector('.q-del') as HTMLElement | null; if (el) el.style.opacity = '0'; }}
-          >
-            <div style={{ width:36, height:36, borderRadius:6, background:item.color, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>
-              {TAB_ICON[tab]}
-            </div>
-
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:C.tx, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginBottom:1 }}>{item.title}</div>
-              <div style={{ fontFamily:fonts.mono, fontSize:9, color:C.txs, opacity:.45 }}>{item.meta}</div>
-              {item.status === 'progress' && (
-                <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
-                  <Bar pct={item.pct} color={C.or} h={3} />
-                  <input
-                    type="range" min={0} max={100} step={5} value={item.pct}
-                    onChange={e => { e.stopPropagation(); setPct(item, +e.target.value); }}
-                    onClick={e => e.stopPropagation()}
-                    style={{ width:55, flexShrink:0, accentColor:C.or }}
-                  />
-                  <span style={{ fontFamily:fonts.mono, fontSize:9, color:C.or, minWidth:28 }}>{item.pct}%</span>
-                </div>
-              )}
-              {item.status === 'done' && <Bar pct={100} color={C.puL} h={3} />}
-            </div>
-
-            <div style={{ display:'flex', flexDirection:'column', gap:3, alignItems:'flex-end', flexShrink:0 }}>
-              <span
-                onClick={e => { e.stopPropagation(); cycle(item); }}
-                title="Click to advance"
-                style={{ fontFamily:fonts.mono, fontSize:8, textTransform:'uppercase', padding:'2px 7px', borderRadius:3, background:`${QUEUE_STATUS[item.status].color}22`, color:QUEUE_STATUS[item.status].color, cursor:'pointer', letterSpacing:1, whiteSpace:'nowrap' }}
-              >{QUEUE_STATUS[item.status].label}</span>
-              <span style={{ fontFamily:fonts.mono, fontSize:8, color:C.txm, opacity:.4 }}>{item.added_date}</span>
-            </div>
-
-            <button
-              className="q-del"
-              onClick={e => { e.stopPropagation(); del(item); }}
-              style={{ background:'rgba(248,113,113,.1)', border:'1px solid rgba(248,113,113,.3)', color:C.red, borderRadius:5, padding:'3px 7px', fontSize:10, cursor:'pointer', opacity:0, transition:'opacity .15s', fontFamily:fonts.main }}
-            >×</button>
+      {formOpen && (
+        <Modal onClose={() => !saving && setFormOpen(false)}>
+          <ModalTitle>{editItem ? 'Edit' : `Add something to ${T.verb}`}</ModalTitle>
+          <FInput label="Title" value={form.title} onChange={v => set('title', v)} placeholder={`What do you want to ${T.verb}?`} />
+          <FInput label="Details" value={form.meta} onChange={v => set('meta', v)} placeholder="Author, genre, who recommended it" />
+          <FArea label="Notes" value={form.notes} onChange={v => set('notes', v)} rows={2} placeholder="Anything to remember" />
+          <Lbl>Status</Lbl>
+          <div className={s.statusPills}>
+            {(['todo', 'progress', 'done'] as QStatus[]).map(st => (
+              <Pill key={st} active={form.status === st} color={STATUS[st].color} onClick={() => set('status', st)}>{STATUS[st].label}</Pill>
+            ))}
           </div>
-        ))}
-      </div>
+          <div style={{ height: 14 }} />
+          <SoulLinkField souls={souls} value={soulIds} onChange={setSoulIds} label="Recommended by or shared with" />
+          <ModalFooter onCancel={() => setFormOpen(false)} onSave={save} saveLabel={saving ? 'Saving' : editItem ? 'Save changes' : 'Add'} />
+        </Modal>
+      )}
 
-      {modal && (
-        <Modal onClose={() => { setModal(false); setEditItem(null); }}>
-          <ModalTitle>{modalTitle}</ModalTitle>
-          <FInput
-            label="Title"
-            value={form.title}
-            onChange={v => setForm(f => ({ ...f, title:v }))}
-            placeholder={`What do you want to ${tab==='read'?'read':tab==='listen'?'listen to':tab==='explore'?'explore':'watch'}?`}
-          />
-          <FInput label="Details" value={form.meta} onChange={v => setForm(f => ({ ...f, meta:v }))} placeholder="Genre, author, length..." />
-          <div style={{ marginBottom:14 }}>
-            <Lbl>Status</Lbl>
-            <div style={{ display:'flex', gap:6, marginTop:4 }}>
-              {(['todo','progress','done'] as QStatus[]).map(st => (
-                <Pill key={st} active={form.status === st} color={QUEUE_STATUS[st].color} onClick={() => setForm(f => ({ ...f, status:st }))}>
-                  {QUEUE_STATUS[st].label}
-                </Pill>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 14 }}>
-            {!soulPickerActive ? (
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); setSoulPickerActive(true); }}
-                style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: 6, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 11, padding: '5px 10px', width: '100%' }}
-              >+ Link souls</button>
-            ) : (
-              <>
-                <Lbl>Linked Souls</Lbl>
-                <SoulPicker
-                  souls={souls}
-                  linkedIds={linkedSoulIds}
-                  onToggle={id => setLinkedSoulIds(prev =>
-                    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-                  )}
-                />
-              </>
-            )}
-          </div>
-
-          <ModalFooter onCancel={() => { setModal(false); setEditItem(null); }} onSave={save} saveLabel={editItem ? 'Update' : 'Add'} />
+      {delItem && (
+        <Modal onClose={() => setDelItem(null)}>
+          <Confirm msg={`"${delItem.title}" will be removed from your queue.`} onConfirm={doDelete} onCancel={() => setDelItem(null)} />
         </Modal>
       )}
 

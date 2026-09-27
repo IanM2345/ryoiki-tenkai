@@ -1,333 +1,352 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Check, RotateCcw, Save, TriangleAlert, CircleCheck, Plus, Sparkles, Type, Palette, Layers } from 'lucide-react';
 import s from './theme.module.css';
-import { Btn, Lbl, Topbar, Toast, useToast } from '@/components/ui';
+import { Btn, Tag, Topbar, Toast, useToast } from '@/components/ui';
 import { getSettings, saveSettings } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import {
+  PRESET_THEMES, APP_FONTS, FONT_SIZES, DEFAULT_THEME, DEFAULT_FONT_KEY, DEFAULT_SIZE_IDX,
+  applyTheme, saveThemeLocally, readLocalTheme, fontKeyFromFamily, sizeIdxFromPx, type StoredTheme,
+} from '@/lib/theme';
 
-// ─── PRESETS ──────────────────────────────────────────────────
+// ─── TYPES & HELPERS ──────────────────────────────────────────
+type ColorKey = 'bg' | 'accent' | 'secondary' | 'text';
+interface Draft { bg: string; accent: string; secondary: string; text: string; font: string; sizeIdx: number; }
 
-const PRESETS = [
-  { name:'Default',  bg:'#0d0a0f', accent:'#ff8c00', secondary:'#7c3aed', text:'#f5e6d0' },
-  { name:'Warm',     bg:'#f5f0e8', accent:'#c9736a', secondary:'#9b8ec4', text:'#1a1612' },
-  { name:'Midnight', bg:'#0d0f1a', accent:'#7b8eff', secondary:'#c4b0ff', text:'#e8e0ff' },
-  { name:'Sage',     bg:'#0a1a0a', accent:'#4ade80', secondary:'#a3e635', text:'#d4f5d4' },
-  { name:'Rose',     bg:'#1a0a10', accent:'#f43f5e', secondary:'#fb7185', text:'#ffe4e8' },
-  { name:'Ocean',    bg:'#04111a', accent:'#22d3ee', secondary:'#38bdf8', text:'#e0f2fe' },
+const COLOR_FIELDS: { key: ColorKey; label: string; hint: string }[] = [
+  { key: 'bg',        label: 'Background', hint: 'The page behind everything' },
+  { key: 'accent',    label: 'Accent',     hint: 'Buttons, links and highlights' },
+  { key: 'secondary', label: 'Secondary',  hint: 'Tags, icons and soft tints' },
+  { key: 'text',      label: 'Text',       hint: 'Headings and body copy' },
 ];
 
-const FONTS: Record<string, string> = {
-  comic:   "'Comic Sans MS', cursive",
-  georgia: 'Georgia, serif',
-  mono:    "'Courier New', monospace",
-  system:  'system-ui, sans-serif',
+const DEFAULT_DRAFT: Draft = {
+  bg: DEFAULT_THEME.bg, accent: DEFAULT_THEME.accent, secondary: DEFAULT_THEME.secondary, text: DEFAULT_THEME.text,
+  font: DEFAULT_FONT_KEY, sizeIdx: DEFAULT_SIZE_IDX,
 };
 
-const FONT_SIZES: { label: string; px: number }[] = [
-  { label: 'XS',  px: 11 },
-  { label: 'S',   px: 12 },
-  { label: 'M',   px: 13 },
-  { label: 'L',   px: 14 },
-  { label: 'XL',  px: 15 },
-  { label: 'XXL', px: 17 },
-];
-
-const DEFAULT_SIZE_IDX = 2;
-const DEFAULT_THEME = PRESETS[0];
-const DEFAULT_FONT  = 'comic';
-
-type ThemeKey = 'bg' | 'accent' | 'secondary' | 'text';
-interface Theme { name: string; bg: string; accent: string; secondary: string; text: string; }
-
-// ─── HELPERS ──────────────────────────────────────────────────
-
-function applyFontSize(px: number) {
-  document.documentElement.style.fontSize = `${px}px`;
+/** Normalise #rgb / #rrggbb (with or without #) to lowercase #rrggbb, or null. */
+function normHex(v: string | null | undefined): string | null {
+  const m = (v ?? '').trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!m) return null;
+  const h = m[1].length === 3 ? m[1].split('').map(c => c + c).join('') : m[1];
+  return `#${h.toLowerCase()}`;
 }
 
-function applyThemeVars(theme: Theme, fontFamily: string) {
-  const r = document.documentElement.style;
-  r.setProperty('--bg',   theme.bg);
-  r.setProperty('--surf', theme.bg);
-  r.setProperty('--card', theme.bg === '#0d0a0f' ? '#1a1025' : `${theme.bg}cc`);
-  r.setProperty('--or',   theme.accent);
-  r.setProperty('--or-l', theme.accent);
-  r.setProperty('--pu-l', theme.secondary);
-  r.setProperty('--tx',   theme.text);
-  r.setProperty('--font', fontFamily);
+function luminance(hex: string): number {
+  const h = normHex(hex) ?? '#000000';
+  const [r, g, b] = [1, 3, 5].map(i => {
+    const c = parseInt(h.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-// Find which font key matches a stored font family string
-function fontKeyFromFamily(family: string): string {
-  const match = Object.entries(FONTS).find(([, v]) => v === family);
-  return match ? match[0] : DEFAULT_FONT;
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
 }
 
-// Find which size index matches a stored px value
-function sizeIdxFromPx(px: number): number {
-  const idx = FONT_SIZES.findIndex(f => f.px === px);
-  return idx > -1 ? idx : DEFAULT_SIZE_IDX;
+const sameDraft = (a: Draft, b: Draft) =>
+  a.bg === b.bg && a.accent === b.accent && a.secondary === b.secondary && a.text === b.text && a.font === b.font && a.sizeIdx === b.sizeIdx;
+
+const toStored = (d: Draft): StoredTheme => ({
+  bg: d.bg, accent: d.accent, secondary: d.secondary, text: d.text,
+  font: APP_FONTS[d.font]?.family ?? APP_FONTS[DEFAULT_FONT_KEY].family,
+  fontSize: FONT_SIZES[d.sizeIdx]?.px ?? FONT_SIZES[DEFAULT_SIZE_IDX].px,
+});
+
+function fromStored(t: StoredTheme, base: Draft = DEFAULT_DRAFT): Draft {
+  return {
+    bg:        normHex(t.bg)        ?? base.bg,
+    accent:    normHex(t.accent)    ?? base.accent,
+    secondary: normHex(t.secondary) ?? base.secondary,
+    text:      normHex(t.text)      ?? base.text,
+    font:      t.font ? fontKeyFromFamily(t.font) : base.font,
+    sizeIdx:   t.fontSize ? sizeIdxFromPx(t.fontSize) : base.sizeIdx,
+  };
+}
+
+const presetVars = (p: { bg: string; accent: string; secondary: string; text: string }) => ({
+  ['--p-bg' as string]: p.bg, ['--p-ac' as string]: p.accent, ['--p-se' as string]: p.secondary, ['--p-tx' as string]: p.text,
+});
+
+// ─── COLOUR FIELD ─────────────────────────────────────────────
+function ColorField({ id, label, hint, value, onChange }: { id: string; label: string; hint: string; value: string; onChange: (v: string) => void }) {
+  const [text, setText] = useState(value);
+  const [prev, setPrev] = useState(value);
+  // Follow outside changes (picker, presets, reset) without an effect.
+  if (value !== prev) { setPrev(value); setText(value); }
+
+  return (
+    <div className={s.colorRow}>
+      <label className={s.swatch} style={{ ['--sw' as string]: value }}>
+        <input type="color" value={value} onChange={e => onChange(e.target.value)} aria-label={`${label} colour picker`} />
+      </label>
+      <div className={s.colorText}>
+        <label htmlFor={id} className={s.colorLabel}>{label}</label>
+        <span className={s.colorHint}>{hint}</span>
+      </div>
+      <input
+        id={id}
+        className={s.hexInput}
+        value={text}
+        spellCheck={false}
+        autoComplete="off"
+        maxLength={7}
+        onChange={e => {
+          setText(e.target.value);
+          const h = normHex(e.target.value);
+          if (h) onChange(h);
+        }}
+        onBlur={() => setText(value)}
+      />
+    </div>
+  );
 }
 
 // ─── PAGE ──────────────────────────────────────────────────────
-
 export default function ThemePage() {
-  const [activeIdx, setActiveIdx] = useState(0);
-  const [custom,    setCustom]    = useState<Theme>({ ...DEFAULT_THEME });
-  const [font,      setFont]      = useState(DEFAULT_FONT);
-  const [sizeIdx,   setSizeIdx]   = useState(DEFAULT_SIZE_IDX);
-  const [saving,    setSaving]    = useState(false);
+  const [saved, setSaved]   = useState<Draft>(DEFAULT_DRAFT);
+  const [draft, setDraft]   = useState<Draft>(DEFAULT_DRAFT);
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [toast, show] = useToast();
+  const savedRef = useRef<Draft>(DEFAULT_DRAFT);
+  const previewingRef = useRef(false);
 
-  // ── Load saved settings on mount ──────────────────────────
+  const dirty = loaded && !sameDraft(saved, draft);
+
+  // ── Load: local copy first (instant), then the database ────
   useEffect(() => {
-    async function load() {
-      const ready = await ensureSession();
-      if (!ready) return;
+    (async () => {
+      const local = fromStored(readLocalTheme());
+      setSaved(local); setDraft(local); savedRef.current = local;
       try {
-        const settings = await getSettings();
-        if (!settings) return; // no saved settings yet — keep defaults
-
-        const loadedTheme: Theme = {
-          name:      'Custom',
-          bg:        settings.theme_bg        || DEFAULT_THEME.bg,
-          accent:    settings.theme_accent    || DEFAULT_THEME.accent,
-          secondary: settings.theme_secondary || DEFAULT_THEME.secondary,
-          text:      settings.theme_text      || DEFAULT_THEME.text,
-        };
-
-        // Check if loaded theme matches a preset
-        const presetIdx = PRESETS.findIndex(p =>
-          p.bg === loadedTheme.bg &&
-          p.accent === loadedTheme.accent &&
-          p.secondary === loadedTheme.secondary &&
-          p.text === loadedTheme.text
-        );
-
-        setCustom(loadedTheme);
-        setActiveIdx(presetIdx > -1 ? presetIdx : -1);
-        setFont(fontKeyFromFamily(settings.theme_font || FONTS[DEFAULT_FONT]));
-        setSizeIdx(sizeIdxFromPx(settings.theme_font_size || FONT_SIZES[DEFAULT_SIZE_IDX].px));
-
-        // Apply immediately so the app reflects saved theme on page load
-        applyThemeVars(loadedTheme, settings.theme_font || FONTS[DEFAULT_FONT]);
-        applyFontSize(settings.theme_font_size || FONT_SIZES[DEFAULT_SIZE_IDX].px);
-      } catch(e) {
-        console.error('[theme] load error:', e);
+        if (!(await ensureSession())) return;
+        const st = await getSettings();
+        if (!st) return;
+        const fromDb = fromStored({
+          bg: st.theme_bg, accent: st.theme_accent, secondary: st.theme_secondary, text: st.theme_text,
+          font: st.theme_font, fontSize: st.theme_font_size,
+        }, local);
+        setSaved(fromDb); setDraft(fromDb); savedRef.current = fromDb;
+        // Keep this device in sync with the theme saved in the database.
+        saveThemeLocally(toStored(fromDb));
+      } catch {
+        show('Could not load your saved theme.', 'var(--red)');
+      } finally {
+        setLoaded(true);
       }
-    }
-    load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    })();
+  }, [show]);
 
-  // ── Handlers ──────────────────────────────────────────────
-  const applyPreset = (p: Theme, i: number) => {
-    setActiveIdx(i);
-    setCustom({ ...p });
-  };
+  // ── Live apply: the whole app previews the draft ───────────
+  useEffect(() => {
+    if (!loaded) return;
+    applyTheme(toStored(draft));
+    previewingRef.current = true;
+  }, [draft, loaded]);
 
-  const setColor = (key: ThemeKey, val: string) => {
-    setCustom(c => ({ ...c, [key]: val }));
-    setActiveIdx(-1);
-  };
+  // Leaving the page without saving puts the saved theme back
+  // (only once we have actually previewed something).
+  useEffect(() => () => { if (previewingRef.current) applyTheme(toStored(savedRef.current)); }, []);
 
-  const handleSizeChange = (idx: number) => {
-    setSizeIdx(idx);
-    applyFontSize(FONT_SIZES[idx].px);
-  };
+  // Warn before closing the tab with unsaved changes.
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
 
-  // ── Save ──────────────────────────────────────────────────
+  // ── Handlers ───────────────────────────────────────────────
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft(d => ({ ...d, [k]: v }));
+  const pickPreset = (p: typeof PRESET_THEMES[number]) =>
+    setDraft(d => ({ ...d, bg: p.bg, accent: p.accent, secondary: p.secondary, text: p.text }));
+  const reset = () => setDraft(saved);
+  const restoreDefaults = () => setDraft(DEFAULT_DRAFT);
+
   const save = async () => {
-  setSaving(true);
-  applyThemeVars(custom, FONTS[font]);
-  applyFontSize(FONT_SIZES[sizeIdx].px);
+    if (saving || !dirty) return;
+    setSaving(true);
+    const next = draft;
+    const stored = toStored(next);
+    try {
+      await saveSettings({
+        theme_bg: next.bg, theme_accent: next.accent, theme_secondary: next.secondary, theme_text: next.text,
+        theme_font: stored.font, theme_font_size: stored.fontSize,
+      });
+      saveThemeLocally(stored);
+      setSaved(next); savedRef.current = next;
+      show('Theme saved');
+    } catch {
+      show('Could not save your theme. Your changes are still here.', 'var(--red)');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  // Persist theme to localStorage so it loads instantly on every page visit
-  localStorage.setItem('yw-theme', JSON.stringify({
-    bg:        custom.bg,
-    accent:    custom.accent,
-    secondary: custom.secondary,
-    text:      custom.text,
-    font:      FONTS[font],
-    fontSize:  FONT_SIZES[sizeIdx].px,
-  }));
-
-  try {
-    await saveSettings({
-      theme_bg:        custom.bg,
-      theme_accent:    custom.accent,
-      theme_secondary: custom.secondary,
-      theme_text:      custom.text,
-      theme_font:      FONTS[font],
-      theme_font_size: FONT_SIZES[sizeIdx].px,
-    });
-    show('Theme saved! ✓');
-  } catch(e) {
-    console.error('[theme] save error:', e);
-    show('Could not save theme.', '#f87171');
-  } finally {
-    setSaving(false);
-  }
-};
-
-  const currentSize = FONT_SIZES[sizeIdx];
+  const activePreset = PRESET_THEMES.findIndex(p =>
+    p.bg === draft.bg && p.accent === draft.accent && p.secondary === draft.secondary && p.text === draft.text);
+  const ratio = contrast(draft.text, draft.bg);
+  const lowContrast = ratio < 4.5;
+  const size = FONT_SIZES[draft.sizeIdx] ?? FONT_SIZES[DEFAULT_SIZE_IDX];
+  const isDefault = sameDraft(draft, DEFAULT_DRAFT);
 
   return (
-    <div className={`${s.page} aFadeUp`}>
-      <Topbar title="Theme & Colors ◑" sub="Make this space truly yours" />
+    <div className={s.page}>
+      <Topbar title="Theme" sub="Make this space feel like yours" maxWidth={1120} />
 
-      <div className={s.grid}>
+      <div className={s.wrap}>
+        <div className={s.layout}>
+          {/* ── Controls ──────────────────────────────────── */}
+          <div className={s.controls}>
+            <section className={s.card} aria-labelledby="presets-title">
+              <h2 id="presets-title" className={s.cardTitle}><Layers size={17} strokeWidth={2} /> Presets</h2>
+              <div className={s.presets} role="radiogroup" aria-label="Preset themes">
+                {PRESET_THEMES.map((p, i) => {
+                  const on = activePreset === i;
+                  return (
+                    <button
+                      key={p.name}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      className={`${s.preset} ${on ? s.presetOn : ''}`}
+                      style={presetVars(p)}
+                      onClick={() => pickPreset(p)}
+                      disabled={!loaded}
+                    >
+                      <span className={s.mini} aria-hidden>
+                        <span className={s.miniBar}>
+                          <span className={s.miniDot} />
+                          <span className={s.miniLine} />
+                        </span>
+                        <span className={s.miniBody}>
+                          <span className={s.miniText}>Aa</span>
+                          <span className={s.miniSub}>Hello there</span>
+                          <span className={s.miniRow}>
+                            <span className={s.miniBtn} />
+                            <span className={s.miniTag} />
+                          </span>
+                        </span>
+                        {on && <span className={s.miniCheck}><Check size={12} strokeWidth={3} /></span>}
+                      </span>
+                      <span className={s.presetName}>{p.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
 
-        {/* ── Left: controls ───────────────────────────────── */}
-        <div>
-
-          {/* Preset swatches */}
-          <Lbl>Preset Themes</Lbl>
-          <div className={s.presetGrid}>
-            {PRESETS.map((p, i) => (
-              <div key={p.name} className={s.presetItem} onClick={() => applyPreset(p, i)}>
-                <div className={`${s.presetSwatch} ${activeIdx === i ? s.presetSwatchActive : ''}`} style={{ background: p.bg }}>
-                  <div className={s.presetDots}>
-                    <div className={s.presetDot} style={{ background: p.accent }} />
-                    <div className={s.presetDot} style={{ background: p.secondary }} />
-                  </div>
-                  {activeIdx === i && <div className={s.previewCheck}>✓</div>}
+            <section className={s.card} aria-labelledby="colours-title">
+              <h2 id="colours-title" className={s.cardTitle}><Palette size={17} strokeWidth={2} /> Colours</h2>
+              {!loaded ? (
+                [0, 1, 2, 3].map(i => <div key={i} className={`skeleton ${s.rowSkel}`} />)
+              ) : (
+                <div className={s.colorList}>
+                  {COLOR_FIELDS.map(f => (
+                    <ColorField key={f.key} id={`theme-${f.key}`} label={f.label} hint={f.hint} value={draft[f.key]} onChange={v => set(f.key, v)} />
+                  ))}
                 </div>
-                <div className={s.presetName}>{p.name}</div>
+              )}
+              <div className={`${s.contrast} ${lowContrast ? s.contrastLow : ''}`} role={lowContrast ? 'alert' : undefined}>
+                {lowContrast ? <TriangleAlert size={16} strokeWidth={2} /> : <CircleCheck size={16} strokeWidth={2} />}
+                <span>
+                  {lowContrast
+                    ? `Text may be hard to read on this background (contrast ${ratio.toFixed(1)} to 1). Aim for 4.5 or more.`
+                    : `Text is easy to read on this background (contrast ${ratio.toFixed(1)} to 1).`}
+                </span>
               </div>
-            ))}
+            </section>
+
+            <section className={s.card} aria-labelledby="type-title">
+              <h2 id="type-title" className={s.cardTitle}><Type size={17} strokeWidth={2} /> Text</h2>
+              <span className={s.subLbl} id="font-lbl">Font</span>
+              <div className={s.fonts} role="radiogroup" aria-labelledby="font-lbl">
+                {Object.entries(APP_FONTS).map(([k, f]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    role="radio"
+                    aria-checked={draft.font === k}
+                    className={`${s.font} ${draft.font === k ? s.fontOn : ''}`}
+                    style={{ ['--ff' as string]: f.family }}
+                    onClick={() => set('font', k)}
+                    disabled={!loaded}
+                  >
+                    <span className={s.fontSample}>Aa</span>
+                    <span className={s.fontName}>{f.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <span className={s.subLbl} id="size-lbl">Size <span className={s.subVal}>{size.px}px</span></span>
+              <div className={s.sizes} role="radiogroup" aria-labelledby="size-lbl">
+                {FONT_SIZES.map((f, i) => (
+                  <button
+                    key={f.label}
+                    type="button"
+                    role="radio"
+                    aria-checked={draft.sizeIdx === i}
+                    aria-label={`${f.label}, ${f.px} pixels`}
+                    className={`${s.size} ${draft.sizeIdx === i ? s.sizeOn : ''}`}
+                    style={{ ['--fs' as string]: `${11 + i * 1.5}px` }}
+                    onClick={() => set('sizeIdx', i)}
+                    disabled={!loaded}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </section>
           </div>
 
-          {/* Custom colour pickers */}
-          <Lbl>Custom Colors</Lbl>
-          {([
-            ['Background', 'bg'],
-            ['Accent',     'accent'],
-            ['Secondary',  'secondary'],
-            ['Text',       'text'],
-          ] as [string, ThemeKey][]).map(([label, key]) => (
-            <div key={key} className={s.colorRow}>
-              <span className={s.colorLabel}>{label}</span>
-              <div className={s.colorRight}>
-                <div className={s.colorSwatch} style={{ background: custom[key] }}>
-                  <input
-                    type="color"
-                    className={s.colorSwatchInput}
-                    value={custom[key]}
-                    onChange={e => setColor(key, e.target.value)}
-                  />
+          {/* ── Preview + save ───────────────────────────── */}
+          <aside className={s.side}>
+            <section className={s.preview} aria-labelledby="preview-title">
+              <h2 id="preview-title" className={s.previewLbl}>Live preview</h2>
+              <div className={s.pvBar}>
+                <Sparkles size={15} strokeWidth={2} className={s.pvLogo} />
+                <span className={s.pvBrand}><span className={s.pvYour}>your</span><span className={s.pvWorld}>world</span></span>
+              </div>
+              <div className={s.pvCard}>
+                <div className={s.pvCardTitle}>The Barcelona trip</div>
+                <p className={s.pvCardText}>I still can&apos;t believe we actually went. Sunsets, tapas and far too many stairs.</p>
+                <div className={s.pvTags}>
+                  <Tag color="var(--pu-l)">travel</Tag>
+                  <Tag color="var(--or)">favourite</Tag>
                 </div>
-                <span className={s.colorHex}>{custom[key]}</span>
+              </div>
+              <div className={s.pvActions}>
+                <Btn sm><Plus size={15} strokeWidth={2.25} /> Add entry</Btn>
+                <Btn sm variant="ghost">Later</Btn>
+              </div>
+              <p className={s.pvMuted}>Muted text looks like this, and <span className={s.pvLink}>links look like this</span>.</p>
+            </section>
+
+            <div className={`${s.saveBar} ${dirty ? s.saveBarDirty : ''}`}>
+              <div className={s.status} aria-live="polite">
+                {dirty
+                  ? <><span className={s.statusDot} /> Unsaved changes</>
+                  : <><Check size={15} strokeWidth={2.5} className={s.statusOk} /> {loaded ? 'All changes saved' : 'Loading your theme'}</>}
+              </div>
+              <div className={s.saveActions}>
+                <Btn variant="ghost" sm onClick={reset} disabled={!dirty || saving}><RotateCcw size={14} strokeWidth={2.25} /> Reset</Btn>
+                <Btn sm onClick={save} disabled={!dirty || saving}><Save size={14} strokeWidth={2.25} /> {saving ? 'Saving' : 'Save'}</Btn>
               </div>
             </div>
-          ))}
-
-          {/* Font family */}
-          <Lbl>Font</Lbl>
-          <div className={s.fontRow}>
-            {Object.entries(FONTS).map(([k, v]) => (
-              <span
-                key={k}
-                className={`${s.fontChip} ${font === k ? s.fontChipActive : ''}`}
-                style={{ fontFamily: v }}
-                onClick={() => setFont(k)}
-              >{k}</span>
-            ))}
-          </div>
-
-          {/* Font size */}
-          <div className={s.sizeSection}>
-            <div className={s.sizeLabelRow}>
-              <Lbl>Font Size</Lbl>
-              <span className={s.sizeValue}>{currentSize.label} · {currentSize.px}px</span>
-            </div>
-            <div className={s.sizeSteps}>
-              {FONT_SIZES.map((f, i) => (
-                <button
-                  key={f.label}
-                  className={`${s.sizeStep} ${sizeIdx === i ? s.sizeStepActive : ''}`}
-                  onClick={() => handleSizeChange(i)}
-                  style={{ fontSize: `${10 + i}px` }}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <div className={s.sliderRow}>
-              <span className={s.sliderA}>A</span>
-              <input
-                type="range"
-                min={0}
-                max={FONT_SIZES.length - 1}
-                step={1}
-                value={sizeIdx}
-                onChange={e => handleSizeChange(Number(e.target.value))}
-                className={s.sizeSlider}
-              />
-              <span className={s.sliderB}>A</span>
-            </div>
-            <div className={s.sizeHint}>
-              Changes take effect immediately across the whole app
-            </div>
-          </div>
-        </div>
-
-        {/* ── Right: live preview ───────────────────────────── */}
-        <div>
-          <Lbl>Live Preview</Lbl>
-          <div
-            className={s.preview}
-            style={{
-              background: custom.bg,
-              fontFamily: FONTS[font],
-              fontSize:   `${currentSize.px}px`,
-            }}
-          >
-            <div className={s.previewBar} style={{ background: 'rgba(0,0,0,0.4)' }}>
-              <div className={s.previewLogo} style={{ color: custom.text }}>
-                ✦ <span style={{ color: custom.accent }}>your</span>
-                   <span style={{ color: custom.secondary }}>world</span>
-              </div>
-            </div>
-
-            <div className={s.previewStats}>
-              {([[127,'Saved',custom.accent],[34,'Places',custom.secondary],[12,'Journal',custom.text]] as [number,string,string][]).map(([n,l,c]) => (
-                <div key={l} className={s.previewStat}>
-                  <div className={s.previewStatNum} style={{ color: c }}>{n}</div>
-                  <div className={s.previewStatLabel} style={{ color: 'rgba(255,255,255,0.35)' }}>{l}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className={s.previewBtn} style={{ background: custom.accent, color: '#000' }}>
-              + Add Entry
-            </div>
-
-            <div className={s.previewCard}>
-              <div className={s.previewCardTitle} style={{ color: custom.text }}>
-                The Barcelona trip
-              </div>
-              <div className={s.previewCardText}>
-                I can&apos;t believe we actually went...
-              </div>
-            </div>
-
-            <div className={s.previewSizeTag} style={{ color: custom.accent }}>
-              {currentSize.label} · {currentSize.px}px
-            </div>
-          </div>
-
-          <div style={{ marginTop: 10 }}>
-            <Btn full onClick={save} disabled={saving}>
-              {saving ? 'Saving…' : 'Save Theme'}
-            </Btn>
-          </div>
-          <div className={s.saveNote}>
-            Saves colours, font &amp; size · applies to whole app instantly
-          </div>
+            <p className={s.saveNote}>
+              Changes preview across the whole app right away. Save to keep them on every device, or Reset to go back.
+              {!isDefault && loaded && <> <button type="button" className={s.linkBtn} onClick={restoreDefaults}>Use the default look</button></>}
+            </p>
+          </aside>
         </div>
       </div>
 
-      {toast !== null && <Toast msg={toast.msg} color={toast.color} />}
+      {toast && <Toast msg={toast.msg} color={toast.color} />}
     </div>
   );
 }

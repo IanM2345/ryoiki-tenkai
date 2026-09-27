@@ -1,95 +1,62 @@
-.wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.wrapper { display: flex; flex-direction: column; margin-bottom: 14px; }
+.label { margin-bottom: 6px; font-size: 0.78rem; font-weight: 700; color: var(--tx-m); }
 
-.label {
-  font-size: 0.75rem;
-  color: var(--text-muted, #a89abc);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-/* ── Drop zone (empty state) ─────────────────────────────── */
 .dropZone {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 20px 16px;
-  border: 2px dashed rgba(255, 140, 0, 0.35);
-  border-radius: 10px;
-  background: rgba(255, 140, 0, 0.04);
+  gap: 4px;
+  min-height: 120px;
+  padding: 18px;
+  border: 1.5px dashed var(--bd-s);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--bg) 60%, transparent);
+  color: var(--tx-m);
+  text-align: center;
   cursor: pointer;
-  transition: border-color 0.18s, background 0.18s;
-  min-height: 110px;
+  transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
 }
-
-.dropZone:hover,
-.dropZone:focus-visible {
-  border-color: rgba(255, 140, 0, 0.7);
-  background: rgba(255, 140, 0, 0.08);
-  outline: none;
-}
-
+.dropZone:hover, .dropZoneOver { border-color: var(--or); background: color-mix(in oklab, var(--or) 7%, transparent); color: var(--tx-s); }
+.dropZone:active { transform: scale(0.99); }
 .dropIcon {
-  font-size: 1.6rem;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--or) 14%, transparent);
+  color: var(--or-l);
 }
+.dropText { font-size: 0.92rem; font-weight: 700; color: var(--tx-s); }
+.dropSub  { font-size: 0.8rem; }
 
-.dropText {
-  font-size: 0.85rem;
-  color: var(--text, #f5e6d0);
-  font-family: 'Comic Sans MS', cursive;
-}
-
-.dropSub {
-  font-size: 0.72rem;
-  color: var(--text-muted, #a89abc);
-}
-
-/* ── Preview (filled state) ──────────────────────────────── */
 .preview {
   position: relative;
-  display: inline-block;
-  border-radius: 10px;
   overflow: hidden;
-  max-height: 180px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  background: var(--raised);
+  animation: fadeIn var(--dur-base) var(--ease-out) both;
 }
-
-.previewImg {
-  display: block;
-  width: 100%;
-  max-height: 180px;
-  object-fit: cover;
-  border-radius: 10px;
-}
-
+.previewImg { display: block; width: 100%; max-height: 240px; min-height: 120px; object-fit: cover; }
 .clearBtn {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 26px;
-  height: 26px;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
   border-radius: 50%;
-  background: rgba(13, 10, 15, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: var(--text, #f5e6d0);
-  font-size: 0.7rem;
+  background: color-mix(in oklab, #000 55%, transparent);
+  backdrop-filter: blur(6px);
+  color: #fff;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
+  transition: background-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
 }
-
-.clearBtn:hover {
-  background: rgba(200, 50, 50, 0.75);
-}
-
-/* ── Hidden file input ───────────────────────────────────── */
-.hiddenInput {
-  display: none;
-}
+.clearBtn:hover { background: color-mix(in oklab, var(--red) 80%, transparent); }
+.clearBtn:active { transform: scale(0.9); }
+.hiddenInput { display: none; }

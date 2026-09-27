@@ -1,117 +1,115 @@
 'use client';
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Sparkles, Eye, EyeOff, ArrowRight, Loader2, Info } from 'lucide-react';
 import { restoreSession } from '@/lib/supabase';
 import s from './login.module.css';
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const [email,    setEmail]    = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [error,    setError]    = useState('');
-  const [notice,   setNotice]   = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [showPw, setShowPw]     = useState(false);
+  const [error, setError]       = useState('');
+  const [shake, setShake]       = useState(0);
+  const [loading, setLoading]   = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
+  const reason = searchParams.get('reason');
+  const notice =
+    reason === 'inactivity' ? 'You were signed out after a while of inactivity. Welcome back!'
+    : reason === 'session_expired' ? 'Your session ended. Please sign in again.'
+    : '';
+
+  // Replay the shake animation each time a login fails
   useEffect(() => {
-    const reason = searchParams.get('reason');
-    if (reason === 'inactivity')      setNotice('You were logged out due to inactivity.');
-    if (reason === 'session_expired') setNotice('Your session expired. Please log in again.');
-  }, [searchParams]);
+    if (!shake || !formRef.current) return;
+    const el = formRef.current;
+    el.classList.remove('t-shake');
+    void el.offsetWidth;
+    el.classList.add('t-shake');
+  }, [shake]);
 
-  async function handleLogin() {
-    if (!email.trim() || !password.trim()) return;
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || !password || loading) return;
     setLoading(true);
     setError('');
-    setNotice('');
-
     try {
       const res = await fetch('/api/auth/login', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
-          email:    email.trim().toLowerCase(),
-          password,
-        }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? 'Wrong email or password.');
-
-      if (data.access_token === 'dev') {
-        // Hard navigation: a client-side push can reuse a cached
-      // "redirect to /login" response prefetched before the cookie existed.
-      const next = searchParams.get('next');
-      window.location.replace(next && next.startsWith('/') ? next : '/dashboard');
-        return;
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message ?? "That email and password don't match.");
       const session = await restoreSession(data.access_token, data.refresh_token);
-
-      if (!session) throw new Error('Session did not initialise. Please try again.');
-      // Hard navigation: a client-side push can reuse a cached
-      // "redirect to /login" response prefetched before the cookie existed.
+      if (!session) throw new Error('Something went wrong signing you in. Please try again.');
+      // Full page load so no page cached from before sign in gets reused
       const next = searchParams.get('next');
-      window.location.replace(next && next.startsWith('/') ? next : '/dashboard');
-
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Wrong email or password.');
-    } finally {
+      window.location.replace(next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
+    } catch (err) {
+      setError(err instanceof Error && err.message !== 'Wrong email or password.' ? err.message : "That email and password don't match.");
+      setShake(n => n + 1);
       setLoading(false);
     }
   }
 
-  const canSubmit = email.trim().length > 0 && password.trim().length > 0;
-
   return (
-    <div className={s.page}>
-      <div className={s.orb}>✦</div>
-      <h1 className={s.title}>
-        <span className={s.titleOr}>your</span>
-        <span className={s.titlePu}>world</span>
-      </h1>
-      <p className={s.subtitle}>private &amp; just for you</p>
+    <main className={s.page}>
+      <div className={s.glow} aria-hidden />
+      <div className={s.card}>
+        <div className={s.orb} aria-hidden><Sparkles size={28} strokeWidth={1.75} /></div>
+        <h1 className={s.title}><span className={s.titleOr}>your</span><span className={s.titlePu}>world</span></h1>
+        <p className={s.subtitle}>A private little place, just for you</p>
 
-      {notice && <p className={s.noticeMsg}>{notice}</p>}
+        {notice && <p className={s.notice}><Info size={15} /> {notice}</p>}
 
-      <div className={s.form}>
-        <div>
-          <label className={s.inputLabel}>Email</label>
-          <input
-            type="email"
-            autoFocus
-            autoComplete="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && canSubmit && handleLogin()}
-            placeholder="your@email.com"
-            className={`${s.passwordInput} ${error ? s.passwordInputError : ''}`}
-          />
-        </div>
+        <form ref={formRef} className={s.form} onSubmit={handleLogin} noValidate>
+          <label className={s.field}>
+            <span className={s.label}>Email</span>
+            <input
+              type="email"
+              autoFocus
+              autoComplete="email"
+              inputMode="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(''); }}
+              placeholder="you@example.com"
+              className={`${s.input} ${error ? s.inputError : ''}`}
+              aria-invalid={!!error}
+            />
+          </label>
 
-        <div>
-          <label className={s.inputLabel}>Password</label>
-          <input
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && canSubmit && handleLogin()}
-            placeholder="Enter your password"
-            className={`${s.passwordInput} ${error ? s.passwordInputError : ''}`}
-          />
-          {error && <p className={s.errorMsg}>{error}</p>}
-        </div>
+          <label className={s.field}>
+            <span className={s.label}>Password</span>
+            <span className={s.pwWrap}>
+              <input
+                type={showPw ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password}
+                onChange={e => { setPassword(e.target.value); setError(''); }}
+                placeholder="Your password"
+                className={`${s.input} ${error ? s.inputError : ''}`}
+                aria-invalid={!!error}
+                aria-describedby={error ? 'login-error' : undefined}
+              />
+              <button type="button" className={s.eye} onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'}>
+                {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </span>
+          </label>
 
-        <button
-          className={s.submitBtn}
-          onClick={handleLogin}
-          disabled={loading || !canSubmit}
-        >
-          {loading ? 'Entering...' : 'Enter →'}
-        </button>
+          {error && <p id="login-error" className={s.error} role="alert">{error}</p>}
 
-        <p className={s.hint}>Only you have access to this place.</p>
+          <button type="submit" className={s.submit} disabled={loading || !email.trim() || !password}>
+            {loading ? <><Loader2 size={18} className="aSpin" /> Opening your world</> : <>Come in <ArrowRight size={18} /></>}
+          </button>
+        </form>
+
+        <p className={s.hint}>Only you can get in here.</p>
       </div>
-    </div>
+    </main>
   );
 }
 

@@ -1,10 +1,15 @@
 'use client';
-import React, { useState, useEffect, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import {
+  Sunrise, Sun, Sunset, MoonStar, Plus, ArrowRight, Shuffle, LibraryBig, MapPin,
+  NotebookPen, Star, PenLine, TriangleAlert, CheckCheck, Sparkles, Users,
+} from 'lucide-react';
 import s from './dashboard.module.css';
 import { Btn, Tag, useToast, Toast } from '@/components/ui';
+import TaskRow from '@/components/tasks/TaskRow';
 import {
-  getTasks, addTask, updateTask, deleteTask, clearDoneTasks, type DbTask,
+  getTasks, addTask, updateTask,
   getJournalEntries, type DbJournalEntry,
   getLibrary, type DbLibraryEntry,
   getSouls, type DbSoul,
@@ -13,422 +18,297 @@ import {
   getSettings, saveSettings,
 } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { type Task, isOverdue, isDueToday, sortOpen } from '@/lib/tasks';
+import { localDateStr, fmtDate, relDay } from '@/lib/dates';
 import BirthdayCard from '@/components/ui/BirthdayCard';
-
-// ─── TASK TYPES — aligned with DB schema ─────────────────────
-
-export type Priority = 'high' | 'medium' | 'low';
-export type Task = DbTask;
-
-export const PRIO_COLOR: Record<Priority, string> = {
-  high:   '#f87171',
-  medium: '#ff8c00',
-  low:    '#4ade80',
-};
-
-// ─── LIBRARY COLOR MAP ────────────────────────────────────────
+import StoredImage from '@/components/ui/StoredImage';
 
 const LIBRARY_COLOR: Record<DbLibraryEntry['type'], string> = {
-  link:  '#a855f7',
-  media: '#ff8c00',
-  place: '#ffb347',
-  note:  '#8a7060',
-  idea:  '#c084fc',
+  link: 'var(--pu-l)', media: 'var(--or)', place: 'var(--or-l)', note: 'var(--tx-s)', idea: 'var(--pu-g)',
 };
 
-// ─── HELPERS ──────────────────────────────────────────────────
-
-const todayStr = () => new Date().toISOString().split('T')[0];
-
-export const fmtDate = (iso: string) =>
-  new Date(iso + 'T00:00:00').toLocaleDateString('en-IE', {
-    day: 'numeric', month: 'short',
-  });
-
-export const isOverdue = (t: Task) =>
-  !t.done && t.due_date !== null && t.due_date < todayStr();
-
-function getGreeting(hour: number): string {
-  if (hour >= 0  && hour < 7)  return 'Good night';
-  if (hour >= 7  && hour < 12) return 'Good morning';
-  if (hour >= 12 && hour < 17) return 'Good afternoon';
-  return 'Good evening';
+function greetingFor(h: number) {
+  if (h < 5)  return { text: 'Good night',     Icon: MoonStar };
+  if (h < 12) return { text: 'Good morning',   Icon: h < 8 ? Sunrise : Sun };
+  if (h < 17) return { text: 'Good afternoon', Icon: Sun };
+  if (h < 21) return { text: 'Good evening',   Icon: Sunset };
+  return { text: 'Good night', Icon: MoonStar };
 }
 
-function getGreetingEmoji(hour: number): string {
-  if (hour >= 0  && hour < 7)  return '⭐';
-  if (hour >= 7  && hour < 12) return '☀️';
-  if (hour >= 12 && hour < 17) return '✨';
-  return '🌙';
+/** Ticks once a minute so the greeting and clock stay current. */
+function useNow() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(new Date());
+    const first = setTimeout(tick, 0);
+    const id = setInterval(tick, 30_000);
+    return () => { clearTimeout(first); clearInterval(id); };
+  }, []);
+  return now;
 }
-
-const noopSubscribe = () => () => {};
-
-// ─── MINI TASK ROW ─────────────────────────────────────────────
-
-function MiniTaskRow({
-  task, onToggle, onDelete,
-  showDueDate = false, showDoneDate = false, showOverdueBadge = false,
-}: {
-  task: Task;
-  onToggle: (id: string) => void;
-  onDelete:  (id: string) => void;
-  showDueDate?:      boolean;
-  showDoneDate?:     boolean;
-  showOverdueBadge?: boolean;
-}) {
-  return (
-    <div className={`${s.taskRow} ${task.done ? s.taskRowDone : ''}`}>
-      <div
-        className={`${s.taskCheck} ${task.done ? s.taskCheckOn : s.taskCheckOff}`}
-        onClick={() => onToggle(task.id)}
-      >
-        {task.done && <span className={s.taskCheckMark}>✓</span>}
-      </div>
-      <div className={s.taskPrioDot} style={{ background: PRIO_COLOR[task.priority] }} />
-      <div className={s.taskBody}>
-        <span className={`${s.taskText} ${task.done ? s.taskTextDone : ''}`}>{task.text}</span>
-        {showOverdueBadge && task.due_date && (
-          <span className={s.overdueTag}>⚠ due {fmtDate(task.due_date)}</span>
-        )}
-        {showDueDate && task.due_date && !showOverdueBadge && (
-          <span className={s.dueTag}>due {fmtDate(task.due_date)}</span>
-        )}
-        {showDoneDate && task.done_at && (
-          <span className={s.doneTag}>✓ {fmtDate(task.done_at)}</span>
-        )}
-      </div>
-      <button className={s.taskDel} onClick={() => onDelete(task.id)}>×</button>
-    </div>
-  );
-}
-
-// ─── PAGE ──────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [tasks,            setTasks]            = useState<Task[]>([]);
-  const [journal,          setJournal]          = useState<DbJournalEntry[]>([]);
-  const [library,          setLibrary]          = useState<DbLibraryEntry[]>([]);
-  const [souls,            setSouls]            = useState<DbSoul[]>([]);
-  const [places,           setPlaces]           = useState<DbPlace[]>([]);
-  const [ratings,          setRatings]          = useState<DbRating[]>([]);
-  const [loading,          setLoading]          = useState(true);
-  const [newText,          setNewText]          = useState('');
-  const [newDue,           setNewDue]           = useState('');
-  const [prio,             setPrio]             = useState<Priority>('medium');
-  const [randIdx,          setRandIdx]          = useState(0);
-  const [showBirthdayCard, setShowBirthdayCard] = useState(false);
-  const [toast, show]                           = useToast();
+  const [tasks, setTasks]       = useState<Task[]>([]);
+  const [journal, setJournal]   = useState<DbJournalEntry[]>([]);
+  const [library, setLibrary]   = useState<DbLibraryEntry[]>([]);
+  const [souls, setSouls]       = useState<DbSoul[]>([]);
+  const [places, setPlaces]     = useState<DbPlace[]>([]);
+  const [ratings, setRatings]   = useState<DbRating[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [newText, setNewText]   = useState('');
+  const [randIdx, setRandIdx]   = useState(0);
+  const [showBirthday, setShowBirthday] = useState(false);
+  const [toast, show] = useToast();
+  const now = useNow();
 
-  // ── Load everything on mount ──────────────────────────────────
   useEffect(() => {
-    async function load() {
-      await new Promise(r => setTimeout(r, 100));
-      const ready = await ensureSession();
-      if (!ready) { setLoading(false); return; }
+    (async () => {
       try {
-        const [t, j, l, so, pl, ra, settings] = await Promise.all([
-          getTasks(),
-          getJournalEntries(),
-          getLibrary(),
-          getSouls(),
-          getPlaces(),
-          getRatings(),
-          getSettings(),
+        if (!(await ensureSession())) return;
+        const results = await Promise.allSettled([
+          getTasks(), getJournalEntries(), getLibrary(), getSouls(), getPlaces(), getRatings(), getSettings(),
         ]);
-        setTasks(t);
-        setJournal(j);
-        setLibrary(l);
-        setSouls(so);
-        setPlaces(pl);
-        setRatings(ra);
-        if (settings && !settings.first_login_done) {
-          setShowBirthdayCard(true);
-        }
-      } catch (err) {
-        console.error('dashboard load error:', err);
-        show('Could not load some data.');
+        const [t, j, l, so, pl, ra, st] = results;
+        if (t.status === 'fulfilled')  setTasks(t.value);
+        if (j.status === 'fulfilled')  setJournal(j.value);
+        if (l.status === 'fulfilled')  { setLibrary(l.value); setRandIdx(Math.floor(Math.random() * Math.max(1, l.value.length))); }
+        if (so.status === 'fulfilled') setSouls(so.value);
+        if (pl.status === 'fulfilled') setPlaces(pl.value);
+        if (ra.status === 'fulfilled') setRatings(ra.value);
+        if (st.status === 'fulfilled' && st.value && !st.value.first_login_done) setShowBirthday(true);
+        if (results.some(r => r.status === 'rejected')) show('Some things could not load. Try refreshing.', 'var(--red)');
       } finally {
         setLoading(false);
       }
-    }
-    load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    })();
+  }, [show]);
 
-  // ── Time-based greeting ───────────────────────────────────────
-  const greeting = useSyncExternalStore(noopSubscribe, () => getGreeting(new Date().getHours()), () => '');
-  const emoji    = useSyncExternalStore(noopSubscribe, () => getGreetingEmoji(new Date().getHours()), () => '');
-  const today    = useSyncExternalStore(noopSubscribe, () => new Date().toLocaleDateString('en-IE', { weekday: 'long', day: 'numeric', month: 'long' }), () => '');
-  const time     = useSyncExternalStore(noopSubscribe, () => new Date().toLocaleTimeString('en-IE', { hour: '2-digit', minute: '2-digit' }), () => '');
+  const today = localDateStr(now ?? undefined);
+  const { overdue, dueToday, doneToday } = useMemo(() => {
+    const open = tasks.filter(t => !t.done).sort(sortOpen);
+    return {
+      overdue:   open.filter(t => isOverdue(t, today)),
+      dueToday:  open.filter(t => isDueToday(t, today)),
+      doneToday: tasks.filter(t => t.done && t.done_at === today),
+    };
+  }, [tasks, today]);
 
-  // ── Derived buckets ──────────────────────────────────────────
-  const todayTasks   = tasks.filter(t => !t.done && !isOverdue(t));
-  const overdueTasks = tasks.filter(t => isOverdue(t));
-  const doneTasks    = tasks
-    .filter(t => t.done)
-    .sort((a, b) => (b.done_at ?? '').localeCompare(a.done_at ?? ''));
+  const greet = now ? greetingFor(now.getHours()) : null;
+  const dateLabel = now?.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const timeLabel = now?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const rand = library.length ? library[randIdx % library.length] : null;
 
-  const recentJournal = journal.slice(0, 3);
-  const rand          = library.length > 0 ? library[randIdx % library.length] : null;
-
-  const STATS = [
-    { n: library.length,  label: 'Saved Items',    color: '#ff8c00', href: '/library'  },
-    { n: places.length,   label: 'Places',          color: '#a855f7', href: '/places'   },
-    { n: journal.length,  label: 'Journal Entries', color: '#ffb347', href: '/journal'  },
-    { n: ratings.length,  label: 'Rated',           color: '#c084fc', href: '/ratings'  },
+  const stats = [
+    { n: library.length, label: 'Saved finds', href: '/library', Icon: LibraryBig,  c: 'var(--or)' },
+    { n: places.length,  label: 'Places',      href: '/places',  Icon: MapPin,      c: 'var(--pu-l)' },
+    { n: journal.length, label: 'Journal entries', href: '/journal', Icon: NotebookPen, c: 'var(--or-l)' },
+    { n: ratings.length, label: 'Ratings',     href: '/ratings', Icon: Star,        c: 'var(--pu-g)' },
   ];
 
-  // ── Actions ───────────────────────────────────────────────────
+  // ── Task actions ───────────────────────────────────────────
   const handleAdd = async () => {
-    if (!newText.trim()) return;
+    const text = newText.trim();
+    if (!text) return;
+    setNewText('');
     try {
-      const created = await addTask({
-        text:         newText.trim(),
-        priority:     prio,
-        due_date:     newDue || todayStr(),
-        created_date: todayStr(),
-      });
+      const created = await addTask({ text, priority: 'medium', due_date: today, created_date: today });
       setTasks(prev => [created, ...prev]);
-      setNewText(''); setNewDue('');
-      show('Task added!');
-    } catch { show('Could not add task.'); }
+    } catch {
+      setNewText(text);
+      show('Could not add that task.', 'var(--red)');
+    }
   };
 
   const handleToggle = async (id: string) => {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    const updates = {
-      done:    !task.done,
-      done_at: !task.done ? todayStr() : null,
-    };
+    const before = tasks.find(t => t.id === id);
+    if (!before) return;
+    const updates = { done: !before.done, done_at: !before.done ? today : null };
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
-    try {
-      await updateTask(id, updates);
-    } catch {
-      setTasks(prev => prev.map(t => t.id === id ? task : t));
-      show('Could not update task.');
-    }
+    try { await updateTask(id, updates); }
+    catch { setTasks(prev => prev.map(t => t.id === id ? before : t)); show('Could not update that task.', 'var(--red)'); }
   };
 
-  const handleDelete = async (id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
-    try {
-      await deleteTask(id);
-    } catch { show('Could not delete task.'); }
+  const shuffle = () => {
+    if (library.length < 2) return;
+    setRandIdx(i => {
+      let n = Math.floor(Math.random() * library.length);
+      if (n === i % library.length) n = (n + 1) % library.length;
+      return n;
+    });
   };
 
-  const handleClearDone = async () => {
-    setTasks(prev => prev.filter(t => !t.done));
-    try {
-      await clearDoneTasks();
-      show('Done tasks cleared.');
-    } catch { show('Could not clear tasks.'); }
-  };
+  const taskCount = overdue.length + dueToday.length;
 
   return (
-    <div className={`${s.page} aFadeUp`}>
-
-      {/* Header */}
-      <div className={s.header}>
-        <div>
-          <div className={s.greeting}>{greeting} {emoji}</div>
-          <div className={s.date}>{today}{time ? ` · ${time}` : ''}</div>
+    <div className={s.page}>
+      {/* Hero */}
+      <header className={s.hero}>
+        <div className={s.heroText}>
+          <h1 className={s.greeting}>
+            {greet ? <><greet.Icon className={s.greetIcon} size={30} strokeWidth={1.75} aria-hidden />{greet.text}</> : ' '}
+          </h1>
+          <p className={s.date}>{dateLabel}{timeLabel ? <span className={s.time}>{timeLabel}</span> : null}</p>
         </div>
-        <div className={s.headerActions}>
-          <Link href="/tasks"><Btn variant="ghost" sm>All Tasks</Btn></Link>
-          <Link href="/journal/new"><Btn sm>+ New entry</Btn></Link>
+        <div className={s.heroActions}>
+          <Link href="/journal/new" className={s.linkReset}>
+            <Btn><PenLine size={16} strokeWidth={2} /> Write in journal</Btn>
+          </Link>
         </div>
-      </div>
+      </header>
 
       {/* Stats */}
-      <div className={s.statsGrid}>
-        {STATS.map(({ n, label, color, href }) => (
-          <Link key={label} href={href} className={s.statCard}>
-            <div className={s.statNum} style={{ color }}>{loading ? '…' : n}</div>
-            <div className={s.statLabel}>{label}</div>
+      <nav className={s.stats} aria-label="Your collections">
+        {stats.map(({ n, label, href, Icon, c }) => (
+          <Link key={label} href={href} className={s.stat} style={{ ['--c' as string]: c }}>
+            <span className={s.statIcon}><Icon size={18} strokeWidth={1.75} /></span>
+            <span className={s.statNum}>{loading ? <span className={`skeleton ${s.statSkel}`} /> : n}</span>
+            <span className={s.statLabel}>{label}</span>
           </Link>
         ))}
-      </div>
+      </nav>
 
-      {/* Main grid */}
-      <div className={s.mainGrid}>
-
-        {/* Recent Journal */}
-        <div className={s.widget}>
-          <div className={s.widgetHeader}>
-            <span className={s.widgetTitle}>Recent Journal</span>
-            <Link href="/journal" className={s.widgetLink}>see all →</Link>
+      <div className={s.grid}>
+        {/* Today */}
+        <section className={`${s.card} ${s.todayCard}`} aria-labelledby="today-h">
+          <div className={s.cardHead}>
+            <h2 id="today-h" className={s.cardTitle}>
+              Today
+              {taskCount > 0 && <span className={s.count}>{taskCount}</span>}
+            </h2>
+            <Link href="/tasks" className={s.cardLink}>All tasks <ArrowRight size={14} /></Link>
           </div>
+
+          <form className={s.quickAdd} onSubmit={e => { e.preventDefault(); handleAdd(); }}>
+            <Plus size={18} strokeWidth={2} className={s.quickIcon} aria-hidden />
+            <input
+              className={s.quickInput}
+              placeholder="Add something for today"
+              aria-label="Add a task for today"
+              value={newText}
+              onChange={e => setNewText(e.target.value)}
+            />
+            {newText.trim() && <Btn type="submit" sm>Add</Btn>}
+          </form>
+
           {loading ? (
-            <div className={s.journalEntry} style={{ opacity: 0.4 }}>Loading…</div>
-          ) : recentJournal.length === 0 ? (
-            <div className={s.journalEntry} style={{ opacity: 0.4 }}>No entries yet ✦</div>
-          ) : recentJournal.map(e => (
-            <Link key={e.id} href={`/journal/${e.id}`} className={s.journalEntry}>
-              <div className={s.journalEntryLeft}>
-                <div className={s.journalEntryTitle}>{e.title}</div>
-                <div className={s.journalEntryDate}>{e.entry_date}</div>
-              </div>
-              {e.mood && <span className={s.journalEntryMood}>{e.mood}</span>}
-            </Link>
-          ))}
-        </div>
-
-        <div className={s.rightCol}>
-
-          {/* Random Pick */}
-          <div className={s.randomCard}>
-            <div className={s.randomHeader}>
-              <span className={s.widgetTitle}>✦ Random Pick</span>
-              {library.length > 1 && (
-                <button
-                  className={s.shuffleBtn}
-                  onClick={() => {
-                    setRandIdx(i => {
-                      let next = Math.floor(Math.random() * library.length);
-                      if (library.length > 1 && next === i) next = (i + 1) % library.length;
-                      return next;
-                    });
-                    show('Shuffled!');
-                  }}
-                >↻</button>
+            <div className={s.skels}>{[0, 1, 2].map(i => <div key={i} className={`skeleton ${s.rowSkel}`} />)}</div>
+          ) : (
+            <>
+              {overdue.length > 0 && (
+                <div className={s.group}>
+                  <div className={s.groupLabel} data-tone="red"><TriangleAlert size={14} strokeWidth={2} /> Overdue</div>
+                  {overdue.map(t => <TaskRow key={t.id} task={t} onToggle={handleToggle} compact />)}
+                </div>
               )}
+              <div className={s.group}>
+                {overdue.length > 0 && dueToday.length > 0 && <div className={s.groupLabel}>Due today</div>}
+                {dueToday.map(t => <TaskRow key={t.id} task={t} onToggle={handleToggle} compact />)}
+                {taskCount === 0 && (
+                  <div className={s.allClear}>
+                    <Sparkles size={20} strokeWidth={1.75} />
+                    <span>{tasks.length ? 'All clear for today. Enjoy it!' : 'Nothing planned yet. Add a task above.'}</span>
+                  </div>
+                )}
+              </div>
+              {doneToday.length > 0 && (
+                <div className={s.doneNote}><CheckCheck size={15} strokeWidth={2} /> {doneToday.length} finished today</div>
+              )}
+            </>
+          )}
+        </section>
+
+        <div className={s.side}>
+          {/* Journal */}
+          <section className={s.card} aria-labelledby="journal-h">
+            <div className={s.cardHead}>
+              <h2 id="journal-h" className={s.cardTitle}>Recent journal</h2>
+              <Link href="/journal" className={s.cardLink}>See all <ArrowRight size={14} /></Link>
             </div>
             {loading ? (
-              <div className={s.randomTitle} style={{ opacity: 0.4 }}>Loading…</div>
-            ) : rand ? (
-              <>
-                <div className={s.randomTitle}>{rand.title}</div>
-                <Tag color={LIBRARY_COLOR[rand.type]}>{rand.type}</Tag>
-              </>
+              <div className={s.skels}>{[0, 1].map(i => <div key={i} className={`skeleton ${s.rowSkel}`} />)}</div>
+            ) : journal.length === 0 ? (
+              <p className={s.muted}>No entries yet. Your first one is a click away.</p>
             ) : (
-              <div className={s.randomTitle} style={{ opacity: 0.4 }}>Add items to your library ✦</div>
+              <ul className={s.entries}>
+                {journal.slice(0, 3).map(e => (
+                  <li key={e.id}>
+                    <Link href={`/journal/${e.id}`} className={s.entry}>
+                      <span className={s.entryMood} aria-hidden>{e.mood || <NotebookPen size={16} />}</span>
+                      <span className={s.entryText}>
+                        <span className={s.entryTitle}>{e.title || 'Untitled'}</span>
+                        <span className={s.entryDate}>{relDay(e.entry_date).replace(/^./, c => c.toUpperCase())}</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             )}
-          </div>
+          </section>
+
+          {/* Random pick */}
+          <section className={`${s.card} ${s.randomCard}`} aria-labelledby="rand-h">
+            <div className={s.cardHead}>
+              <h2 id="rand-h" className={s.cardTitle}>From your library</h2>
+              {library.length > 1 && (
+                <button type="button" className={s.iconBtn} onClick={shuffle} aria-label="Show another">
+                  <Shuffle size={16} strokeWidth={2} />
+                </button>
+              )}
+            </div>
+            {loading ? <div className={`skeleton ${s.rowSkel}`} /> : rand ? (
+              <Link href="/library" className={s.randLink} key={rand.id}>
+                <span className={s.randTitle}>{rand.title}</span>
+                <span className={s.randMeta}>
+                  <Tag color={LIBRARY_COLOR[rand.type]}>{rand.type.charAt(0).toUpperCase() + rand.type.slice(1)}</Tag>
+                  <span className={s.muted}>Saved {fmtDate(rand.created_at)}</span>
+                </span>
+              </Link>
+            ) : (
+              <p className={s.muted}>Save links, films, books and notes to see one pop up here.</p>
+            )}
+          </section>
 
           {/* Souls */}
-          <div className={s.soulsWidget}>
-            <div className={s.widgetHeader}>
-              <span className={s.widgetTitle}>Souls</span>
-              <Link href="/souls" className={s.widgetLink}>view all →</Link>
+          <section className={s.card} aria-labelledby="souls-h">
+            <div className={s.cardHead}>
+              <h2 id="souls-h" className={s.cardTitle}>Souls</h2>
+              <Link href="/souls" className={s.cardLink}>View all <ArrowRight size={14} /></Link>
             </div>
-            <div className={s.soulsAvatarRow}>
-              {loading ? null : souls.length === 0 ? (
-                <span style={{ opacity: 0.4, fontSize: 13 }}>No souls yet ✦</span>
-              ) : souls.slice(0, 6).map(soul => {
-                const imgUrl = (soul as DbSoul & { image_url?: string }).image_url;
-                return (
-                  <Link
-                    key={soul.id}
-                    href={`/souls/${soul.id}`}
-                    title={soul.name}
-                    className={s.soulBubble}
-                    style={{
-                      background: imgUrl
-                        ? 'transparent'
-                        : `radial-gradient(circle at 35% 35%,${soul.color}cc,${soul.color}44)`,
-                      border: `2px solid ${soul.color}44`,
-                      overflow: 'hidden',
-                      padding: imgUrl ? 0 : undefined,
-                    }}
-                  >
-                    {imgUrl
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={imgUrl} alt={soul.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                      : soul.emoji
-                    }
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
+            {!loading && souls.length === 0 ? (
+              <p className={s.muted}><Users size={15} /> The people who matter will live here.</p>
+            ) : (
+              <div className={s.avatars}>
+                {souls.slice(0, 8).map(soul => {
+                  const img = (soul as DbSoul & { image_url?: string | null }).image_url;
+                  return (
+                    <Link
+                      key={soul.id}
+                      href={`/souls/${soul.id}`}
+                      className={s.avatar}
+                      title={soul.name}
+                      aria-label={soul.name}
+                      style={{ ['--c' as string]: soul.color }}
+                    >
+                      {img
+                        ? <StoredImage src={img} alt="" />
+                        : <span aria-hidden>{soul.emoji}</span>}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         </div>
       </div>
 
-      {/* Task section */}
-      <div className={s.taskSection}>
+      {toast && <Toast msg={toast.msg} color={toast.color} />}
 
-        {/* Today */}
-        <div className={s.taskCard}>
-          <div className={s.taskCardHeader}>
-            <span className={s.widgetTitle}>
-              Today <span className={s.taskCount}>{todayTasks.length}</span>
-            </span>
-            <div className={s.prioRow}>
-              {(['high','medium','low'] as Priority[]).map(p => (
-                <span key={p} className={s.prioChip} onClick={() => setPrio(p)}
-                  style={{ background: prio===p ? PRIO_COLOR[p] : 'transparent', borderColor: PRIO_COLOR[p]+'55', color: prio===p ? '#000' : PRIO_COLOR[p] }}
-                >{p}</span>
-              ))}
-            </div>
-          </div>
-          <div className={s.taskList}>
-            {loading
-              ? <div className={s.taskEmpty}>Loading...</div>
-              : todayTasks.length === 0
-                ? <div className={s.taskEmpty}>All done for today 🎉</div>
-                : todayTasks.map(t => <MiniTaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} showDueDate />)
-            }
-          </div>
-          <div className={s.addRow}>
-            <div className={s.addRowTop}>
-              <input className={s.taskInput} placeholder="Add a task…" value={newText}
-                onChange={e => setNewText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleAdd()} />
-              <Btn sm onClick={handleAdd}>+ Add</Btn>
-            </div>
-            <div className={s.addRowBottom}>
-              <input type="date" className={s.dateInput} value={newDue}
-                onChange={e => setNewDue(e.target.value)} title="Due date (optional)" />
-            </div>
-          </div>
-        </div>
-
-        {/* Overdue */}
-        <div className={`${s.taskCard} ${s.taskCardOverdue}`}>
-          <div className={s.taskCardHeader}>
-            <span className={s.widgetTitle}>
-              Overdue {overdueTasks.length > 0 && <span className={s.taskCountRed}>{overdueTasks.length}</span>}
-            </span>
-            {overdueTasks.length === 0 && <span className={s.allClearBadge}>✓ clear</span>}
-          </div>
-          <div className={s.taskList}>
-            {overdueTasks.length === 0
-              ? <div className={s.taskEmpty}>Nothing overdue ✦</div>
-              : overdueTasks.map(t => <MiniTaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} showOverdueBadge />)
-            }
-          </div>
-        </div>
-
-        {/* Finished */}
-        <div className={`${s.taskCard} ${s.taskCardDone}`}>
-          <div className={s.taskCardHeader}>
-            <span className={s.widgetTitle}>
-              Finished {doneTasks.length > 0 && <span className={s.taskCount}>{doneTasks.length}</span>}
-            </span>
-            {doneTasks.length > 0 && <button className={s.clearBtn} onClick={handleClearDone}>clear all</button>}
-          </div>
-          <div className={s.taskList}>
-            {doneTasks.length === 0
-              ? <div className={s.taskEmpty}>Nothing finished yet</div>
-              : doneTasks.map(t => <MiniTaskRow key={t.id} task={t} onToggle={handleToggle} onDelete={handleDelete} showDoneDate />)
-            }
-          </div>
-        </div>
-
-      </div>
-
-      {toast !== null && <Toast msg={toast.msg} color={toast.color} />}
-
-      {/* Birthday card — only on first ever login */}
-      {showBirthdayCard && (
+      {showBirthday && (
         <BirthdayCard onDismiss={async () => {
-          setShowBirthdayCard(false);
-          await saveSettings({ first_login_done: true });
+          setShowBirthday(false);
+          await saveSettings({ first_login_done: true }).catch(() => {});
         }} />
       )}
-
     </div>
   );
 }

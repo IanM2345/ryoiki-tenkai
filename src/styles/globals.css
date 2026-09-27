@@ -1,34 +1,77 @@
 /* ─── DESIGN TOKENS ──────────────────────────────────────── */
 :root {
-  --bg:        #0d0a0f;
-  --surf:      #130d1a;
-  --card:      #1a1025;
-  --card-hov:  #221436;
-  --or:        #ff8c00;
-  --or-l:      #ffb347;
-  --or-d:      #cc6600;
-  --pu:        #7c3aed;
-  --pu-l:      #a855f7;
-  --pu-d:      #4c1d95;
-  --pu-g:      #c084fc;
-  --tx:        #f5e6d0;
-  --tx-s:      #c4a882;
-  --tx-m:      #8a7060;
-  --tx-d:      #4a3830;
-  --bd:        rgba(255,140,0,0.16);
-  --bds:       rgba(255,140,0,0.07);
+  /* ── Base theme colours (the only four the Theme page sets) ── */
+  --bg:        #0d0a0f;   /* background          */
+  --or:        #ff8c00;   /* accent (orange)     */
+  --pu-l:      #a855f7;   /* secondary (purple)  */
+  --tx:        #f5e6d0;   /* text                */
+
+  /* ── Everything below is derived, so every theme applies everywhere ── */
+  --surf:      color-mix(in oklab, var(--bg) 94%, var(--pu-l));
+  --card:      color-mix(in oklab, var(--bg) 88%, var(--pu-l));
+  --card-hov:  color-mix(in oklab, var(--bg) 80%, var(--pu-l));
+  --raised:    color-mix(in oklab, var(--bg) 84%, var(--pu-l));
+  --or-l:      color-mix(in oklab, var(--or) 72%, #fff);
+  --or-d:      color-mix(in oklab, var(--or) 78%, #000);
+  --pu:        color-mix(in oklab, var(--pu-l) 82%, #000);
+  --pu-d:      color-mix(in oklab, var(--pu-l) 50%, #000);
+  --pu-g:      color-mix(in oklab, var(--pu-l) 70%, #fff);
+  --tx-s:      color-mix(in oklab, var(--tx) 76%, var(--bg));
+  --tx-m:      color-mix(in oklab, var(--tx) 54%, var(--bg));
+  --tx-d:      color-mix(in oklab, var(--tx) 30%, var(--bg));
+  --bd:        color-mix(in oklab, var(--or) 16%, transparent);
+  --bds:       color-mix(in oklab, var(--or) 7%, transparent);
+  --bd-s:      color-mix(in oklab, var(--or) 32%, transparent);
+  --glow:      color-mix(in oklab, var(--or) 22%, transparent);
+  --on-accent: #120a02;
+  --scrim:     color-mix(in oklab, #000 62%, transparent);
+
+  /* Status colours stay fixed so meaning never changes with theme */
   --gr:        #4ade80;
   --red:       #f87171;
   --blue:      #60a5fa;
-  --font:      'Comic Sans MS','Comic Sans',cursive;
-  --mono:      'Courier New',monospace;
-  --radius:    10px;
-  --radius-lg: 14px;
-  --sidebar-w: 176px;
+  --yellow:    #fbbf24;
+
+  /* Aliases used by older pages */
+  --text:       var(--tx);
+  --text-muted: var(--tx-m);
+  --border:     var(--bd);
+  --accent:     var(--or);
+
+  /* ── Type ── */
+  --font-comic: 'Comic Neue';
+  --font:      var(--font-comic), 'Comic Sans MS', 'Comic Sans', cursive;
+  --mono:      ui-monospace, 'SF Mono', 'Cascadia Mono', 'Courier New', monospace;
+  --fs-xs:     0.75rem;
+  --fs-sm:     0.875rem;
+  --fs-md:     1rem;
+  --fs-lg:     1.25rem;
+  --fs-xl:     1.625rem;
+  --fs-2xl:    2.25rem;
+
+  /* ── Space & shape ── */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+  --radius:    12px;
+  --radius-sm: 8px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+  --sidebar-w: 200px;
+  --sidebar-w-closed: 60px;
   --bottom-nav-h: 56px;
-  --shadow:    0 4px 20px rgba(0,0,0,0.45);
-  --shadow-lg: 0 8px 40px rgba(0,0,0,0.6);
-  --speed:     150ms;
+  --page-max: 1120px;
+  --shadow:    0 1px 0 color-mix(in oklab, var(--tx) 5%, transparent) inset, 0 6px 24px -8px rgba(0,0,0,0.5);
+  --shadow-lg: 0 1px 0 color-mix(in oklab, var(--tx) 6%, transparent) inset, 0 24px 60px -16px rgba(0,0,0,0.65);
+
+  /* ── Motion (Emil Kowalski curves) ── */
+  --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-press: 140ms;
+  --dur-fast:  180ms;
+  --dur-base:  240ms;
+  --dur-slow:  320ms;
+  --speed:     var(--dur-fast);
 }
 
 /* ─── RESET ───────────────────────────────────────────────── */
@@ -61,7 +104,7 @@ input, textarea, select, button {
 
 textarea { resize: vertical; }
 a { color: var(--or-l); text-decoration: none; }
-mark { background: rgba(255,140,0,0.25); color: var(--or-l); border-radius: 2px; padding: 0 2px; }
+mark { background: color-mix(in oklab, var(--or) 25%, transparent); color: var(--or-l); border-radius: 2px; padding: 0 2px; }
 
 @media (hover: none) {
   button, a, [role="button"] { min-height: 40px; }
@@ -70,7 +113,7 @@ mark { background: rgba(255,140,0,0.25); color: var(--or-l); border-radius: 2px;
 /* ─── SCROLLBAR ───────────────────────────────────────────── */
 ::-webkit-scrollbar       { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,140,0,0.22); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--or) 22%, transparent); border-radius: 3px; }
 
 /* ─── KEYFRAMES ───────────────────────────────────────────── */
 @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
@@ -102,14 +145,14 @@ mark { background: rgba(255,140,0,0.25); color: var(--or-l); border-radius: 2px;
   overflow-x: hidden;      
   position: relative;
   background: var(--surf);
-  margin-left: 176px;
-  transition: margin-left 0.25s ease;
+  margin-left: var(--sidebar-w);
+  transition: margin-left var(--dur-slow) var(--ease-drawer);
   height: 100%;
 }
 
 /* Body class toggled by Sidebar.tsx */
-body.sidebar-closed .appMain { margin-left: 52px; }
-body.sidebar-open   .appMain { margin-left: 176px; }
+body.sidebar-closed .appMain { margin-left: var(--sidebar-w-closed); }
+body.sidebar-open   .appMain { margin-left: var(--sidebar-w); }
 
 .leaflet-pane         { z-index: 4 !important; }
 .leaflet-tile-pane    { z-index: 2 !important; }
@@ -122,28 +165,28 @@ body.sidebar-open   .appMain { margin-left: 176px; }
 .leaflet-bottom       { z-index: 10 !important; }
 
 .leaflet-popup-content-wrapper {
-  background: #130d1a !important;
-  color: #f5e6d0 !important;
-  border: 1px solid rgba(255,140,0,0.4) !important;
+  background: var(--surf) !important;
+  color: var(--tx) !important;
+  border: 1px solid color-mix(in oklab, var(--or) 40%, transparent) !important;
   border-radius: 10px !important;
-  box-shadow: 0 0 20px rgba(255,140,0,0.15) !important;
+  box-shadow: 0 0 20px color-mix(in oklab, var(--or) 15%, transparent) !important;
 }
-.leaflet-popup-tip { background: #130d1a !important; }
+.leaflet-popup-tip { background: var(--surf) !important; }
 .leaflet-popup-content { margin: 12px 14px !important; }
 .leaflet-control-zoom a {
-  background: #1a1025 !important;
-  color: #ff8c00 !important;
-  border-color: rgba(255,140,0,0.3) !important;
+  background: var(--card) !important;
+  color: var(--or) !important;
+  border-color: color-mix(in oklab, var(--or) 30%, transparent) !important;
 }
 .leaflet-control-zoom a:hover {
-  background: #ff8c00 !important;
-  color: #000 !important;
+  background: var(--or) !important;
+  color: var(--on-accent) !important;
 }
 
 @media (max-width: 1023px) {
   .appMain,
   body.sidebar-open   .appMain,
-  body.sidebar-closed .appMain { margin-left: 52px; }
+  body.sidebar-closed .appMain { margin-left: var(--sidebar-w-closed); }
 }
 
 @media (max-width: 767px) {
@@ -151,7 +194,7 @@ body.sidebar-open   .appMain { margin-left: 176px; }
   body.sidebar-open   .appMain,
   body.sidebar-closed .appMain {
     margin-left: 0;
-    padding-top: 60px;
+    padding-top: 64px;
   }
 }
 
@@ -171,7 +214,7 @@ body.sidebar-open   .appMain { margin-left: 176px; }
   background: linear-gradient(
     90deg,
     var(--card) 25%,
-    #2a1f3a 50%,
+    var(--raised) 50%,
     var(--card) 75%
   );
   background-size: 600px 100%;
@@ -198,5 +241,49 @@ input:focus,
 textarea:focus,
 select:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 140, 0, 0.4);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--or) 40%, transparent);
 }
+/* ─── Legacy animation class names used by older pages ─────── */
+.animate-fade-up { animation: fadeUp var(--dur-base) var(--ease-out) both; }
+.animate-fade-in { animation: fadeIn var(--dur-fast) var(--ease-out) both; }
+
+/* ─── Light themes: softer shadows & scrollbar ─────────────── */
+[data-scheme="light"] {
+  --shadow:    0 1px 2px rgba(40,20,10,0.06), 0 8px 24px -10px rgba(40,20,10,0.18);
+  --shadow-lg: 0 2px 6px rgba(40,20,10,0.08), 0 28px 60px -18px rgba(40,20,10,0.28);
+  --scrim:     rgba(30,20,10,0.35);
+}
+
+/* ─── Keyboard focus that is always visible ────────────────── */
+:focus-visible { outline: 2px solid var(--or); outline-offset: 2px; }
+button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+
+/* ─── Reduced motion: keep fades, drop movement ────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  .aSpin, .skeleton { animation: none !important; }
+}
+
+/* Login and password pages have no sidebar */
+body.no-sidebar .appMain,
+body.no-sidebar.sidebar-open .appMain,
+body.no-sidebar.sidebar-closed .appMain { margin-left: 0 !important; padding-top: 0 !important; }
+
+/* transitions.dev: error state shake */
+@keyframes t-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+.t-shake { animation: t-shake 360ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .t-shake { animation: none; } }
+
+/* Inputs inside a wrapper that draws its own focus ring shouldn't draw a second one */
+:where(input, textarea):focus-visible { outline: none; }

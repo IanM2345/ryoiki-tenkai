@@ -1,0 +1,98 @@
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.row + .row { margin-top: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .row:hover { background: var(--bds); border-color: var(--bds); }
+}
+.compact { padding: 8px 8px 8px 10px; gap: 10px; }
+
+/* Checkbox with a drawn check (transitions.dev "success check") */
+.check {
+  --prio: var(--or);
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  padding: 0;
+  border: 2px solid color-mix(in oklab, var(--prio) 70%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+.check:active { transform: scale(0.88); }
+@media (hover: hover) and (pointer: fine) {
+  .check:hover { background: color-mix(in oklab, var(--prio) 14%, transparent); }
+}
+.checkSvg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--on-accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+  transition: stroke-dashoffset var(--dur-base) var(--ease-out);
+}
+.done .check { background: var(--prio); border-color: var(--prio); }
+.done .checkSvg { stroke-dashoffset: 0; }
+
+.body { flex: 1; min-width: 0; }
+.text {
+  color: var(--tx);
+  font-size: 0.97rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-decoration: line-through;
+  text-decoration-color: transparent;
+  transition: color var(--dur-base) ease, text-decoration-color var(--dur-base) ease;
+}
+.done .text { color: var(--tx-m); text-decoration-color: var(--tx-m); }
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--tx-m);
+}
+.meta span { display: inline-flex; align-items: center; gap: 5px; }
+.prio { font-weight: 700; }
+.dot { width: 7px; height: 7px; border-radius: 50%; }
+.overdue { color: var(--red); font-weight: 700; }
+
+.actions { display: flex; gap: 2px; opacity: 1; transition: opacity var(--dur-fast) ease; }
+@media (hover: hover) and (pointer: fine) {
+  .actions { opacity: 0; }
+  .row:hover .actions, .row:focus-within .actions { opacity: 1; }
+}
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--tx-m);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.iconBtn:hover { background: var(--bd); color: var(--tx); }
+.danger:hover { background: color-mix(in oklab, var(--red) 14%, transparent); color: var(--red); }
+
+@media (prefers-reduced-motion: reduce) {
+  .checkSvg { transition: none; }
+}

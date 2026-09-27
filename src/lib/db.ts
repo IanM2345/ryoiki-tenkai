@@ -16,16 +16,9 @@ function unwrap<T>(data: T | null, error: unknown): T {
   return data as T;
 }
 
-
 // ================================================================
 //  AUTH
 // ================================================================
-
-export async function signIn(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data;
-}
 
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
@@ -41,7 +34,6 @@ export async function getUser() {
   const { data: { user } } = await supabase.auth.getUser();
   return user;
 }
-
 
 // ================================================================
 //  USER SETTINGS
@@ -80,7 +72,6 @@ export async function saveSettings(settings: Partial<Omit<DbUserSettings, 'user_
     .single();
   return unwrap(data, error);
 }
-
 
 // ================================================================
 //  TASKS
@@ -140,7 +131,6 @@ export async function clearDoneTasks(): Promise<void> {
   const { error } = await supabase.from('tasks').delete().eq('done', true);
   if (error) throw error;
 }
-
 
 // ================================================================
 //  JOURNAL ENTRIES
@@ -237,7 +227,6 @@ export async function getJournalEntrySoulIds(entryId: string): Promise<string[]>
   return rows.map((r: { soul_id: string }) => r.soul_id);
 }
 
-
 // ================================================================
 //  LIBRARY
 // ================================================================
@@ -254,6 +243,7 @@ export interface DbLibraryEntry {
   tags:       string[];
   created_at: string;
   updated_at: string;
+  image_url?:  string | null;
 }
 
 export async function getLibrary(): Promise<DbLibraryEntry[]> {
@@ -295,7 +285,6 @@ export async function deleteLibraryEntry(id: string): Promise<void> {
   const { error } = await supabase.from('library').delete().eq('id', id);
   if (error) throw error;
 }
-
 
 // ================================================================
 //  IDEAS
@@ -351,13 +340,13 @@ export async function deleteIdea(id: string): Promise<void> {
   if (error) throw error;
 }
 
-
 // ================================================================
 //  QUEUE
 // ================================================================
 
 export interface DbQueueItem {
-  notes: string;
+  notes:      string | null;
+  due_date?:  string | null;
   id:         string;
   user_id:    string;
   tab:        'watch' | 'listen' | 'read' | 'explore';
@@ -387,6 +376,7 @@ export async function addQueueItem(item: {
   pct?: number;
   color?: string;
   added_date?: string;
+  notes?: string | null;
 }): Promise<DbQueueItem> {
   const { data, error } = await supabase
     .from('queue')
@@ -411,7 +401,6 @@ export async function deleteQueueItem(id: string): Promise<void> {
   if (error) throw error;
 }
 
-
 // ================================================================
 //  PLACES
 // ================================================================
@@ -430,6 +419,7 @@ export interface DbPlace {
   tags:       string[];
   created_at: string;
   updated_at: string;
+  image_url?:  string | null;
 }
 
 export async function getPlaces(): Promise<DbPlace[]> {
@@ -473,7 +463,6 @@ export async function deletePlace(id: string): Promise<void> {
   const { error } = await supabase.from('places').delete().eq('id', id);
   if (error) throw error;
 }
-
 
 // ================================================================
 //  RATINGS
@@ -528,7 +517,6 @@ export async function deleteRating(id: string): Promise<void> {
   if (error) throw error;
 }
 
-
 // ================================================================
 //  SOULS
 // ================================================================
@@ -546,6 +534,7 @@ export interface DbSoul {
   tags:        string[];
   created_at:  string;
   updated_at:  string;
+  image_url?:  string | null;
 }
 
 export interface DbSoulMedia {
@@ -636,7 +625,6 @@ export async function deleteSoulMedia(id: string): Promise<void> {
   if (error) throw error;
 }
 
-
 // ================================================================
 //  MOOD
 // ================================================================
@@ -724,7 +712,6 @@ export async function deleteMoodLog(id: string): Promise<void> {
   if (error) throw error;
 }
 
-
 export interface DbSoulLink {
   id:         string;
   user_id:    string;
@@ -760,28 +747,6 @@ export async function getSoulLinksForItem(
   return unwrap(data, error) ?? [];
 }
 
-/** Add a single soul link */
-export async function addSoulLink(link: {
-  soul_id:    string;
-  table_name: DbSoulLink['table_name'];
-  item_id:    string;
-  item_title: string;
-  item_meta?: string | null;
-}): Promise<DbSoulLink> {
-  const { data, error } = await supabase
-    .from('soul_links')
-    .insert(link)
-    .select()
-    .single();
-  return unwrap(data, error);
-}
-
-/** Delete a single soul link by its own id */
-export async function deleteSoulLink(id: string): Promise<void> {
-  const { error } = await supabase.from('soul_links').delete().eq('id', id);
-  if (error) throw error;
-}
-
 /**
  * Sync soul links for an item — replaces ALL existing links for that item
  * with exactly the provided soulIds. Call after saving the item itself.
@@ -799,29 +764,38 @@ export async function setSoulLinks(
   itemMeta: string | null,
   soulIds: string[]
 ): Promise<void> {
-  // 1. Delete all existing links for this item
-  const { error: delError } = await supabase
-    .from('soul_links')
-    .delete()
-    .eq('table_name', tableName)
-    .eq('item_id', itemId);
-  if (delError) throw delError;
+  // Change only what differs, so a failure never wipes the existing links.
+  const existing = await getSoulLinksForItem(tableName, itemId);
+  const want = new Set(soulIds);
+  const have = new Set(existing.map(l => l.soul_id));
 
-  // 2. Insert fresh links (skip if none)
-  if (soulIds.length === 0) return;
+  const toRemove = existing.filter(l => !want.has(l.soul_id)).map(l => l.id);
+  const toAdd = soulIds.filter(id => !have.has(id));
 
-  const rows = soulIds.map(soul_id => ({
-    soul_id,
-    table_name: tableName,
-    item_id:    itemId,
-    item_title: itemTitle,
-    item_meta:  itemMeta,
-  }));
+  if (toAdd.length) {
+    const { error } = await supabase.from('soul_links').insert(
+      toAdd.map(soul_id => ({ soul_id, table_name: tableName, item_id: itemId, item_title: itemTitle, item_meta: itemMeta })),
+    );
+    if (error) throw error;
+  }
+  if (toRemove.length) {
+    const { error } = await supabase.from('soul_links').delete().in('id', toRemove);
+    if (error) throw error;
+  }
+  // Keep the copied title/subtitle current on links that stayed.
+  const stale = existing.filter(l => want.has(l.soul_id) && (l.item_title !== itemTitle || l.item_meta !== itemMeta));
+  if (stale.length) {
+    const { error } = await supabase.from('soul_links')
+      .update({ item_title: itemTitle, item_meta: itemMeta })
+      .in('id', stale.map(l => l.id));
+    if (error) throw error;
+  }
+}
 
-  const { error: insError } = await supabase
-    .from('soul_links')
-    .insert(rows);
-  if (insError) throw insError;
+/** Remove every soul link that points at an item (call when the item is deleted). */
+export async function deleteSoulLinksForItem(tableName: DbSoulLink['table_name'], itemId: string): Promise<void> {
+  const { error } = await supabase.from('soul_links').delete().eq('table_name', tableName).eq('item_id', itemId);
+  if (error) throw error;
 }
 
 // ================================================================
@@ -846,85 +820,6 @@ export interface DbGameSession {
   updated_at: string;
 }
 
-/** Save or update an in-progress game state */
-export async function saveGame(
-  gameType: GameType,
-  difficulty: GameDifficulty,
-  state: Record<string, unknown>
-): Promise<DbGameSession> {
-  // Load existing in-progress session for this game type
-  const { data: existing } = await supabase
-    .from('game_sessions')
-    .select('id')
-    .eq('game_type', gameType)
-    .eq('status', 'in_progress')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (existing) {
-    const { data, error } = await supabase
-      .from('game_sessions')
-      .update({ state, difficulty, updated_at: new Date().toISOString() })
-      .eq('id', existing.id)
-      .select()
-      .single();
-    return unwrap(data, error);
-  } else {
-    const { data, error } = await supabase
-      .from('game_sessions')
-      .insert({ game_type: gameType, difficulty, state, status: 'in_progress' })
-      .select()
-      .single();
-    return unwrap(data, error);
-  }
-}
-
-/** Load the most recent in-progress session for a game type */
-export async function loadGame(gameType: GameType): Promise<DbGameSession | null> {
-  const { data, error } = await supabase
-    .from('game_sessions')
-    .select('*')
-    .eq('game_type', gameType)
-    .eq('status', 'in_progress')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
-}
-
-/** Mark a game as finished and record the result */
-export async function saveResult(
-  gameType: GameType,
-  difficulty: GameDifficulty,
-  result: GameResult
-): Promise<void> {
-  // Close any in-progress session for this game
-  const { data: existing } = await supabase
-    .from('game_sessions')
-    .select('id')
-    .eq('game_type', gameType)
-    .eq('status', 'in_progress')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (existing) {
-    const { error } = await supabase
-      .from('game_sessions')
-      .update({ status: 'finished', result, updated_at: new Date().toISOString() })
-      .eq('id', existing.id);
-    if (error) throw error;
-  } else {
-    // No in-progress session — create a finished one directly (e.g. very fast game)
-    const { error } = await supabase
-      .from('game_sessions')
-      .insert({ game_type: gameType, difficulty, state: null, status: 'finished', result });
-    if (error) throw error;
-  }
-}
-
 /** Get all finished sessions for a game type (for stats/leaderboard) */
 export async function getGameHistory(gameType: GameType): Promise<DbGameSession[]> {
   const { data, error } = await supabase
@@ -947,7 +842,6 @@ export async function getGameStats(gameType: GameType): Promise<{
     draws:  sessions.filter(s => s.result === 'draw').length,
   };
 }
-
 
 // ============================================================
 // GALLERY — append these to the bottom of src/lib/db.ts
@@ -976,15 +870,6 @@ export interface DbGalleryImage {
   image_url:  string;
   caption:    string | null;
   created_at: string;
-}
-
-export async function getGalleryImages(): Promise<DbGalleryImage[]> {
-  const { data, error } = await supabase
-    .from('gallery_images')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data ?? [];
 }
 
 export async function addGalleryImage(
@@ -1073,15 +958,53 @@ export async function getAllImages(): Promise<GalleryImage[]> {
   return images;
 }
 
-export async function devPasswordCheck(password: string): Promise<boolean> {
-if(process.env.NODE_ENV !== 'development') return false;
+/** Journal entry ids linked to a soul through @mentions. */
+export async function getJournalEntryIdsForSoul(soulId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('journal_entry_souls')
+    .select('journal_entry_id')
+    .eq('soul_id', soulId);
+  return (unwrap(data, error) ?? []).map((r: { journal_entry_id: string }) => r.journal_entry_id);
+}
 
-const { data, error } = await supabase
-  .from('dev_config')
-  .select('value')
-  .eq('key', 'dev_password')
-  .single();
+/**
+ * Same as getAllImages, but reports which sources failed to load
+ * instead of silently skipping them. Throws only if every source failed.
+ */
+export async function getAllImagesWithStatus(): Promise<{ images: GalleryImage[]; failed: GallerySource[] }> {
+  const [galleryRes, lib, soulsRes, placesRes] = await Promise.all([
+    supabase.from('gallery_images').select('*').order('created_at', { ascending: false }),
+    supabase.from('library').select('id, title, image_url, type').not('image_url', 'is', null),
+    supabase.from('souls').select('id, name, image_url, emoji').not('image_url', 'is', null),
+    supabase.from('places').select('id, name, image_url').not('image_url', 'is', null),
+  ]);
 
-  if(error) return false;
-  return data?.value === password;
+  const failed: GallerySource[] = [];
+  if (galleryRes.error) failed.push('gallery');
+  if (lib.error) failed.push('library');
+  if (soulsRes.error) failed.push('souls');
+  if (placesRes.error) failed.push('places');
+  if (failed.length === 4) throw galleryRes.error;
+
+  const images: GalleryImage[] = [];
+  for (const item of galleryRes.data ?? []) {
+    if (!item.image_url) continue;
+    images.push({
+      id: `gallery-${item.id}`, raw_id: item.id, image_url: item.image_url,
+      title: item.caption || 'Photo', caption: item.caption ?? undefined, source: 'gallery', href: '/gallery',
+    });
+  }
+  for (const item of lib.data ?? []) {
+    if (!item.image_url) continue;
+    images.push({ id: `library-${item.id}`, image_url: item.image_url, title: item.title, source: 'library', href: '/library', subtitle: item.type });
+  }
+  for (const item of soulsRes.data ?? []) {
+    if (!item.image_url) continue;
+    images.push({ id: `souls-${item.id}`, image_url: item.image_url, title: item.name, source: 'souls', href: `/souls/${item.id}`, emoji: item.emoji ?? undefined });
+  }
+  for (const item of placesRes.data ?? []) {
+    if (!item.image_url) continue;
+    images.push({ id: `places-${item.id}`, image_url: item.image_url, title: item.name, source: 'places', href: '/places' });
+  }
+  return { images, failed };
 }

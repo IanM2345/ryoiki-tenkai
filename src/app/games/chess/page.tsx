@@ -1,559 +1,564 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { ensureSession } from '@/lib/supabase';
-import styles from './chess.module.css';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
+import { Crown, X } from 'lucide-react';
+import GameShell from '@/components/games/GameShell';
+import { recordResult } from '@/lib/games';
+import s from './chess.module.css';
 
-// chess.js is loaded via CDN script tag — we use the global Chess constructor
-declare const Chess: new (fen?: string) => ChessInstance;
+/* ── chess.js 0.10.3, loaded once from the CDN ─────────────────────────── */
 
-interface ChessInstance {
-  move: (move: string | { from: string; to: string; promotion?: string }) => MoveResult | null;
-  moves: (opts?: { verbose?: boolean; square?: string }) => string[] | VerboseMove[];
+type Color = 'w' | 'b';
+type PieceType = 'p' | 'n' | 'b' | 'r' | 'q' | 'k';
+type PromoType = 'q' | 'r' | 'b' | 'n';
+
+interface Piece { type: PieceType; color: Color }
+
+interface VerboseMove {
+  color: Color;
+  from: string;
+  to: string;
+  piece: PieceType;
+  captured?: PieceType;
+  promotion?: PromoType;
+  flags: string;
+  san: string;
+}
+
+interface ChessGame {
+  move: (move: { from: string; to: string; promotion?: PromoType }) => VerboseMove | null;
+  undo: () => VerboseMove | null;
+  moves: (opts: { verbose: true; square?: string }) => VerboseMove[];
   fen: () => string;
-  game_over: () => boolean;
   in_checkmate: () => boolean;
   in_draw: () => boolean;
   in_stalemate: () => boolean;
   insufficient_material: () => boolean;
   in_threefold_repetition: () => boolean;
   in_check: () => boolean;
-  turn: () => 'w' | 'b';
-  get: (square: string) => Piece | null;
+  turn: () => Color;
   board: () => (Piece | null)[][];
-  history: (opts?: { verbose?: boolean }) => string[] | VerboseMove[];
-  load: (fen: string) => boolean;
-  reset: () => void;
+  history: (opts: { verbose: true }) => VerboseMove[];
 }
 
-interface Piece {
-  type: 'p' | 'n' | 'b' | 'r' | 'q' | 'k';
-  color: 'w' | 'b';
+type ChessCtor = new (fen?: string) => ChessGame;
+
+let chessLoader: Promise<ChessCtor> | null = null;
+
+/** Load the bundled chess.js once (no outside website needed). */
+function loadChess(): Promise<ChessCtor> {
+  if (!chessLoader) {
+    chessLoader = import('chess.js')
+      .then(mod => {
+        const m = mod as unknown as { Chess?: ChessCtor; default?: { Chess?: ChessCtor } };
+        const Ctor = m.Chess ?? m.default?.Chess;
+        if (!Ctor) throw new Error('chess.js missing');
+        return Ctor;
+      })
+      .catch(err => { chessLoader = null; throw err; });
+  }
+  return chessLoader;
 }
 
-interface VerboseMove {
-  from: string;
-  to: string;
-  piece: string;
-  captured?: string;
-  promotion?: string;
-  flags: string;
-  san: string;
-}
-
-interface MoveResult {
-  from: string;
-  to: string;
-  piece: string;
-  captured?: string;
-  promotion?: string;
-  flags: string;
-  san: string;
-}
+/* ── Engine: alpha-beta over a private copy of the position ─────────────── */
 
 type Difficulty = 'easy' | 'medium' | 'hard';
-type GameStatus = 'idle' | 'playing' | 'won' | 'lost' | 'draw';
 
-const FILES = ['a','b','c','d','e','f','g','h'];
-const RANKS = ['8','7','6','5','4','3','2','1'];
+const DIFFICULTIES = [
+  { key: 'easy', label: 'Easy', hint: 'Loose, often random moves' },
+  { key: 'medium', label: 'Medium', hint: 'Looks two moves ahead' },
+  { key: 'hard', label: 'Hard', hint: 'Looks three moves ahead' },
+];
 
-const PIECE_UNICODE: Record<string, string> = {
-  wp: '♙', wn: '♘', wb: '♗', wr: '♖', wq: '♕', wk: '♔',
-  bp: '♟', bn: '♞', bb: '♝', br: '♜', bq: '♛', bk: '♚',
-};
+const DEPTH: Record<Difficulty, number> = { easy: 1, medium: 2, hard: 3 };
+const MATE = 100000;
 
-const PIECE_VALUES: Record<string, number> = {
-  p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000,
-};
+const VAL: Record<PieceType, number> = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
 
-// Piece-square tables for positional evaluation (from white's perspective)
-const PST: Record<string, number[]> = {
+// Piece square tables, index 0 = a8 from White's point of view.
+const PST: Record<PieceType, number[]> = {
   p: [
-     0,  0,  0,  0,  0,  0,  0,  0,
-    50, 50, 50, 50, 50, 50, 50, 50,
-    10, 10, 20, 30, 30, 20, 10, 10,
-     5,  5, 10, 25, 25, 10,  5,  5,
-     0,  0,  0, 20, 20,  0,  0,  0,
-     5, -5,-10,  0,  0,-10, -5,  5,
-     5, 10, 10,-20,-20, 10, 10,  5,
-     0,  0,  0,  0,  0,  0,  0,  0,
+    0, 0, 0, 0, 0, 0, 0, 0, 50, 50, 50, 50, 50, 50, 50, 50, 10, 10, 20, 30, 30, 20, 10, 10,
+    5, 5, 10, 25, 25, 10, 5, 5, 0, 0, 0, 20, 20, 0, 0, 0, 5, -5, -10, 0, 0, -10, -5, 5,
+    5, 10, 10, -20, -20, 10, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0,
   ],
   n: [
-    -50,-40,-30,-30,-30,-30,-40,-50,
-    -40,-20,  0,  0,  0,  0,-20,-40,
-    -30,  0, 10, 15, 15, 10,  0,-30,
-    -30,  5, 15, 20, 20, 15,  5,-30,
-    -30,  0, 15, 20, 20, 15,  0,-30,
-    -30,  5, 10, 15, 15, 10,  5,-30,
-    -40,-20,  0,  5,  5,  0,-20,-40,
-    -50,-40,-30,-30,-30,-30,-40,-50,
+    -50, -40, -30, -30, -30, -30, -40, -50, -40, -20, 0, 0, 0, 0, -20, -40, -30, 0, 10, 15, 15, 10, 0, -30,
+    -30, 5, 15, 20, 20, 15, 5, -30, -30, 0, 15, 20, 20, 15, 0, -30, -30, 5, 10, 15, 15, 10, 5, -30,
+    -40, -20, 0, 5, 5, 0, -20, -40, -50, -40, -30, -30, -30, -30, -40, -50,
   ],
   b: [
-    -20,-10,-10,-10,-10,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5, 10, 10,  5,  0,-10,
-    -10,  5,  5, 10, 10,  5,  5,-10,
-    -10,  0, 10, 10, 10, 10,  0,-10,
-    -10, 10, 10, 10, 10, 10, 10,-10,
-    -10,  5,  0,  0,  0,  0,  5,-10,
-    -20,-10,-10,-10,-10,-10,-10,-20,
+    -20, -10, -10, -10, -10, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5, 10, 10, 5, 0, -10,
+    -10, 5, 5, 10, 10, 5, 5, -10, -10, 0, 10, 10, 10, 10, 0, -10, -10, 10, 10, 10, 10, 10, 10, -10,
+    -10, 5, 0, 0, 0, 0, 5, -10, -20, -10, -10, -10, -10, -10, -10, -20,
   ],
   r: [
-     0,  0,  0,  0,  0,  0,  0,  0,
-     5, 10, 10, 10, 10, 10, 10,  5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-     0,  0,  0,  5,  5,  0,  0,  0,
+    0, 0, 0, 0, 0, 0, 0, 0, 5, 10, 10, 10, 10, 10, 10, 5, -5, 0, 0, 0, 0, 0, 0, -5,
+    -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5, -5, 0, 0, 0, 0, 0, 0, -5,
+    -5, 0, 0, 0, 0, 0, 0, -5, 0, 0, 0, 5, 5, 0, 0, 0,
   ],
   q: [
-    -20,-10,-10, -5, -5,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5,  5,  5,  5,  0,-10,
-     -5,  0,  5,  5,  5,  5,  0, -5,
-      0,  0,  5,  5,  5,  5,  0, -5,
-    -10,  5,  5,  5,  5,  5,  0,-10,
-    -10,  0,  5,  0,  0,  0,  0,-10,
-    -20,-10,-10, -5, -5,-10,-10,-20,
+    -20, -10, -10, -5, -5, -10, -10, -20, -10, 0, 0, 0, 0, 0, 0, -10, -10, 0, 5, 5, 5, 5, 0, -10,
+    -5, 0, 5, 5, 5, 5, 0, -5, 0, 0, 5, 5, 5, 5, 0, -5, -10, 5, 5, 5, 5, 5, 0, -10,
+    -10, 0, 5, 0, 0, 0, 0, -10, -20, -10, -10, -5, -5, -10, -10, -20,
   ],
   k: [
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -20,-30,-30,-40,-40,-30,-30,-20,
-    -10,-20,-20,-20,-20,-20,-20,-10,
-     20, 20,  0,  0,  0,  0, 20, 20,
-     20, 30, 10,  0,  0, 10, 30, 20,
+    -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30,
+    -30, -40, -40, -50, -50, -40, -40, -30, -30, -40, -40, -50, -50, -40, -40, -30,
+    -20, -30, -30, -40, -40, -30, -30, -20, -10, -20, -20, -20, -20, -20, -20, -10,
+    20, 20, 0, 0, 0, 0, 20, 20, 20, 30, 10, 0, 0, 10, 30, 20,
   ],
 };
 
-function squareToIndex(square: string): number {
-  const file = square.charCodeAt(0) - 97; // a=0
-  const rank = 8 - parseInt(square[1]);   // 8=0, 1=7
-  return rank * 8 + file;
-}
-
-function evaluateBoard(chess: ChessInstance): number {
-  const board = chess.board();
+/** Static score from White's point of view. */
+function evaluate(g: ChessGame): number {
+  const board = g.board();
   let score = 0;
   for (let r = 0; r < 8; r++) {
     for (let f = 0; f < 8; f++) {
-      const piece = board[r][f];
-      if (!piece) continue;
-      const val = PIECE_VALUES[piece.type] ?? 0;
-      const idx = piece.color === 'w' ? r * 8 + f : (7 - r) * 8 + f;
-      const pst = PST[piece.type]?.[idx] ?? 0;
-      score += piece.color === 'w' ? val + pst : -(val + pst);
+      const p = board[r][f];
+      if (!p) continue;
+      const idx = p.color === 'w' ? r * 8 + f : (7 - r) * 8 + f;
+      const v = VAL[p.type] + PST[p.type][idx];
+      score += p.color === 'w' ? v : -v;
     }
   }
   return score;
 }
 
-function minimax(
-  chess: ChessInstance,
-  depth: number,
-  alpha: number,
-  beta: number,
-  isMax: boolean
-): number {
-  if (depth === 0 || chess.game_over()) return evaluateBoard(chess);
-
-  const moves = chess.moves() as string[];
-  if (isMax) {
-    let best = -Infinity;
-    for (const move of moves) {
-      chess.move(move);
-      best = Math.max(best, minimax(chess, depth - 1, alpha, beta, false));
-      chess.move('--' as never); // undo — use history trick below
-      alpha = Math.max(alpha, best);
-      if (beta <= alpha) break;
-    }
-    return best;
-  } else {
-    let best = Infinity;
-    for (const move of moves) {
-      chess.move(move);
-      best = Math.min(best, minimax(chess, depth - 1, alpha, beta, true));
-      chess.move('--' as never);
-      beta = Math.min(beta, best);
-      if (beta <= alpha) break;
-    }
-    return best;
-  }
+/** Captures (most valuable victim first) and promotions before quiet moves. */
+function orderMoves(moves: VerboseMove[]): VerboseMove[] {
+  const key = (m: VerboseMove) =>
+    (m.captured ? 1000 + 10 * VAL[m.captured] - VAL[m.piece] : 0) + (m.promotion ? 800 : 0);
+  return moves
+    .map(m => ({ m, k: key(m) }))
+    .sort((a, b) => b.k - a.k)
+    .map(x => x.m);
 }
 
-// chess.js doesn't have undo() natively in all versions — we use FEN snapshots
-function getBestMove(chess: ChessInstance, depth: number): string {
-  const moves = chess.moves() as string[];
-  let bestMove = moves[0];
-  let bestVal = Infinity; // AI plays black → minimise
-
-  for (const move of moves) {
-    const fen = chess.fen();
-    chess.move(move);
-    const val = minimax(chess, depth - 1, -Infinity, Infinity, true);
-    chess.load(fen);
-    if (val < bestVal) { bestVal = val; bestMove = move; }
-  }
-  return bestMove;
+function play(g: ChessGame, m: VerboseMove) {
+  return g.move({ from: m.from, to: m.to, promotion: m.promotion });
 }
 
-function getAiMove(chess: ChessInstance, difficulty: Difficulty): string {
-  const moves = chess.moves() as string[];
-  if (difficulty === 'easy') {
-    return moves[Math.floor(Math.random() * moves.length)];
+/** Negamax with alpha-beta. Every move is taken back with undo() so the position is always restored. */
+function negamax(g: ChessGame, depth: number, alpha: number, beta: number, ply: number): number {
+  if (depth === 0) return (g.turn() === 'w' ? 1 : -1) * evaluate(g);
+  const moves = g.moves({ verbose: true });
+  if (moves.length === 0) return g.in_check() ? -MATE + ply : 0;
+  let best = -Infinity;
+  for (const m of orderMoves(moves)) {
+    play(g, m);
+    const v = -negamax(g, depth - 1, -beta, -alpha, ply + 1);
+    g.undo();
+    if (v > best) best = v;
+    if (v > alpha) alpha = v;
+    if (alpha >= beta) break;
   }
-  if (difficulty === 'medium') {
-    return getBestMove(chess, 1);
-  }
-  return getBestMove(chess, 3);
+  return best;
 }
 
-export default function ChessPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [libReady, setLibReady] = useState(false);
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
-  const [status, setStatus] = useState<GameStatus>('idle');
+const nextTick = () => new Promise<void>(r => setTimeout(r, 0));
 
-  // Board state derived from chess.js — re-render by bumping this
-  const chessRef = useRef<ChessInstance | null>(null);
-  const [fen, setFen] = useState('');
-  const [selected, setSelected] = useState<string | null>(null);
-  const [legalTargets, setLegalTargets] = useState<string[]>([]);
-  const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
-  const [inCheck, setInCheck] = useState(false);
-  const [message, setMessage] = useState('');
-  const [moveHistory, setMoveHistory] = useState<string[]>([]);
-  const [scores, setScores] = useState({ wins: 0, losses: 0, draws: 0 });
-  const [promotion, setPromotion] = useState<{ from: string; to: string } | null>(null);
-  const [playerTurn, setPlayerTurn] = useState(true);
+/**
+ * Pick a move for the side to move. Runs on a copy of the position and yields
+ * to the browser between root moves, so the page stays responsive.
+ */
+async function findMove(Ctor: ChessCtor, fen: string, difficulty: Difficulty, cancelled: () => boolean) {
+  const g = new Ctor(fen);
+  const moves = g.moves({ verbose: true });
+  if (moves.length === 0) return null;
+  if (difficulty === 'easy' && Math.random() < 0.4) return moves[Math.floor(Math.random() * moves.length)];
 
-  const aiTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Shuffle first so equal moves vary from game to game, then order.
+  for (let i = moves.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [moves[i], moves[j]] = [moves[j], moves[i]];
+  }
+  const depth = DEPTH[difficulty];
+  let best = moves[0];
+  let bestVal = -Infinity;
+  for (const m of orderMoves(moves)) {
+    play(g, m);
+    const v = -negamax(g, depth - 1, -Infinity, -bestVal, 1);
+    g.undo();
+    if (v > bestVal) { bestVal = v; best = m; }
+    await nextTick();
+    if (cancelled()) return null;
+  }
+  return best;
+}
 
-  // Load chess.js from CDN
-  useEffect(() => {
-    if (typeof window !== 'undefined' && (window as never as Record<string,unknown>)['Chess']) {
-      setLibReady(true); return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js';
-    script.onload = () => setLibReady(true);
-    document.head.appendChild(script);
-    return () => clearTimeout(aiTimeout.current);
-  }, []);
+/* ── Board helpers ─────────────────────────────────────────────────────── */
 
-  useEffect(() => {
-    async function init() {
-      await new Promise(r => setTimeout(r, 100));
-      const ready = await ensureSession();
-      if (!ready) { setLoading(false); return; }
-      setLoading(false);
-    }
-    init();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+const RANKS = ['8', '7', '6', '5', '4', '3', '2', '1'];
+const SQUARES = RANKS.flatMap(r => FILES.map(f => f + r));
 
-  const syncState = useCallback(() => {
-    const chess = chessRef.current;
-    if (!chess) return;
-    setFen(chess.fen());
-    setInCheck(chess.in_check());
-    setMoveHistory(chess.history() as string[]);
-  }, []);
+// Solid glyphs for both sides (coloured by CSS). U+FE0E asks for text, not emoji, rendering.
+const GLYPH: Record<PieceType, string> = {
+  k: '♚︎', q: '♛︎', r: '♜︎', b: '♝︎', n: '♞︎', p: '♟︎',
+};
+const NAME: Record<PieceType, string> = { k: 'king', q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn' };
+const PROMOS: PromoType[] = ['q', 'r', 'b', 'n'];
 
-  const endGame = useCallback((chess: ChessInstance) => {
-    if (chess.in_checkmate()) {
-      const winner = chess.turn() === 'b' ? 'w' : 'b';
-      if (winner === 'w') {
-        setStatus('won'); setScores(s => ({ ...s, wins: s.wins + 1 }));
-        setMessage('Checkmate! 🎉 You win!');
-      } else {
-        setStatus('lost'); setScores(s => ({ ...s, losses: s.losses + 1 }));
-        setMessage('Checkmate. 💀 You lose.');
-      }
-    } else if (chess.in_draw()) {
-      setStatus('draw'); setScores(s => ({ ...s, draws: s.draws + 1 }));
-      const reason = chess.in_stalemate() ? 'Stalemate'
-        : chess.insufficient_material() ? 'Insufficient material'
-        : chess.in_threefold_repetition() ? 'Threefold repetition'
-        : 'Draw';
-      setMessage(`${reason} — it's a draw.`);
-    }
-  }, []);
+type Outcome = { result: 'win' | 'loss' | 'draw'; reason: string };
 
-  const startGame = useCallback(() => {
-    if (!libReady) return;
-    const chess = new Chess();
-    chessRef.current = chess;
-    setSelected(null);
-    setLegalTargets([]);
-    setLastMove(null);
-    setPromotion(null);
-    setPlayerTurn(true);
-    setMessage("Your turn — you play White");
-    setStatus('playing');
-    syncState();
-  }, [libReady, syncState]);
+interface Snap {
+  board: (Piece | null)[][];
+  turn: Color;
+  inCheck: boolean;
+  history: VerboseMove[];
+  over: Outcome | null;
+}
 
-  const runAiTurn = useCallback(() => {
-    const chess = chessRef.current;
-    if (!chess || chess.game_over()) return;
+function outcomeOf(g: ChessGame): Outcome | null {
+  if (g.in_checkmate()) {
+    return g.turn() === 'b'
+      ? { result: 'win', reason: 'Checkmate! You win.' }
+      : { result: 'loss', reason: 'Checkmate. The computer wins this one.' };
+  }
+  if (g.in_stalemate()) return { result: 'draw', reason: 'Stalemate, so it is a draw.' };
+  if (g.insufficient_material()) return { result: 'draw', reason: 'Not enough pieces left to mate, so it is a draw.' };
+  if (g.in_threefold_repetition()) return { result: 'draw', reason: 'Same position three times, so it is a draw.' };
+  if (g.in_draw()) return { result: 'draw', reason: 'Fifty moves without a capture or pawn move, so it is a draw.' };
+  return null;
+}
 
-    setMessage('AI is thinking…');
-    aiTimeout.current = setTimeout(() => {
-      const move = getAiMove(chess, difficulty);
-      const result = chess.move(move);
-      if (result) setLastMove({ from: result.from, to: result.to });
-      syncState();
+function snapshot(g: ChessGame): Snap {
+  return {
+    board: g.board(),
+    turn: g.turn(),
+    inCheck: g.in_check(),
+    history: g.history({ verbose: true }),
+    over: outcomeOf(g),
+  };
+}
 
-      if (chess.game_over()) { endGame(chess); return; }
-      if (chess.in_check()) setMessage('Check! Your move.');
-      else setMessage('Your turn.');
-      setPlayerTurn(true);
-    }, difficulty === 'hard' ? 600 : 300);
-  }, [difficulty, syncState, endGame]);
+function pieceAt(snap: Snap, sq: string): Piece | null {
+  const f = sq.charCodeAt(0) - 97;
+  const r = 8 - Number(sq[1]);
+  return snap.board[r]?.[f] ?? null;
+}
 
-  const handleSquareClick = useCallback((square: string) => {
-    const chess = chessRef.current;
-    if (!chess || !playerTurn || status !== 'playing' || promotion) return;
+function stepSquare(sq: string, key: string): string | null {
+  let f = sq.charCodeAt(0) - 97;
+  let r = Number(sq[1]);
+  if (key === 'ArrowLeft') f--;
+  else if (key === 'ArrowRight') f++;
+  else if (key === 'ArrowUp') r++;
+  else if (key === 'ArrowDown') r--;
+  else return null;
+  if (f < 0 || f > 7 || r < 1 || r > 8) return null;
+  return FILES[f] + r;
+}
 
-    const piece = chess.get(square);
-
-    if (selected) {
-      if (legalTargets.includes(square)) {
-        // Check for pawn promotion
-        const movingPiece = chess.get(selected);
-        const isPromotion = movingPiece?.type === 'p' &&
-          ((movingPiece.color === 'w' && square[1] === '8') ||
-           (movingPiece.color === 'b' && square[1] === '1'));
-
-        if (isPromotion) {
-          setPromotion({ from: selected, to: square });
-          setSelected(null); setLegalTargets([]);
-          return;
-        }
-
-        const result = chess.move({ from: selected, to: square });
-        if (result) {
-          setLastMove({ from: result.from, to: result.to });
-          setSelected(null); setLegalTargets([]);
-          syncState();
-
-          if (chess.game_over()) { endGame(chess); return; }
-          setPlayerTurn(false);
-          runAiTurn();
-        }
-        return;
-      }
-      // Clicked a different own piece — re-select
-      if (piece && piece.color === 'w') {
-        setSelected(square);
-        const moves = chess.moves({ verbose: true, square }) as VerboseMove[];
-        setLegalTargets(moves.map(m => m.to));
-        return;
-      }
-      setSelected(null); setLegalTargets([]);
-      return;
-    }
-
-    // Nothing selected yet — select own piece
-    if (piece && piece.color === 'w') {
-      setSelected(square);
-      const moves = chess.moves({ verbose: true, square }) as VerboseMove[];
-      setLegalTargets(moves.map(m => m.to));
-    }
-  }, [selected, legalTargets, playerTurn, status, promotion, syncState, endGame, runAiTurn]);
-
-  const handlePromotion = useCallback((pieceType: 'q' | 'r' | 'b' | 'n') => {
-    const chess = chessRef.current;
-    if (!chess || !promotion) return;
-    const result = chess.move({ from: promotion.from, to: promotion.to, promotion: pieceType });
-    if (result) setLastMove({ from: result.from, to: result.to });
-    setPromotion(null);
-    syncState();
-    if (chess.game_over()) { endGame(chess); return; }
-    setPlayerTurn(false);
-    runAiTurn();
-  }, [promotion, syncState, endGame, runAiTurn]);
-
-  // Derive board squares from FEN / chess.board()
-  const getBoardPiece = useCallback((square: string): Piece | null => {
-    return chessRef.current?.get(square) ?? null;
-  }, [fen]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const isOver = status === 'won' || status === 'lost' || status === 'draw';
-
-  if (loading) return <div className={styles.loading}><div className={styles.dot} /></div>;
-
+function CapturedRow({ pieces, color, label }: { pieces: PieceType[]; color: Color; label: string }) {
+  const order: PieceType[] = ['q', 'r', 'b', 'n', 'p'];
+  const sorted = [...pieces].sort((a, b) => order.indexOf(a) - order.indexOf(b));
   return (
-    <div className={styles.page}>
-      {/* chess.js CDN — must be in DOM */}
-      {typeof window !== 'undefined' && (
-        <script
-          src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"
-          async
-        />
-      )}
-
-      <div className={styles.topBar}>
-        <button className={styles.back} onClick={() => router.push('/games')}>← arcade</button>
-        <div className={styles.scoreboard}>
-          <span className={styles.scoreWin}>W {scores.wins}</span>
-          <span className={styles.scoreDraw}>D {scores.draws}</span>
-          <span className={styles.scoreLoss}>L {scores.losses}</span>
-        </div>
-      </div>
-
-      <h1 className={styles.title}>Chess</h1>
-
-      {status === 'idle' && (
-        <div className={styles.setup}>
-          <p className={styles.setupLabel}>choose difficulty</p>
-          <div className={styles.diffRow}>
-            {(['easy', 'medium', 'hard'] as Difficulty[]).map(d => (
-              <button
-                key={d}
-                className={`${styles.diffBtn} ${difficulty === d ? styles.diffBtnActive : ''}`}
-                onClick={() => setDifficulty(d)}
-              >
-                {d}
-                <span className={styles.diffHint}>
-                  {d === 'easy' ? 'random moves' : d === 'medium' ? '1-ply eval' : '3-ply minimax'}
-                </span>
-              </button>
-            ))}
-          </div>
-          <button
-            className={styles.startBtn}
-            onClick={startGame}
-            disabled={!libReady}
-          >
-            {libReady ? 'start game' : 'loading…'}
-          </button>
-        </div>
-      )}
-
-      {status !== 'idle' && (
-        <div className={styles.gameWrap}>
-          {/* Board + sidebar */}
-          <div className={styles.boardCol}>
-            <div className={styles.messageBar}>
-              {inCheck && status === 'playing' && <span className={styles.checkAlert}>⚠ check — </span>}
-              {message}
-            </div>
-
-            {/* Promotion picker */}
-            {promotion && (
-              <div className={styles.promotionBar}>
-                <span className={styles.promoLabel}>promote to:</span>
-                {(['q','r','b','n'] as const).map(p => (
-                  <button
-                    key={p}
-                    className={styles.promoBtn}
-                    onClick={() => handlePromotion(p)}
-                    aria-label={`Promote to ${p}`}
-                  >
-                    {PIECE_UNICODE[`w${p}`]}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Board */}
-            <div className={styles.boardWrap}>
-              {/* Rank labels */}
-              <div className={styles.rankLabels}>
-                {RANKS.map(r => <span key={r} className={styles.rankLabel}>{r}</span>)}
-              </div>
-
-              <div className={styles.board}>
-                {RANKS.map((rank, ri) =>
-                  FILES.map((file, fi) => {
-                    const square = `${file}${rank}`;
-                    const piece = getBoardPiece(square);
-                    const isLight = (ri + fi) % 2 === 0;
-                    const isSelected = selected === square;
-                    const isTarget = legalTargets.includes(square);
-                    const isLastFrom = lastMove?.from === square;
-                    const isLastTo = lastMove?.to === square;
-                    const isKingInCheck = inCheck && piece?.type === 'k' && piece?.color === chess_turn();
-
-                    let cellClass = `${styles.cell} ${isLight ? styles.cellLight : styles.cellDark}`;
-                    if (isSelected)    cellClass += ` ${styles.cellSelected}`;
-                    if (isLastFrom || isLastTo) cellClass += ` ${styles.cellLastMove}`;
-                    if (isKingInCheck) cellClass += ` ${styles.cellCheck}`;
-
-                    return (
-                      <button
-                        key={square}
-                        className={cellClass}
-                        onClick={() => handleSquareClick(square)}
-                        aria-label={`${square}${piece ? ` — ${piece.color === 'w' ? 'white' : 'black'} ${piece.type}` : ''}`}
-                      >
-                        {piece && (
-                          <span className={`${styles.piece} ${piece.color === 'w' ? styles.pieceWhite : styles.pieceBlack}`}>
-                            {PIECE_UNICODE[`${piece.color}${piece.type}`]}
-                          </span>
-                        )}
-                        {isTarget && (
-                          <span className={piece ? styles.targetCapture : styles.targetDot} aria-hidden="true" />
-                        )}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* File labels */}
-              <div className={styles.fileLabels}>
-                {FILES.map(f => <span key={f} className={styles.fileLabel}>{f}</span>)}
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar: move history */}
-          <div className={styles.sidebar}>
-            <p className={styles.historyLabel}>moves</p>
-            <div className={styles.historyList}>
-              {moveHistory.length === 0
-                ? <span className={styles.historyEmpty}>no moves yet</span>
-                : moveHistory.reduce((pairs: string[][], move, i) => {
-                    if (i % 2 === 0) pairs.push([move]);
-                    else pairs[pairs.length - 1].push(move);
-                    return pairs;
-                  }, []).map((pair, i) => (
-                    <div key={i} className={styles.historyRow}>
-                      <span className={styles.historyNum}>{i + 1}.</span>
-                      <span className={styles.historyWhite}>{pair[0]}</span>
-                      <span className={styles.historyBlack}>{pair[1] ?? ''}</span>
-                    </div>
-                  ))
-              }
-            </div>
-
-            {isOver && (
-              <div className={styles.overActions}>
-                <div className={
-                  status === 'won' ? styles.wonText :
-                  status === 'lost' ? styles.lostText : styles.drawText
-                }>
-                  {status === 'won' ? '🎉 You win!' : status === 'lost' ? '💀 You lose.' : '🤝 Draw.'}
-                </div>
-                <button className={styles.startBtn} onClick={startGame}>play again</button>
-                <button className={styles.diffChange} onClick={() => setStatus('idle')}>change difficulty</button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+    <div className={s.capRow}>
+      <span className={s.capLabel}>{label}</span>
+      <span className={s.capPieces} data-color={color} aria-label={sorted.length ? sorted.map(p => NAME[p]).join(', ') : 'none'}>
+        {sorted.length === 0 ? <span className={s.capNone}>None yet</span> : sorted.map((p, i) => <span key={i}>{GLYPH[p]}</span>)}
+      </span>
     </div>
   );
+}
 
-  function chess_turn(): 'w' | 'b' {
-    return chessRef.current?.turn() ?? 'w';
-  }
+/* ── Page ──────────────────────────────────────────────────────────────── */
+
+export default function ChessPage() {
+  const [Ctor, setCtor] = useState<ChessCtor | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
+  const [gameId, setGameId] = useState(0);
+  const [snap, setSnap] = useState<Snap | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [targets, setTargets] = useState<VerboseMove[]>([]);
+  const [promo, setPromo] = useState<{ from: string; to: string } | null>(null);
+  const [focusSq, setFocusSq] = useState('e2');
+  const [scores, setScores] = useState({ wins: 0, draws: 0, losses: 0 });
+
+  const gameRef = useRef<ChessGame | null>(null);
+  const recordedRef = useRef<number | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const difficultyRef = useRef<Difficulty>(difficulty);
+
+  const newGame = useCallback((C: ChessCtor) => {
+    const g = new C();
+    gameRef.current = g;
+    setGameId(id => id + 1);
+    setSnap(snapshot(g));
+    setSelected(null);
+    setTargets([]);
+    setPromo(null);
+  }, []);
+
+  const attemptLoad = useCallback(() => {
+    loadChess()
+      .then(C => { setLoadError(false); setCtor(() => C); newGame(C); })
+      .catch(() => setLoadError(true));
+  }, [newGame]);
+
+  useEffect(() => { attemptLoad(); }, [attemptLoad]);
+
+  /** Apply a legal move to the one real game, refresh the view and record the result once. */
+  const applyMove = useCallback((m: { from: string; to: string; promotion?: PromoType }, forGame: number) => {
+    const g = gameRef.current;
+    if (!g || !g.move(m)) return;
+    const next = snapshot(g);
+    setSnap(next);
+    setSelected(null);
+    setTargets([]);
+    setPromo(null);
+    if (next.over && recordedRef.current !== forGame) {
+      recordedRef.current = forGame;
+      const { result } = next.over;
+      setScores(sc => ({
+        wins: sc.wins + (result === 'win' ? 1 : 0),
+        draws: sc.draws + (result === 'draw' ? 1 : 0),
+        losses: sc.losses + (result === 'loss' ? 1 : 0),
+      }));
+      void recordResult('chess', difficultyRef.current, result);
+    }
+  }, []);
+
+  const aiTurn = !!snap && snap.turn === 'b' && !snap.over;
+
+  // Computer plays Black: runs whenever it becomes Black's turn.
+  useEffect(() => {
+    if (!aiTurn || !Ctor || !gameRef.current) return;
+    const g = gameRef.current;
+    const forGame = gameId;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const m = await findMove(Ctor, g.fen(), difficultyRef.current, () => cancelled);
+      if (cancelled || !m || gameRef.current !== g) return;
+      applyMove({ from: m.from, to: m.to, promotion: m.promotion }, forGame);
+    }, 350);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [aiTurn, Ctor, gameId, applyMove]);
+
+  const handleNewGame = useCallback(() => { if (Ctor) newGame(Ctor); }, [Ctor, newGame]);
+
+  const handleDifficulty = useCallback((key: string) => {
+    const d = key as Difficulty;
+    difficultyRef.current = d;
+    setDifficulty(d);
+    if (Ctor) newGame(Ctor);
+  }, [Ctor, newGame]);
+
+  const handleSquare = (sq: string) => {
+    const g = gameRef.current;
+    if (!g || !snap || snap.over || snap.turn !== 'w' || promo) return;
+    setFocusSq(sq);
+    const hits = targets.filter(t => t.to === sq);
+    if (selected && hits.length) {
+      if (hits.some(h => h.promotion)) { setPromo({ from: selected, to: sq }); return; }
+      applyMove({ from: selected, to: sq }, gameId);
+      return;
+    }
+    const p = pieceAt(snap, sq);
+    if (p?.color === 'w' && sq !== selected) {
+      setSelected(sq);
+      setTargets(g.moves({ verbose: true, square: sq }));
+    } else {
+      setSelected(null);
+      setTargets([]);
+    }
+  };
+
+  const handleBoardKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const next = stepSquare(focusSq, e.key);
+    if (!next) return;
+    e.preventDefault();
+    setFocusSq(next);
+    boardRef.current?.querySelector<HTMLButtonElement>(`[data-sq="${next}"]`)?.focus();
+  };
+
+  const derived = useMemo(() => {
+    const hist = snap?.history ?? [];
+    const last = hist[hist.length - 1] ?? null;
+    const byWhite: PieceType[] = [];
+    const byBlack: PieceType[] = [];
+    for (const m of hist) {
+      if (m.captured) (m.color === 'w' ? byWhite : byBlack).push(m.captured);
+    }
+    // Promotions change material too: a pawn becomes a bigger piece.
+    const material = (list: PieceType[]) => list.reduce((n, p) => n + VAL[p], 0);
+    const promoGain = (c: Color) =>
+      hist.filter(m => m.color === c && m.promotion).reduce((n, m) => n + VAL[m.promotion as PieceType] - VAL.p, 0);
+    const diff = Math.round((material(byWhite) + promoGain('w') - material(byBlack) - promoGain('b')) / 100);
+    const pairs: [VerboseMove, VerboseMove | undefined][] = [];
+    for (let i = 0; i < hist.length; i += 2) pairs.push([hist[i], hist[i + 1]]);
+    let checkSq: string | null = null;
+    if (snap?.inCheck) {
+      checkSq = SQUARES.find(sq => {
+        const p = pieceAt(snap, sq);
+        return p?.type === 'k' && p.color === snap.turn;
+      }) ?? null;
+    }
+    return { last, byWhite, byBlack, diff, pairs, checkSq };
+  }, [snap]);
+
+  const moveListRef = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    const el = moveListRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [derived.pairs.length]);
+
+  let status: ReactNode;
+  let tone: 'neutral' | 'good' | 'bad' | 'info' = 'neutral';
+  if (loadError) { status = 'Could not load the chess engine. Check your connection and try again.'; tone = 'bad'; }
+  else if (!snap) status = 'Setting up the board…';
+  else if (snap.over) {
+    status = snap.over.reason;
+    tone = snap.over.result === 'win' ? 'good' : snap.over.result === 'loss' ? 'bad' : 'info';
+  } else if (snap.turn === 'b') { status = 'The computer is thinking…'; tone = 'info'; }
+  else if (snap.inCheck) { status = 'Check! Get your king to safety.'; tone = 'bad'; }
+  else status = snap.history.length ? 'Your move.' : 'You play White. Pick a piece to start.';
+
+  const aside = (
+    <>
+      <section className={s.panel} aria-label="Captured pieces">
+        <h2 className={s.panelTitle}>Captured</h2>
+        <CapturedRow pieces={derived.byWhite} color="b" label="You took" />
+        <CapturedRow pieces={derived.byBlack} color="w" label="Computer took" />
+        {derived.diff !== 0 && (
+          <p className={s.material} data-tone={derived.diff > 0 ? 'good' : 'bad'}>
+            {derived.diff > 0 ? `You are up ${derived.diff}` : `You are down ${-derived.diff}`} in material
+          </p>
+        )}
+      </section>
+      <section className={s.panel} aria-label="Moves">
+        <h2 className={s.panelTitle}>Moves</h2>
+        {derived.pairs.length === 0 ? (
+          <p className={s.empty}>No moves yet.</p>
+        ) : (
+          <ol className={s.moves} ref={moveListRef}>
+            {derived.pairs.map(([w, b], i) => (
+              <li key={i} className={s.moveRow}>
+                <span className={s.moveNum}>{i + 1}.</span>
+                <span className={s.moveSan}>{w.san}</span>
+                <span className={s.moveSan}>{b?.san ?? ''}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </>
+  );
+
+  const locked = !snap || !!snap.over || snap.turn !== 'w' || !!promo;
+
+  return (
+    <GameShell
+      title="Chess"
+      subtitle="You play White against the computer."
+      icon={<Crown size={24} strokeWidth={2} />}
+      difficulties={DIFFICULTIES}
+      difficulty={difficulty}
+      onDifficulty={handleDifficulty}
+      score={[
+        { label: 'Wins', value: scores.wins, tone: 'win' },
+        { label: 'Draws', value: scores.draws, tone: 'draw' },
+        { label: 'Losses', value: scores.losses, tone: 'loss' },
+      ]}
+      status={status}
+      statusTone={tone}
+      onNewGame={Ctor ? handleNewGame : undefined}
+      aside={aside}
+      rules={
+        <>
+          <p>Tap one of your pieces to see where it can go, then tap a highlighted square to move. Dots mark empty squares and rings mark captures.</p>
+          <p>Checkmate the black king to win. Stalemate, running out of mating material, repeating the same position three times, or fifty moves without a capture or pawn move all end in a draw.</p>
+          <p>On a keyboard, use the arrow keys to move around the board and Enter to pick a square.</p>
+        </>
+      }
+    >
+      <div className={s.stage}>
+        {loadError ? (
+          <div className={s.errorBox}>
+            <p>The chess engine did not load.</p>
+            <button type="button" className={s.retry} onClick={attemptLoad}>Try again</button>
+          </div>
+        ) : !snap ? (
+          <div className={`skeleton ${s.skel}`} aria-hidden="true" />
+        ) : (
+          <div className={s.boardWrap} data-thinking={aiTurn || undefined}>
+            <div
+              ref={boardRef}
+              className={s.board}
+              role="group"
+              aria-label="Chess board"
+              aria-busy={aiTurn}
+              onKeyDown={handleBoardKey}
+            >
+              {SQUARES.map((sq, i) => {
+                const p = pieceAt(snap, sq);
+                const light = (Math.floor(i / 8) + (i % 8)) % 2 === 0;
+                const target = targets.some(t => t.to === sq);
+                const isLast = derived.last && (derived.last.from === sq || derived.last.to === sq);
+                const label = `${sq}${p ? `, ${p.color === 'w' ? 'white' : 'black'} ${NAME[p.type]}` : ''}${target ? ', legal move' : ''}`;
+                return (
+                  <button
+                    key={sq}
+                    type="button"
+                    data-sq={sq}
+                    tabIndex={sq === focusSq ? 0 : -1}
+                    className={s.sq}
+                    data-light={light || undefined}
+                    data-last={isLast || undefined}
+                    data-selected={selected === sq || undefined}
+                    data-check={derived.checkSq === sq || undefined}
+                    aria-label={label}
+                    aria-pressed={selected === sq}
+                    aria-disabled={locked || undefined}
+                    onClick={() => handleSquare(sq)}
+                    onFocus={() => setFocusSq(sq)}
+                  >
+                    {sq[0] === 'a' && <span className={s.rankTag} aria-hidden="true">{sq[1]}</span>}
+                    {sq[1] === '1' && <span className={s.fileTag} aria-hidden="true">{sq[0]}</span>}
+                    {p && <span className={s.piece} data-color={p.color} aria-hidden="true">{GLYPH[p.type]}</span>}
+                    {target && <span className={p ? s.ring : s.dot} aria-hidden="true" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {promo && (
+              <div className={s.promoScrim}>
+                <div
+                  className={s.promo}
+                  role="dialog"
+                  aria-label="Choose a promotion piece"
+                  onKeyDown={e => { if (e.key === 'Escape') setPromo(null); }}
+                >
+                  <p className={s.promoTitle}>Promote your pawn</p>
+                  <div className={s.promoRow}>
+                    {PROMOS.map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        className={s.promoBtn}
+                        aria-label={`Promote to ${NAME[t]}`}
+                        onClick={() => applyMove({ ...promo, promotion: t }, gameId)}
+                        autoFocus={t === 'q'}
+                      >
+                        <span className={s.piece} data-color="w">{GLYPH[t]}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" className={s.promoCancel} onClick={() => setPromo(null)}>
+                    <X size={14} strokeWidth={2.25} /> Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </GameShell>
+  );
 }

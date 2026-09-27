@@ -1,0 +1,120 @@
+.avatar {
+  --c: var(--or);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 2px solid color-mix(in oklab, var(--c) 55%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--c) 75%, transparent), color-mix(in oklab, var(--c) 25%, transparent));
+  line-height: 1;
+  box-shadow: 0 6px 18px -8px var(--c);
+}
+.avatarImg { display: block; object-fit: cover; padding: 0; }
+
+.preview {
+  --c: var(--or);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid color-mix(in oklab, var(--c) 35%, transparent);
+  border-radius: var(--radius);
+  background: linear-gradient(120deg, color-mix(in oklab, var(--c) 16%, transparent), transparent 70%);
+  transition: border-color var(--dur-base) ease, background var(--dur-base) ease;
+}
+.previewAvatar {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--c) 35%, transparent);
+  font-size: 24px;
+  transition: background-color var(--dur-base) ease;
+}
+.previewName { font-size: 1.1rem; font-weight: 700; }
+
+.emojiGrid { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 14px; }
+.emojiOpt {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+.emojiOpt:hover { background: var(--bds); }
+.emojiOpt:active { transform: scale(0.88); }
+.emojiOn { border-color: var(--or); background: color-mix(in oklab, var(--or) 14%, transparent); }
+
+.colorRow { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.colorOpt {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px transparent;
+  transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-fast) ease;
+}
+.colorOpt:hover { transform: scale(1.1); }
+.colorOn { border-color: var(--bg); box-shadow: 0 0 0 2px var(--tx); transform: scale(1.1); }
+
+.twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .twoCol { grid-template-columns: 1fr; } }
+.field { margin-bottom: 14px; }
+.deleteLink { margin-top: 4px; color: var(--red) !important; }
+
+/* Photo-first avatar in the form */
+.photoBtn {
+  position: relative;
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 2px solid color-mix(in oklab, var(--c) 60%, transparent);
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-fast) ease;
+}
+.photoBtn:hover { border-color: var(--c); }
+.photoBtn:active { transform: scale(0.95); }
+.photoBtn .previewAvatar { width: 100%; height: 100%; font-size: 34px; }
+.photoImg { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.photoBadge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--surf);
+  border-radius: 50%;
+  background: var(--or);
+  color: var(--on-accent);
+}
+.previewText { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.previewHint { color: var(--tx-m); font-size: 0.8rem; }
+.removePhoto {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--tx-s);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.removePhoto:hover { color: var(--red); }

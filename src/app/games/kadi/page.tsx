@@ -1,537 +1,413 @@
 'use client';
 
-/**
- * KADI — Updated rules:
- * - Penalty stacking: any penalty card can be placed on another (2+3+Joker = cumulative)
- * - K or J can BLOCK a penalty (plays on the penalty card, passes turn without drawing)
- * - Q/8 = question cards
- * - A = wild, blocks penalties
- */
-
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Bot, Layers, Megaphone, User } from 'lucide-react';
+import GameShell from '@/components/games/GameShell';
+import { CardHand, PlayingCard, SuitIcon, SuitPicker } from '@/components/games/PlayingCard';
 import { ensureSession } from '@/lib/supabase';
-import styles from './kadi.module.css';
+import { recordResult } from '@/lib/games';
+import {
+  aiPickSuit, cardName, drawCards, makeDeck, matchesTarget, other, pickRandom, pickStarter, plural,
+  removeCard, shuffle, targetAfter, useIsClient,
+  type Card, type Suit, type Target, type Who,
+} from '@/lib/cards';
+import s from './kadi.module.css';
 
-type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades';
-type Rank = 'A' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'JOKER';
-type Color = 'red' | 'black';
-
-interface Card {
-  suit: Suit | 'joker';
-  rank: Rank;
-  color: Color;
-  id: string;
-}
+/* ───────────────────────── Rules engine (pure) ───────────────────────── */
 
 type Difficulty = 'easy' | 'medium' | 'hard';
-type GameStatus = 'idle' | 'playing' | 'won' | 'lost';
 
-const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
-const RANKS: Rank[] = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
-const SUIT_EMOJI: Record<Suit | 'joker', string> = {
-  hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠', joker: '🃏',
-};
-const SUIT_COLOR: Record<Suit | 'joker', Color> = {
-  hearts: 'red', diamonds: 'red', clubs: 'black', spades: 'black', joker: 'red',
-};
+const DIFFICULTIES = [
+  { key: 'easy', label: 'Easy', hint: 'Plays random cards and often forgets to call Kadi' },
+  { key: 'medium', label: 'Medium', hint: 'Answers penalties sensibly' },
+  { key: 'hard', label: 'Hard', hint: 'Bounces penalties, saves Aces and never forgets Kadi' },
+];
 
-function makeDeck(): Card[] {
-  const deck: Card[] = [];
-  let id = 0;
-  for (const suit of SUITS) {
-    for (const rank of RANKS) {
-      deck.push({ suit, rank, color: SUIT_COLOR[suit], id: `${suit}-${rank}-${id++}` });
+const HAND_SIZE = 4;
+const FORGOT_KADI_DRAW = 2;
+const AI_DELAY = 850;
+
+interface KadiState {
+  id: number;
+  deck: Card[];
+  pile: Card[];
+  hands: Record<Who, Card[]>;
+  turn: Who;
+  target: Target;
+  /** Cards the player to move must pick up unless they stack or block. */
+  penalty: number;
+  /** Suit that must answer an open question (Q or 8). */
+  question: Suit | null;
+  kadi: Record<Who, boolean>;
+  winner: Who | null;
+  note: string;
+}
+
+type Move =
+  | { type: 'play'; cardId: string; suit?: Suit; callKadi?: boolean }
+  | { type: 'draw' }
+  | { type: 'kadi' };
+
+const penaltyOf = (c: Card) => (c.rank === '2' ? 2 : c.rank === '3' ? 3 : c.rank === 'JOKER' ? 5 : 0);
+const isPenalty = (c: Card) => penaltyOf(c) > 0;
+const isQuestion = (c: Card) => c.rank === 'Q' || c.rank === '8';
+const isSkip = (c: Card) => c.rank === 'K' || c.rank === 'J';
+const isPlain = (c: Card) => ['4', '5', '6', '7', '9', '10'].includes(c.rank);
+const nameOf = (w: Who) => (w === 'you' ? 'You' : 'The AI');
+const lower = (w: Who) => (w === 'you' ? 'you' : 'the AI');
+
+function deal(id: number): KadiState {
+  const full = shuffle(makeDeck(`k${id}`));
+  const hands = { you: full.slice(0, HAND_SIZE), ai: full.slice(HAND_SIZE, HAND_SIZE * 2) };
+  const { deck, starter } = pickStarter(full.slice(HAND_SIZE * 2), isPlain);
+  return {
+    id, deck, pile: [starter], hands, turn: 'you',
+    target: { suit: starter.suit ?? 'hearts', rank: starter.rank },
+    penalty: 0, question: null, kadi: { you: false, ai: false }, winner: null,
+    note: `Cards are dealt. The first card is the ${cardName(starter)}.`,
+  };
+}
+
+function canPlay(st: KadiState, card: Card): boolean {
+  if (st.penalty > 0) return card.rank === 'A' || isSkip(card) || isPenalty(card);
+  if (st.question) return card.rank === 'A' || card.suit === st.question;
+  if (card.rank === 'A' || card.rank === 'JOKER') return true;
+  return matchesTarget(card, st.target);
+}
+
+/** Kadi can be called on your own turn while holding exactly two cards, so you can finish next turn. */
+function canCallKadi(st: KadiState, who: Who): boolean {
+  return !st.winner && st.turn === who && !st.kadi[who] && st.hands[who].length === 2;
+}
+
+function applyMove(st: KadiState, who: Who, move: Move): KadiState {
+  if (st.winner || st.turn !== who) return st;
+  const opp = other(who);
+  const hands = { ...st.hands };
+  const kadi = { ...st.kadi };
+
+  if (move.type === 'kadi') {
+    if (!canCallKadi(st, who)) return st;
+    kadi[who] = true;
+    return { ...st, kadi, note: who === 'you' ? 'You called Kadi. Finish on your next turn to win.' : 'The AI called Kadi!' };
+  }
+
+  let deck = st.deck;
+  let pile = st.pile;
+
+  if (move.type === 'draw') {
+    const r = drawCards(hands[who], deck, pile, st.penalty > 0 ? st.penalty : 1);
+    hands[who] = r.hand;
+    if (hands[who].length > 2) kadi[who] = false;
+    const note = st.penalty > 0
+      ? `${nameOf(who)} picked up ${plural(r.drawn, 'penalty card')}.`
+      : st.question
+        ? `${nameOf(who)} could not answer the question and drew a card.`
+        : `${nameOf(who)} drew a card.`;
+    return { ...st, deck: r.deck, pile: r.pile, hands, kadi, penalty: 0, question: null, turn: opp, note };
+  }
+
+  const card = hands[who].find(c => c.id === move.cardId);
+  if (!card || !canPlay(st, card)) return st;
+
+  const parts: string[] = [];
+  if (move.callKadi && canCallKadi(st, who)) {
+    kadi[who] = true;
+    parts.push(`${nameOf(who)} called Kadi!`);
+  }
+
+  hands[who] = removeCard(hands[who], card.id);
+  pile = [...pile, card];
+  const target = targetAfter(card, st.target, move.suit);
+  let penalty = st.penalty;
+  let question: Suit | null = null;
+  let turn: Who = opp;
+  parts.push(`${nameOf(who)} played the ${cardName(card)}${card.rank === 'A' ? ` and asked for ${target.suit}` : ''}.`);
+
+  if (penalty > 0 && isSkip(card)) {
+    const r = drawCards(hands[opp], deck, pile, penalty);
+    hands[opp] = r.hand; deck = r.deck; pile = r.pile;
+    parts.push(`That sends the penalty back, so ${lower(opp)} picked up ${plural(r.drawn, 'card')}.`);
+    penalty = 0;
+    turn = who;
+  } else if (card.rank === 'A') {
+    if (penalty > 0) parts.push('The penalty is cancelled.');
+    penalty = 0;
+  } else if (isPenalty(card)) {
+    penalty += penaltyOf(card);
+    if (card.rank === 'JOKER') parts.push(`The suit stays on ${target.suit}.`);
+  } else if (isQuestion(card)) {
+    question = card.suit;
+    parts.push(`That is a question, so ${lower(opp)} must answer with ${card.suit}.`);
+  } else if (isSkip(card)) {
+    turn = who;
+    parts.push(`${nameOf(opp)} ${opp === 'you' ? 'are' : 'is'} skipped.`);
+  }
+
+  let winner: Who | null = null;
+  if (hands[who].length === 0) {
+    if (kadi[who]) {
+      winner = who;
+    } else {
+      const r = drawCards(hands[who], deck, pile, FORGOT_KADI_DRAW);
+      hands[who] = r.hand; deck = r.deck; pile = r.pile;
+      if (hands[who].length === 0) winner = who;
+      else parts.push(`${nameOf(who)} went out without calling Kadi, so ${who === 'you' ? 'you draw' : 'it draws'} ${FORGOT_KADI_DRAW} instead of winning.`);
     }
   }
-  deck.push({ suit: 'joker', rank: 'JOKER', color: 'red',   id: `joker-red-${id++}`   });
-  deck.push({ suit: 'joker', rank: 'JOKER', color: 'black', id: `joker-black-${id++}` });
-  return deck;
-}
+  for (const w of ['you', 'ai'] as Who[]) if (hands[w].length > 2) kadi[w] = false;
 
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+  if (winner) {
+    parts.push(winner === 'you' ? 'Kadi! You win.' : 'The AI went out. You lose this one.');
+    return { ...st, deck, pile, hands, kadi, target, penalty: 0, question: null, winner, note: parts.join(' ') };
   }
-  return a;
+  return { ...st, deck, pile, hands, kadi, target, penalty, question, turn, note: parts.join(' ') };
 }
 
-function isQuestion(rank: Rank) { return rank === 'Q' || rank === '8'; }
-function isPenalty(rank: Rank)  { return rank === '2' || rank === '3' || rank === 'JOKER'; }
-function isBlocker(rank: Rank)  { return rank === 'K' || rank === 'J' || rank === 'A'; }
-function penaltyCount(rank: Rank) { return rank === '2' ? 2 : rank === '3' ? 3 : rank === 'JOKER' ? 5 : 0; }
+/* ───────────────────────── AI ───────────────────────── */
 
-function canPlay(
-  card: Card,
-  topCard: Card,
-  chosenSuit: Suit | null,
-  questionActive: boolean,
-  pendingPenalty: number
-): boolean {
-  // If there's a pending penalty, you can: stack another penalty, play A/K/J to block
-  if (pendingPenalty > 0 && !questionActive) {
-    if (card.rank === 'A') return true;
-    if (card.rank === 'K' || card.rank === 'J') return true;
-    if (isPenalty(card.rank)) return true; // any penalty stacks
-    return false;
+function aiMove(st: KadiState, diff: Difficulty): Move {
+  const hand = st.hands.ai;
+  const playable = hand.filter(c => canPlay(st, c));
+  const forget = diff === 'easy' ? 0.4 : diff === 'medium' ? 0.12 : 0;
+  const callKadi = hand.length === 2 && !st.kadi.ai && Math.random() >= forget;
+  if (playable.length === 0) return { type: 'draw' };
+
+  const play = (c: Card): Move => ({ type: 'play', cardId: c.id, callKadi, suit: c.rank === 'A' ? aiPickSuit(hand, c.id) : undefined });
+  if (diff === 'easy') return play(pickRandom(playable));
+
+  const skips = playable.filter(isSkip);
+  const pens = playable.filter(isPenalty);
+  const aces = playable.filter(c => c.rank === 'A');
+  const plain = playable.filter(c => !isSkip(c) && !isPenalty(c) && c.rank !== 'A' && !isQuestion(c));
+  const questions = playable.filter(isQuestion);
+
+  if (st.penalty > 0) {
+    if (diff === 'hard') return play(skips[0] ?? pens[0] ?? aces[0]);
+    return play(pens[0] ?? skips[0] ?? aces[0]);
   }
-  if (card.rank === 'A') return true;
-  if (card.rank === 'JOKER') return !questionActive;
-  if (questionActive) return card.rank === topCard.rank;
-  const effectiveSuit = chosenSuit ?? topCard.suit;
-  return card.suit === effectiveSuit || card.rank === topCard.rank;
-}
+  if (hand.length === 1) return play(playable[0]);
 
-function aiChooseCard(
-  hand: Card[],
-  topCard: Card,
-  chosenSuit: Suit | null,
-  questionActive: boolean,
-  pendingPenalty: number,
-  difficulty: Difficulty
-): Card | null {
-  const playable = hand.filter(c => canPlay(c, topCard, chosenSuit, questionActive, pendingPenalty));
-  if (playable.length === 0) return null;
-  if (difficulty === 'easy') return playable[Math.floor(Math.random() * playable.length)];
-
-  const penalties = playable.filter(c => isPenalty(c.rank));
-  const questions = playable.filter(c => isQuestion(c.rank));
-  const aces      = playable.filter(c => c.rank === 'A');
-  const blockers  = playable.filter(c => c.rank === 'K' || c.rank === 'J');
-  const normals   = playable.filter(c => !isPenalty(c.rank) && !isQuestion(c.rank) && !isBlocker(c.rank));
-
-  if (difficulty === 'hard') {
-    if (pendingPenalty > 0) {
-      // Stack if possible, else block with K/J, else block with A
-      if (penalties.length > 0) return penalties[0];
-      if (blockers.length > 0) return blockers[0];
-      if (aces.length > 0) return aces[0];
-    }
-    if (questions.length > 0) return questions[0];
-    if (blockers.length > 0 && hand.length <= 3) return blockers[0]; // save blocker til end
-    if (normals.length > 0) return normals[Math.floor(Math.random() * normals.length)];
-    if (aces.length > 0) return aces[0];
-    return playable[0];
+  if (diff === 'hard') {
+    // Keep a skip for an extra turn, hit hard when you are close to finishing, keep Aces for emergencies.
+    if (skips.length && hand.length > skips.length) return play(skips[0]);
+    if (pens.length && st.hands.you.length <= 2) return play(pens[0]);
+    const suitCount = (x: Suit | null) => hand.filter(c => c.suit === x).length;
+    const byShape = [...plain, ...questions].sort((a, b) => suitCount(b.suit) - suitCount(a.suit));
+    if (byShape.length) return play(byShape[0]);
+    return play(pens[0] ?? skips[0] ?? aces[0] ?? playable[0]);
   }
 
-  // Medium
-  if (pendingPenalty > 0 && penalties.length > 0) return penalties[0];
-  if (pendingPenalty > 0 && blockers.length > 0) return blockers[0];
-  if (normals.length > 0) return normals[Math.floor(Math.random() * normals.length)];
-  if (questions.length > 0) return questions[0];
-  return playable[Math.floor(Math.random() * playable.length)];
+  if (plain.length) return play(pickRandom(plain));
+  return play(pickRandom(playable));
 }
 
-function aiChooseSuit(hand: Card[]): Suit {
-  const counts: Record<Suit, number> = { hearts: 0, diamonds: 0, clubs: 0, spades: 0 };
-  for (const c of hand) { if (c.suit !== 'joker') counts[c.suit as Suit]++; }
-  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0] as Suit;
-}
-
-interface AiTurnArgs {
-  ah: Card[]; nd: Card[]; np: Card[];
-  currentPendingPenalty: number;
-  currentQuestionActive: boolean;
-  currentChosenSuit: Suit | null;
-  forceDraw?: boolean; // true when K/J was played — AI must draw, no stacking/blocking
-}
+/* ───────────────────────── Page ───────────────────────── */
 
 export default function KadiPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const client = useIsClient();
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
-  const [status, setStatus] = useState<GameStatus>('idle');
+  const [game, setGame] = useState<KadiState>(() => deal(1));
+  const [aceId, setAceId] = useState<string | null>(null);
+  const [score, setScore] = useState({ win: 0, loss: 0 });
+  const recorded = useRef(0);
 
-  const [deck, setDeck] = useState<Card[]>([]);
-  const [pile, setPile] = useState<Card[]>([]);
-  const [playerHand, setPlayerHand] = useState<Card[]>([]);
-  const [aiHand, setAiHand] = useState<Card[]>([]);
-  const [playerTurn, setPlayerTurn] = useState(true);
-  const [chosenSuit, setChosenSuit] = useState<Suit | null>(null);
-  const [choosingSuit, setChoosingSuit] = useState(false);
-  const [pendingPenalty, setPendingPenalty] = useState(0);
-  const [questionActive, setQuestionActive] = useState(false);
-  const [kadiCalled, setKadiCalled] = useState(false);
-  const [message, setMessage] = useState('');
-  const [scores, setScores] = useState({ wins: 0, losses: 0 });
+  useEffect(() => { ensureSession().catch(() => undefined); }, []);
 
-  const aiTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const difficultyRef = useRef<Difficulty>(difficulty);
-  const runAiTurnRef = useRef<(args: AiTurnArgs) => void>(() => { /* filled in useEffect */ });
+  /** Set the new state and, if the game just ended, record it exactly once. */
+  const commit = useCallback((prev: KadiState, next: KadiState) => {
+    setGame(next);
+    if (next.winner && !prev.winner && recorded.current !== next.id) {
+      recorded.current = next.id;
+      const res = next.winner === 'you' ? 'win' : 'loss';
+      setScore(sc => ({ ...sc, [res]: sc[res] + 1 }));
+      void recordResult('kadi', difficulty, res);
+    }
+  }, [difficulty]);
 
-  useEffect(() => { difficultyRef.current = difficulty; }, [difficulty]);
-
+  // The AI moves in an effect whenever it is its turn, after a short pause.
   useEffect(() => {
-    async function init() {
-      await new Promise(r => setTimeout(r, 100));
-      const ready = await ensureSession();
-      if (!ready) { setLoading(false); return; }
-      setLoading(false);
-    }
-    init();
-    return () => clearTimeout(aiTimeout.current);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!client || game.winner || game.turn !== 'ai') return;
+    const t = setTimeout(() => {
+      let next = applyMove(game, 'ai', aiMove(game, difficulty));
+      if (next === game) next = applyMove(game, 'ai', { type: 'draw' });
+      commit(game, next);
+    }, AI_DELAY);
+    return () => clearTimeout(t);
+  }, [client, game, difficulty, commit]);
 
-  const startGame = useCallback(() => {
-    const d = shuffle(makeDeck());
-    const pHand = d.splice(0, 4);
-    const aHand = d.splice(0, 4);
-    let startIdx = d.findIndex(c => !['JOKER','A','Q','8'].includes(c.rank));
-    if (startIdx === -1) startIdx = 0;
-    const [firstCard] = d.splice(startIdx, 1);
-    setDeck(d); setPile([firstCard]); setPlayerHand(pHand); setAiHand(aHand);
-    setPlayerTurn(true); setChosenSuit(null); setChoosingSuit(false);
-    setPendingPenalty(0); setQuestionActive(false); setKadiCalled(false);
-    setStatus('playing'); setMessage('Your turn!');
-  }, []);
+  const newGame = useCallback(() => {
+    setAceId(null);
+    setGame(deal(game.id + 1));
+  }, [game.id]);
 
-  const drawCards = useCallback((count: number, hand: Card[], currentDeck: Card[], currentPile: Card[]): {
-    drawn: Card[]; newHand: Card[]; newDeck: Card[]; newPile: Card[];
-  } => {
-    let d = [...currentDeck];
-    let p = [...currentPile];
-    const h = [...hand];
-    const drawn: Card[] = [];
-    for (let i = 0; i < count; i++) {
-      if (d.length === 0) {
-        const top = p[p.length - 1];
-        d = shuffle(p.slice(0, -1));
-        p = [top];
-      }
-      if (d.length === 0) break;
-      const card = d.shift()!;
-      h.push(card); drawn.push(card);
-    }
-    return { drawn, newHand: h, newDeck: d, newPile: p };
-  }, []);
-
-  useEffect(() => {
-    runAiTurnRef.current = ({ ah, nd, np, currentPendingPenalty, currentQuestionActive, currentChosenSuit, forceDraw = false }: AiTurnArgs) => {
-      aiTimeout.current = setTimeout(() => {
-        setAiHand(() => {
-          let aiHand2 = [...ah];
-          let nd2 = [...nd];
-          let np2 = [...np];
-          const topCard = np2[np2.length - 1];
-          const diff = difficultyRef.current;
-
-          // AI deals with pending penalty
-          if (currentPendingPenalty > 0 && !currentQuestionActive) {
-            // forceDraw=true means a K/J was played at us — must draw, no response allowed
-            if (!forceDraw) {
-              const aiCard = aiChooseCard(aiHand2, topCard, currentChosenSuit, false, currentPendingPenalty, diff);
-              if (aiCard) {
-                aiHand2 = aiHand2.filter(c => c.id !== aiCard.id);
-                np2 = [...np2, aiCard];
-                if (isPenalty(aiCard.rank)) {
-                  // Stack
-                  const newTotal = currentPendingPenalty + penaltyCount(aiCard.rank);
-                  setPendingPenalty(newTotal);
-                  setMessage(`AI stacked ${aiCard.rank}! You must draw ${newTotal}, stack, or play K/J to pass it on.`);
-                  setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-                }
-                if (aiCard.rank === 'A') {
-                  // Ace cancels
-                  const bestSuit = aiChooseSuit(aiHand2);
-                  setChosenSuit(bestSuit);
-                  setPendingPenalty(0);
-                  setMessage(`AI blocked with Ace → ${SUIT_EMOJI[bestSuit]}. Your turn!`);
-                  if (aiHand2.length === 0) { setStatus('lost'); setScores(s => ({ ...s, losses: s.losses + 1 })); setMessage('💀 AI wins!'); }
-                  setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-                }
-                // K or J: skip player AND pass the penalty on to them
-                setMessage(`AI played ${aiCard.rank} — you're skipped and must draw ${currentPendingPenalty}!`);
-                // pendingPenalty stays — player must deal with it
-                if (aiHand2.length === 0) { setStatus('lost'); setScores(s => ({ ...s, losses: s.losses + 1 })); setMessage('💀 AI wins!'); }
-                setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-              }
-            }
-            // No playable response (or forceDraw) — must draw
-            const { newHand, newDeck: d2, newPile: p2 } = drawCards(currentPendingPenalty, aiHand2, nd2, np2);
-            aiHand2 = newHand; nd2 = d2; np2 = p2;
-            setPendingPenalty(0);
-            setMessage(`AI drew ${currentPendingPenalty} cards. Your turn!`);
-            setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-          }
-
-          // AI must answer a question
-          if (currentQuestionActive) {
-            const matchQ = aiHand2.find(c => c.rank === topCard.rank);
-            if (!matchQ) {
-              const { newHand, newDeck: d2, newPile: p2 } = drawCards(1, aiHand2, nd2, np2);
-              aiHand2 = newHand; nd2 = d2; np2 = p2;
-              setQuestionActive(false);
-              setMessage("AI couldn't answer — drew 1. Your turn!");
-              setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-            }
-            aiHand2 = aiHand2.filter(c => c.id !== matchQ.id);
-            np2 = [...np2, matchQ];
-            if (aiHand2.length === 0) {
-              setPile(np2); setDeck(nd2);
-              setStatus('lost'); setScores(s => ({ ...s, losses: s.losses + 1 }));
-              setMessage('💀 AI wins!'); return aiHand2;
-            }
-            setQuestionActive(isQuestion(matchQ.rank));
-            setMessage(isQuestion(matchQ.rank)
-              ? `AI answered with ${matchQ.rank}! You must match or draw.`
-              : 'AI answered the question. Your turn!');
-            setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-          }
-
-          // Normal turn
-          const aiCard = aiChooseCard(aiHand2, topCard, currentChosenSuit, false, 0, diff);
-          if (!aiCard) {
-            const { newHand, newDeck: d2, newPile: p2 } = drawCards(1, aiHand2, nd2, np2);
-            aiHand2 = newHand; nd2 = d2; np2 = p2;
-            setMessage('AI drew a card. Your turn!');
-            setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-          }
-
-          aiHand2 = aiHand2.filter(c => c.id !== aiCard.id);
-          np2 = [...np2, aiCard];
-
-          if (aiHand2.length === 0) {
-            setPile(np2); setDeck(nd2);
-            setStatus('lost'); setScores(s => ({ ...s, losses: s.losses + 1 }));
-            setMessage('💀 AI played its last card! You lose!'); return aiHand2;
-          }
-
-          if (aiCard.rank === 'A') {
-            const bestSuit = aiChooseSuit(aiHand2);
-            setChosenSuit(bestSuit); setMessage(`AI played Ace → ${SUIT_EMOJI[bestSuit]}. Your turn!`);
-            setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-          }
-          setChosenSuit(null);
-
-          if (isPenalty(aiCard.rank)) {
-            const total = penaltyCount(aiCard.rank);
-            setPendingPenalty(total);
-            setMessage(`AI played ${aiCard.rank}! Draw ${total}, stack another, or play K/J to skip + pass it back.`);
-            setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-          }
-          if (isQuestion(aiCard.rank)) {
-            setQuestionActive(true);
-            setMessage(`AI played ${aiCard.rank}${aiCard.suit !== 'joker' ? ' ' + SUIT_EMOJI[aiCard.suit] : ''}! Match it or draw!`);
-            setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-          }
-          if (aiCard.rank === 'J' || aiCard.rank === 'K') {
-            setMessage(`AI played ${aiCard.rank} — you're skipped! AI goes again…`);
-            setPile(np2); setDeck(nd2);
-            runAiTurnRef.current({ ah: aiHand2, nd: nd2, np: np2, currentPendingPenalty: 0, currentQuestionActive: false, currentChosenSuit: null });
-            return aiHand2;
-          }
-          setMessage(`AI played ${aiCard.rank}${aiCard.suit !== 'joker' ? ' ' + SUIT_EMOJI[aiCard.suit] : ''}. Your turn!`);
-          setPile(np2); setDeck(nd2); setPlayerTurn(true); return aiHand2;
-        });
-      }, 900);
-    };
-  }, [drawCards]);
-
-  const handlePlayerPlay = useCallback((card: Card) => {
-    if (!playerTurn || status !== 'playing' || choosingSuit) return;
-    const topCard = pile[pile.length - 1];
-
-    if (!canPlay(card, topCard, chosenSuit, questionActive, pendingPenalty)) {
-      setMessage("Can't play that card!"); return;
-    }
-
-    const newPlayerHand = playerHand.filter(c => c.id !== card.id);
-    const newPile = [...pile, card];
-
-    // Ace — choose suit (also blocks penalty)
-    if (card.rank === 'A') {
-      setPile(newPile); setPlayerHand(newPlayerHand);
-      setPendingPenalty(0); setQuestionActive(false);
-      if (newPlayerHand.length === 0) { setStatus('won'); setScores(s => ({ ...s, wins: s.wins + 1 })); return; }
-      setChoosingSuit(true); setMessage('Choose a suit!'); return;
-    }
-
-    // K or J against pending penalty — skips AI AND forces them to draw (no stacking/blocking)
-    if ((card.rank === 'K' || card.rank === 'J') && pendingPenalty > 0) {
-      setPile(newPile); setPlayerHand(newPlayerHand);
-      setQuestionActive(false); setChosenSuit(null);
-      setPlayerTurn(false);
-      if (newPlayerHand.length === 0) { setStatus('won'); setScores(s => ({ ...s, wins: s.wins + 1 })); return; }
-      setMessage(`${card.rank} played! AI is skipped and must draw ${pendingPenalty}!`);
-      runAiTurnRef.current({ ah: [...aiHand], nd: [...deck], np: newPile, currentPendingPenalty: pendingPenalty, currentQuestionActive: false, currentChosenSuit: null, forceDraw: true });
-      return;
-    }
-
-    setPlayerHand(newPlayerHand);
-    setPile(newPile);
-    setChosenSuit(null);
-    setPlayerTurn(false);
-
-    if (newPlayerHand.length === 0) {
-      setStatus('won'); setScores(s => ({ ...s, wins: s.wins + 1 }));
-      setMessage('🎉 Kadi! You win!'); return;
-    }
-
-    // Penalty card — stack onto existing penalty
-    if (isPenalty(card.rank)) {
-      const total = pendingPenalty + penaltyCount(card.rank);
-      setPendingPenalty(total); setQuestionActive(false);
-      setMessage(`Penalty stacked! AI must draw ${total}, stack, or block.`);
-      runAiTurnRef.current({ ah: [...aiHand], nd: [...deck], np: newPile, currentPendingPenalty: total, currentQuestionActive: false, currentChosenSuit: null });
-      return;
-    }
-
-    if (isQuestion(card.rank)) {
-      setPendingPenalty(0); setQuestionActive(true);
-      setMessage(`Question! AI must match ${card.rank} or draw.`);
-      runAiTurnRef.current({ ah: [...aiHand], nd: [...deck], np: newPile, currentPendingPenalty: 0, currentQuestionActive: true, currentChosenSuit: null });
-      return;
-    }
-
-    // K or J normal play — just skip AI, player goes again
-    if (card.rank === 'K' || card.rank === 'J') {
-      setPendingPenalty(0); setQuestionActive(false);
-      setMessage(`AI skipped! Your turn again.`);
-      setPlayerTurn(true); return;
-    }
-
-    setPendingPenalty(0); setQuestionActive(false);
-    setMessage("AI's turn…");
-    runAiTurnRef.current({ ah: [...aiHand], nd: [...deck], np: newPile, currentPendingPenalty: 0, currentQuestionActive: false, currentChosenSuit: null });
-  }, [playerTurn, status, choosingSuit, pile, chosenSuit, questionActive, pendingPenalty, playerHand, aiHand, deck]);
-
-  const handleSuitChoice = useCallback((suit: Suit) => {
-    setChosenSuit(suit); setChoosingSuit(false);
-    setPendingPenalty(0); setQuestionActive(false);
-    setMessage(`Suit → ${SUIT_EMOJI[suit]} ${suit}. AI's turn…`);
-    setPlayerTurn(false);
-    runAiTurnRef.current({ ah: [...aiHand], nd: [...deck], np: [...pile], currentPendingPenalty: 0, currentQuestionActive: false, currentChosenSuit: suit });
-  }, [aiHand, deck, pile]);
-
-  const handlePlayerDraw = useCallback(() => {
-    if (!playerTurn || status !== 'playing' || choosingSuit) return;
-    const drawCount = pendingPenalty > 0 ? pendingPenalty : 1;
-    const { newHand, newDeck: nd, newPile: np } = drawCards(drawCount, playerHand, deck, pile);
-    setPlayerHand(newHand); setDeck(nd); setPile(np);
-    setPendingPenalty(0); setQuestionActive(false); setPlayerTurn(false);
-    setMessage(`You drew ${drawCount}. AI's turn…`);
-    runAiTurnRef.current({ ah: [...aiHand], nd, np, currentPendingPenalty: 0, currentQuestionActive: false, currentChosenSuit: chosenSuit });
-  }, [playerTurn, status, choosingSuit, pendingPenalty, playerHand, deck, pile, drawCards, aiHand, chosenSuit]);
-
-  const isCardPlayable = (c: Card) => {
-    if (!playerTurn || status !== 'playing' || choosingSuit) return false;
-    return canPlay(c, pile[pile.length - 1], chosenSuit, questionActive, pendingPenalty);
+  const changeDifficulty = (k: string) => {
+    setDifficulty(k as Difficulty);
+    newGame();
   };
 
-  const cardLabel = (c: Card) => c.rank === 'JOKER' ? '🃏' : `${c.rank}${SUIT_EMOJI[c.suit]}`;
+  const yourTurn = game.turn === 'you' && !game.winner;
+  const thinking = game.turn === 'ai' && !game.winner;
+  const top = game.pile[game.pile.length - 1];
+  const playableIds = new Set(yourTurn ? game.hands.you.filter(c => canPlay(game, c)).map(c => c.id) : []);
+  const drawCount = game.penalty > 0 ? game.penalty : 1;
 
-  if (loading) return <div className={styles.loading}><div className={styles.dot} /></div>;
+  const playCard = (card: Card) => {
+    if (!yourTurn || aceId || !playableIds.has(card.id)) return;
+    if (card.rank === 'A') { setAceId(card.id); return; }
+    commit(game, applyMove(game, 'you', { type: 'play', cardId: card.id }));
+  };
+  const pickSuit = (suit: Suit) => {
+    if (!aceId) return;
+    const id = aceId;
+    setAceId(null);
+    commit(game, applyMove(game, 'you', { type: 'play', cardId: id, suit }));
+  };
+  const draw = () => { if (yourTurn && !aceId) commit(game, applyMove(game, 'you', { type: 'draw' })); };
+  const callKadi = () => { if (!aceId) commit(game, applyMove(game, 'you', { type: 'kadi' })); };
 
-  const topCard = pile[pile.length - 1];
+  // Status line
+  let tone: 'neutral' | 'good' | 'bad' | 'info' = 'neutral';
+  let ask = '';
+  if (game.winner) {
+    tone = game.winner === 'you' ? 'good' : 'bad';
+  } else if (thinking) {
+    ask = 'The AI is thinking.';
+    tone = 'info';
+  } else if (game.penalty > 0) {
+    tone = 'bad';
+    ask = `Pick up ${game.penalty}, stack a 2, 3 or Joker, send it back with a King or Jack, or cancel it with an Ace.`;
+  } else if (game.question) {
+    tone = 'info';
+    ask = `Answer the question with any ${game.question} card or an Ace, or draw one.`;
+  } else if (aceId) {
+    ask = 'Pick the suit you want next.';
+  } else {
+    ask = `Your turn. Play a ${game.target.suit} card${game.target.rank ? ` or any ${game.target.rank}` : ''}.`;
+  }
+  const status = (
+    <>
+      <span>{game.note}</span>{ask && <span className={s.ask}> {ask}</span>}
+    </>
+  );
+
+  const rules = (
+    <ul className={s.rules}>
+      <li>Each player gets 4 cards. On your turn play one card that matches the suit or rank of the card on the pile, or draw one card.</li>
+      <li><b>Ace</b> is wild. Play it on anything and pick the next suit. It also cancels a penalty.</li>
+      <li><b>2, 3 and Joker</b> are penalties: the next player picks up 2, 3 or 5. Penalties stack, so you can answer any penalty with another 2, 3 or Joker and pass the growing total on.</li>
+      <li><b>King or Jack</b> skips the other player so you go again. Played on a penalty (any suit), it sends the whole penalty back and the other player picks it all up.</li>
+      <li><b>Joker</b> can go on any card when there is no question open. The suit stays what it was under the Joker, so play continues from that card.</li>
+      <li><b>Queen or 8</b> is a question. The other player must answer with any card of the same suit (or an Ace). If they cannot, they draw 1.</li>
+      <li><b>Kadi!</b> When you hold 2 cards on your turn, press Kadi to warn that you can finish next turn. Going out without calling it means you draw 2 instead of winning. The AI has to call it too.</li>
+      <li>When the draw pile runs out, the played cards are shuffled back in.</li>
+    </ul>
+  );
+
+  const ended = !!game.winner;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.topBar}>
-        <button className={styles.back} onClick={() => router.push('/games')}>← arcade</button>
-        <div className={styles.scoreboard}>
-          <span className={styles.scoreWin}>W {scores.wins}</span>
-          <span className={styles.scoreLoss}>L {scores.losses}</span>
-        </div>
-      </div>
-
-      <h1 className={styles.title}>Kadi</h1>
-
-      {status === 'idle' && (
-        <div className={styles.setup}>
-          <p className={styles.setupLabel}>choose difficulty</p>
-          <div className={styles.diffRow}>
-            {(['easy','medium','hard'] as Difficulty[]).map(d => (
-              <button key={d}
-                className={`${styles.diffBtn} ${difficulty === d ? styles.diffBtnActive : ''}`}
-                onClick={() => setDifficulty(d)}
-              >{d}</button>
-            ))}
-          </div>
-          <button className={styles.startBtn} onClick={startGame}>deal cards</button>
-          <div className={styles.rulesBox}>
-            <p className={styles.rulesTitle}>Quick rules</p>
-            <p>Match suit or rank · K/J = skip opponent (+ force them to draw if penalty active) · A = wild/cancel penalty · Q/8 = question · 2 = draw 2 · 3 = draw 3 · Joker = draw 5 · Penalties stack! · Shout Kadi on second-to-last card</p>
-          </div>
-        </div>
-      )}
-
-      {status !== 'idle' && (
-        <>
-          <div className={`${styles.messageBar} ${questionActive ? styles.messageQuestion : pendingPenalty > 0 ? styles.messagePenalty : ''}`}>
-            <span>{message}</span>
-            {playerHand.length === 2 && playerTurn && !kadiCalled && (
-              <button className={styles.kadiBtn} onClick={() => setKadiCalled(true)}>Kadi! 🎴</button>
-            )}
-            {kadiCalled && <span className={styles.kadiTag}>Kadi called!</span>}
-          </div>
-
-          <div className={styles.aiArea}>
-            <span className={styles.handLabel}>AI — {aiHand.length} cards</span>
-            <div className={styles.aiCards}>
-              {aiHand.map((_, i) => <div key={i} className={styles.cardBack} />)}
+    <GameShell
+      title="Kadi"
+      subtitle="The Kenyan card game of stacking penalties and shouting Kadi."
+      icon={<Layers size={24} strokeWidth={2} />}
+      difficulties={DIFFICULTIES}
+      difficulty={difficulty}
+      onDifficulty={changeDifficulty}
+      score={[{ label: 'Wins', value: score.win, tone: 'win' }, { label: 'Losses', value: score.loss, tone: 'loss' }]}
+      status={client ? status : 'Shuffling the deck.'}
+      statusTone={tone}
+      onNewGame={newGame}
+      rules={rules}
+    >
+      {!client ? (
+        <div className={`skeleton ${s.skel}`} />
+      ) : (
+        <div className={s.table}>
+          <section className={s.seat} aria-label="AI hand">
+            <div className={s.seatHead}>
+              <span className={s.who}><Bot size={16} strokeWidth={2.25} /> AI</span>
+              <span className={s.count}>{plural(game.hands.ai.length, 'card')}</span>
+              {game.kadi.ai && <span className={s.kadiTag}><Megaphone size={13} strokeWidth={2.25} /> Kadi</span>}
+              {thinking && <span className={s.thinking} aria-hidden><i /><i /><i /></span>}
             </div>
-          </div>
+            <CardHand label="AI cards" compact={!ended}>
+              {game.hands.ai.map(c => <PlayingCard key={c.id} card={c} faceDown={!ended} size={ended ? 'md' : 'sm'} />)}
+            </CardHand>
+          </section>
 
-          <div className={styles.tableArea}>
-            <button className={styles.deckBtn} onClick={handlePlayerDraw}
-              disabled={!playerTurn || status !== 'playing' || choosingSuit}
-              aria-label={`Draw ${pendingPenalty > 0 ? pendingPenalty : 1} card${pendingPenalty > 1 ? 's' : ''}`}>
-              <span className={styles.deckCount}>{deck.length}</span>
-              <span className={styles.deckLabel}>draw</span>
-            </button>
-            {topCard && (
-              <div className={`${styles.topCard} ${topCard.color === 'red' ? styles.topCardRed : styles.topCardBlack}`}>
-                {cardLabel(topCard)}
-                {chosenSuit && <div className={styles.chosenSuit}>→ {SUIT_EMOJI[chosenSuit]}</div>}
-                {questionActive && <div className={styles.questionBadge}>❓</div>}
-              </div>
-            )}
-            {pendingPenalty > 0 && <div className={styles.penaltyChip}>+{pendingPenalty}</div>}
-          </div>
-
-          {choosingSuit && (
-            <div className={styles.suitPicker}>
-              <p className={styles.setupLabel}>choose a suit</p>
-              <div className={styles.suitRow}>
-                {SUITS.map(suit => (
-                  <button key={suit}
-                    className={`${styles.suitBtn} ${SUIT_COLOR[suit] === 'red' ? styles.suitBtnRed : styles.suitBtnBlack}`}
-                    onClick={() => handleSuitChoice(suit)}>
-                    {SUIT_EMOJI[suit]} {suit}
-                  </button>
-                ))}
-              </div>
+          <section className={s.centre} aria-label="Table">
+            <div className={s.stack}>
+              <PlayingCard
+                faceDown
+                size="lg"
+                onClick={draw}
+                disabled={!yourTurn || !!aceId}
+                playable={yourTurn && !aceId && playableIds.size === 0}
+                label={`Draw ${plural(drawCount, 'card')}`}
+              />
+              <span className={s.stackLabel}>{game.deck.length} left</span>
             </div>
-          )}
+            <div className={s.stack}>
+              {top && <PlayingCard key={top.id} card={top} size="lg" flip />}
+              <span className={s.stackLabel}>Pile</span>
+            </div>
+            <div className={s.chips}>
+              <span className={s.chip}>
+                <SuitIcon suit={game.target.suit} size={14} className={game.target.suit === 'hearts' || game.target.suit === 'diamonds' ? s.redSuit : undefined} />
+                {game.target.suit.charAt(0).toUpperCase() + game.target.suit.slice(1)}{game.target.rank ? ` or any ${game.target.rank}` : ''}
+              </span>
+              {game.penalty > 0 && <span className={`${s.chip} ${s.chipBad}`}>Pick up {game.penalty}</span>}
+              {game.question && <span className={`${s.chip} ${s.chipInfo}`}>Question: {game.question}</span>}
+            </div>
+          </section>
 
-          <div className={styles.playerArea}>
-            <span className={styles.handLabel}>Your hand — {playerHand.length} cards</span>
-            <div className={styles.playerCards}>
-              {playerHand.map(card => (
-                <button key={card.id}
-                  className={`${styles.card} ${card.color === 'red' ? styles.cardRed : styles.cardBlack} ${isCardPlayable(card) ? styles.cardPlayable : styles.cardDim}`}
-                  onClick={() => handlePlayerPlay(card)}
-                  disabled={!isCardPlayable(card) || status !== 'playing'}
-                  aria-label={`Play ${card.rank}${card.suit !== 'joker' ? ' of ' + card.suit : ''}`}>
-                  {cardLabel(card)}
+          {aceId && <SuitPicker onPick={pickSuit} onCancel={() => setAceId(null)} title="Your Ace asks for" />}
+
+          <section className={s.seat} aria-label="Your hand">
+            <div className={s.seatHead}>
+              <span className={s.who}><User size={16} strokeWidth={2.25} /> You</span>
+              <span className={s.count}>{plural(game.hands.you.length, 'card')}</span>
+              {game.kadi.you ? (
+                <span className={s.kadiTag}><Megaphone size={13} strokeWidth={2.25} /> Kadi called</span>
+              ) : (
+                <button
+                  type="button"
+                  className={s.kadiBtn}
+                  onClick={callKadi}
+                  disabled={!canCallKadi(game, 'you') || !!aceId}
+                  title="Call this when you hold 2 cards and can finish next turn"
+                >
+                  <Megaphone size={15} strokeWidth={2.25} /> Kadi!
                 </button>
-              ))}
+              )}
             </div>
-          </div>
+            <CardHand label="Your cards">
+              {game.hands.you.map(c => {
+                const ok = playableIds.has(c.id) && !aceId;
+                return (
+                  <PlayingCard
+                    key={c.id}
+                    card={c}
+                    onClick={() => playCard(c)}
+                    disabled={!ok}
+                    playable={ok}
+                    dim={yourTurn && !ok}
+                    label={`${ok ? 'Play' : 'Cannot play'} the ${cardName(c)}`}
+                  />
+                );
+              })}
+            </CardHand>
+          </section>
 
-          {(status === 'won' || status === 'lost') && (
-            <div className={styles.actions}>
-              <div className={status === 'won' ? styles.wonText : styles.lostText}>
-                {status === 'won' ? '🎉 You win!' : '💀 You lose!'}
-              </div>
-              <button className={styles.startBtn} onClick={startGame}>play again</button>
-              <button className={styles.diffChange} onClick={() => setStatus('idle')}>change difficulty</button>
+          {ended && (
+            <div className={s.result} data-tone={game.winner === 'you' ? 'win' : 'loss'}>
+              <p>{game.winner === 'you' ? 'You won this round. Nicely played!' : 'The AI took this round.'}</p>
+              <button type="button" className={s.againBtn} onClick={newGame}>Deal again</button>
             </div>
           )}
-        </>
+        </div>
       )}
-    </div>
+    </GameShell>
   );
 }

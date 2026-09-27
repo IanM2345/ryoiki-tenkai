@@ -1,22 +1,34 @@
 'use client';
-import React, { useState, ReactNode, KeyboardEvent } from 'react';
+import React, { useState, useEffect, useRef, useCallback, ReactNode, KeyboardEvent } from 'react';
+import { Star, X, Search, CircleCheck, TriangleAlert, Check, Sparkles } from 'lucide-react';
 import s from './ui.module.css';
+import { Glyph } from './icons';
 import type { DbSoul } from '@/lib/db';
+import SoulAvatar from '@/components/souls/SoulAvatar';
+
+export { Glyph, glyphIcon } from './icons';
+
+/** Tint helper: works for hex colours and CSS variables alike. */
+const tint = (c: string, pct: number) => `color-mix(in oklab, ${c} ${pct}%, transparent)`;
 
 // ─── BUTTON ───────────────────────────────────────────────────
 type BtnVariant = 'or' | 'purple' | 'ghost' | 'danger';
-interface BtnProps { variant?: BtnVariant; sm?: boolean; full?: boolean; disabled?: boolean; children: ReactNode; onClick?: () => void; className?: string; type?: 'button'|'submit'|'reset'; }
+interface BtnProps {
+  variant?: BtnVariant; sm?: boolean; full?: boolean; disabled?: boolean; children: ReactNode;
+  onClick?: () => void; className?: string; type?: 'button' | 'submit' | 'reset'; ariaLabel?: string;
+}
 
 const VARIANT_CLASS: Record<BtnVariant, string> = {
   or: s.btnOr, purple: s.btnPurple, ghost: s.btnGhost, danger: s.btnDanger,
 };
 
-export function Btn({ variant='or', sm, full, disabled, children, onClick, className='', type='button' }: BtnProps) {
+export function Btn({ variant = 'or', sm, full, disabled, children, onClick, className = '', type = 'button', ariaLabel }: BtnProps) {
   return (
     <button
       type={type}
       disabled={disabled}
       onClick={onClick}
+      aria-label={ariaLabel}
       className={`${s.btn} ${VARIANT_CLASS[variant]} ${sm ? s.btnSm : ''} ${full ? s.btnFull : ''} ${className}`}
     >
       {children}
@@ -25,87 +37,139 @@ export function Btn({ variant='or', sm, full, disabled, children, onClick, class
 }
 
 // ─── LABEL ────────────────────────────────────────────────────
-export function Lbl({ children, className='' }: { children: ReactNode; className?: string }) {
+export function Lbl({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <span className={`${s.lbl} ${className}`}>{children}</span>;
 }
 
 // ─── TAG ──────────────────────────────────────────────────────
-export function Tag({ color='#ff8c00', children, onRemove }: { color?: string; children: ReactNode; onRemove?: () => void; }) {
+export function Tag({ color = 'var(--or)', children, onRemove }: { color?: string; children: ReactNode; onRemove?: () => void; }) {
   return (
-    <span className={s.tag} style={{ background:`${color}22`, color, border:`1px solid ${color}44` }}>
+    <span className={s.tag} style={{ background: tint(color, 14), color, borderColor: tint(color, 30) }}>
       {children}
-      {onRemove && <button className={s.tagRemoveBtn} onClick={onRemove} style={{ color }}>×</button>}
+      {onRemove && (
+        <button type="button" className={s.tagRemoveBtn} onClick={onRemove} aria-label={`Remove ${String(children)}`}>
+          <X size={12} strokeWidth={2.25} />
+        </button>
+      )}
     </span>
   );
 }
 
-// ─── PILL ─────────────────────────────────────────────────────
-export function Pill({ children, active, color='#ff8c00', onClick }: { children: ReactNode; active?: boolean; color?: string; onClick?: () => void; }) {
+// ─── PILL (filter chip) ───────────────────────────────────────
+export function Pill({ children, active, color = 'var(--or)', onClick }: { children: ReactNode; active?: boolean; color?: string; onClick?: () => void; }) {
   return (
-    <span
+    <button
+      type="button"
       onClick={onClick}
-      className={s.pill}
-      style={active ? { background: color, borderColor: color, color: '#000', fontWeight: 700 } : {}}
+      aria-pressed={!!active}
+      className={`${s.pill} ${active ? s.pillActive : ''}`}
+      style={active ? { background: color, borderColor: color } : undefined}
     >
       {children}
-    </span>
+    </button>
   );
 }
 
 // ─── STARS ────────────────────────────────────────────────────
-export function Stars({ n, onSet, size=13 }: { n: number; onSet?: (v: number) => void; size?: number; }) {
+export function Stars({ n, onSet, size = 14 }: { n: number; onSet?: (v: number) => void; size?: number; }) {
+  const [hover, setHover] = useState(0);
+  const shown = hover || n;
+  if (!onSet) {
+    return (
+      <span className={s.stars} aria-label={`${n} out of 5 stars`} role="img">
+        {[1, 2, 3, 4, 5].map(i => (
+          <Star key={i} size={size} strokeWidth={1.5} className={i <= n ? s.starOn : s.starOff} fill={i <= n ? 'currentColor' : 'none'} />
+        ))}
+      </span>
+    );
+  }
   return (
-    <span className={s.stars}>
-      {[1,2,3,4,5].map(i => (
-        <span
+    <span className={s.stars} role="radiogroup" aria-label="Rating" onMouseLeave={() => setHover(0)}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <button
           key={i}
-          className={`${s.star} ${onSet ? s.starClickable : ''}`}
-          style={{ color: i<=n ? '#ff8c00' : 'rgba(255,140,0,0.15)', fontSize: size }}
-          onClick={() => onSet?.(i)}
-          onMouseEnter={e => { if (onSet) (e.target as HTMLElement).style.color = '#ffb347'; }}
-          onMouseLeave={e => { if (onSet) (e.target as HTMLElement).style.color = i<=n ? '#ff8c00' : 'rgba(255,140,0,0.15)'; }}
-        >★</span>
+          type="button"
+          role="radio"
+          aria-checked={n === i}
+          aria-label={`${i} star${i > 1 ? 's' : ''}`}
+          className={s.starBtn}
+          onMouseEnter={() => setHover(i)}
+          onClick={() => onSet(i === n ? 0 : i)}
+        >
+          <Star size={size} strokeWidth={1.5} className={i <= shown ? s.starOn : s.starOff} fill={i <= shown ? 'currentColor' : 'none'} />
+        </button>
       ))}
     </span>
   );
 }
 
 // ─── PROGRESS BAR ─────────────────────────────────────────────
-export function Bar({ pct, color='#ff8c00', h=4 }: { pct: number; color?: string; h?: number; }) {
+export function Bar({ pct, color = 'var(--or)', h = 6 }: { pct: number; color?: string; h?: number; }) {
+  const v = Math.min(100, Math.max(0, pct));
   return (
-    <div className={s.barTrack} style={{ height: h }}>
-      <div className={s.barFill} style={{ width:`${Math.min(100,Math.max(0,pct))}%`, background: color }} />
+    <div className={s.barTrack} style={{ height: h }} role="progressbar" aria-valuenow={Math.round(v)} aria-valuemin={0} aria-valuemax={100}>
+      <div className={s.barFill} style={{ transform: `scaleX(${v / 100})`, background: color }} />
     </div>
   );
 }
 
 // ─── BADGE ────────────────────────────────────────────────────
-export function Badge({ color='#ff8c00', children }: { color?: string; children: ReactNode; }) {
-  return <span className={s.badge} style={{ background:`${color}22`, color, border:`1px solid ${color}44` }}>{children}</span>;
+export function Badge({ color = 'var(--or)', children }: { color?: string; children: ReactNode; }) {
+  return <span className={s.badge} style={{ background: tint(color, 14), color, borderColor: tint(color, 30) }}>{children}</span>;
 }
 
 // ─── DIVIDER ──────────────────────────────────────────────────
-export function Divider() { return <div className={s.divider} />; }
+export function Divider() { return <div className={s.divider} role="separator" />; }
 
 // ─── CARD ─────────────────────────────────────────────────────
-export function Card({ children, hover, className='' }: { children: ReactNode; hover?: boolean; className?: string; }) {
+export function Card({ children, hover, className = '' }: { children: ReactNode; hover?: boolean; className?: string; }) {
   return <div className={`${s.card} ${hover ? s.cardHov : ''} ${className}`}>{children}</div>;
 }
 
 // ─── TOAST ────────────────────────────────────────────────────
-export function Toast({ msg, color='#4ade80' }: { msg: string; color?: string; }) {
+export function Toast({ msg, color = 'var(--gr)' }: { msg: string; color?: string; }) {
+  const isError = /red|f87171|ef4444/i.test(color);
   return (
-    <div className={s.toast} style={{ borderColor:`${color}55`, color }}>
-      ✓ {msg}
+    <div className={s.toast} style={{ borderColor: tint(color, 40) }} role="status" aria-live="polite">
+      {isError
+        ? <TriangleAlert size={16} strokeWidth={2} style={{ color }} />
+        : <CircleCheck size={16} strokeWidth={2} style={{ color }} />}
+      <span>{msg}</span>
     </div>
   );
 }
 
 // ─── MODAL ────────────────────────────────────────────────────
 export function Modal({ children, onClose }: { children: ReactNode; onClose?: () => void; }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; });
+
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') closeRef.current?.(); };
+    window.addEventListener('keydown', onKey);
+    const html = document.documentElement;
+    const prevOverflow = html.style.overflow;
+    html.style.overflow = 'hidden';
+    // Move focus into the dialog (first field if there is one).
+    const first = boxRef.current?.querySelector<HTMLElement>('input, textarea, select, button');
+    first?.focus({ preventScroll: true });
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      html.style.overflow = prevOverflow;
+      prev?.focus?.({ preventScroll: true });
+    };
+  }, []);
+
   return (
-    <div className={`${s.overlay} aFadeIn`} onClick={e => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className={`${s.modalBox} aFadeUp`}>
+    <div className={s.overlay} onMouseDown={e => { if (e.target === e.currentTarget) onClose?.(); }}>
+      <div ref={boxRef} className={s.modalBox} role="dialog" aria-modal="true">
+        {onClose && (
+          <button type="button" className={s.modalClose} onClick={onClose} aria-label="Close">
+            <X size={18} strokeWidth={2} />
+          </button>
+        )}
         {children}
       </div>
     </div>
@@ -113,10 +177,10 @@ export function Modal({ children, onClose }: { children: ReactNode; onClose?: ()
 }
 
 export function ModalTitle({ children }: { children: ReactNode }) {
-  return <div className={s.modalTitle}>{children}</div>;
+  return <h2 className={s.modalTitle}>{children}</h2>;
 }
 
-export function ModalFooter({ onCancel, onSave, saveLabel='Save', danger }: { onCancel: ()=>void; onSave: ()=>void; saveLabel?: string; danger?: boolean; }) {
+export function ModalFooter({ onCancel, onSave, saveLabel = 'Save', danger }: { onCancel: () => void; onSave: () => void; saveLabel?: string; danger?: boolean; }) {
   return (
     <div className={s.modalFooter}>
       <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
@@ -126,11 +190,11 @@ export function ModalFooter({ onCancel, onSave, saveLabel='Save', danger }: { on
 }
 
 // ─── CONFIRM ──────────────────────────────────────────────────
-export function Confirm({ msg, onConfirm, onCancel }: { msg: string; onConfirm: ()=>void; onCancel: ()=>void; }) {
+export function Confirm({ msg, onConfirm, onCancel }: { msg: string; onConfirm: () => void; onCancel: () => void; }) {
   return (
-    <div className={s.confirm}>
-      <div className={s.confirmIcon}>⚠️</div>
-      <div className={s.confirmTitle}>Are you sure?</div>
+    <div className={s.confirm} role="alertdialog" aria-labelledby="confirm-title">
+      <div className={s.confirmIcon}><TriangleAlert size={22} strokeWidth={1.75} /></div>
+      <div id="confirm-title" className={s.confirmTitle}>Are you sure?</div>
       <div className={s.confirmMsg}>{msg}</div>
       <div className={s.confirmActions}>
         <Btn variant="ghost" onClick={onCancel}>Keep it</Btn>
@@ -141,32 +205,41 @@ export function Confirm({ msg, onConfirm, onCancel }: { msg: string; onConfirm: 
 }
 
 // ─── FIELD INPUT ──────────────────────────────────────────────
-interface FInputProps { label?: string; value: string; onChange: (v:string)=>void; placeholder?: string; type?: string; style?: React.CSSProperties; }
-export function FInput({ label, value, onChange, placeholder, type='text', style }: FInputProps) {
+let fieldSeq = 0;
+function useFieldId() {
+  const ref = useRef<string>('');
+  if (!ref.current) ref.current = `f${++fieldSeq}`;
+  return ref.current;
+}
+
+interface FInputProps { label?: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; style?: React.CSSProperties; }
+export function FInput({ label, value, onChange, placeholder, type = 'text', style }: FInputProps) {
+  const id = useFieldId();
   return (
     <div className={s.fieldWrap} style={style}>
-      {label && <Lbl>{label}</Lbl>}
-      <input type={type} className={s.fieldInput} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} />
+      {label && <label htmlFor={id} className={s.lbl}>{label}</label>}
+      <input id={id} type={type} className={s.fieldInput} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   );
 }
 
 // ─── FIELD TEXTAREA ───────────────────────────────────────────
-export function FArea({ label, value, onChange, placeholder, rows=4 }: { label?: string; value: string; onChange: (v:string)=>void; placeholder?: string; rows?: number; }) {
+export function FArea({ label, value, onChange, placeholder, rows = 4 }: { label?: string; value: string; onChange: (v: string) => void; placeholder?: string; rows?: number; }) {
+  const id = useFieldId();
   return (
     <div className={s.fieldWrap}>
-      {label && <Lbl>{label}</Lbl>}
-      <textarea rows={rows} className={s.fieldArea} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{ minHeight: rows*26 }} />
+      {label && <label htmlFor={id} className={s.lbl}>{label}</label>}
+      <textarea id={id} rows={rows} className={s.fieldArea} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   );
 }
 
 // ─── TAG INPUT ────────────────────────────────────────────────
-export function TagInput({ tags, onAdd, onRemove, color='#ff8c00' }: { tags: string[]; onAdd:(t:string)=>void; onRemove:(t:string)=>void; color?: string; }) {
+export function TagInput({ tags, onAdd, onRemove, color = 'var(--or)' }: { tags: string[]; onAdd: (t: string) => void; onRemove: (t: string) => void; color?: string; }) {
   const [v, setV] = useState('');
 
   const commit = () => {
-    const trimmed = v.trim();
+    const trimmed = v.trim().replace(/,$/, '');
     if (trimmed && !tags.includes(trimmed)) onAdd(trimmed);
     setV('');
   };
@@ -174,12 +247,10 @@ export function TagInput({ tags, onAdd, onRemove, color='#ff8c00' }: { tags: str
   const handle = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      e.stopPropagation(); // ← stops Enter bubbling up to modal Save button
+      e.stopPropagation(); // keep Enter from reaching the modal's Save button
       commit();
     }
-    if (e.key === 'Backspace' && !v && tags.length) {
-      onRemove(tags[tags.length - 1]);
-    }
+    if (e.key === 'Backspace' && !v && tags.length) onRemove(tags[tags.length - 1]);
   };
 
   return (
@@ -187,220 +258,153 @@ export function TagInput({ tags, onAdd, onRemove, color='#ff8c00' }: { tags: str
       {tags.map(t => <Tag key={t} color={color} onRemove={() => onRemove(t)}>{t}</Tag>)}
       <input
         className={s.tagInlineInput}
-        placeholder="tag + ↵"
+        placeholder={tags.length ? 'Add another' : 'Add a tag and press Enter'}
         value={v}
         onChange={e => setV(e.target.value)}
         onKeyDown={handle}
-        // Also commit on blur so typing a tag and clicking Save still works
         onBlur={commit}
+        aria-label="Add tag"
       />
     </div>
   );
 }
 
 // ─── SEARCH BAR ───────────────────────────────────────────────
-export function SearchBar({ value, onChange, placeholder='Search...', className='' }: { value: string; onChange:(v:string)=>void; placeholder?: string; className?: string; }) {
+export function SearchBar({ value, onChange, placeholder = 'Search', className = '' }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string; }) {
   return (
     <div className={`${s.searchBar} ${className}`}>
-      <span className={s.searchIcon}>⌕</span>
-      <input className={s.searchInput} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} />
-      {value && <button className={s.searchClear} onClick={()=>onChange('')}>×</button>}
+      <Search size={16} strokeWidth={2} className={s.searchIcon} aria-hidden />
+      <input className={s.searchInput} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder.replace(/\.\.\.$|…$/, '')} aria-label={placeholder} type="search" />
+      {value && (
+        <button type="button" className={s.searchClear} onClick={() => onChange('')} aria-label="Clear search">
+          <X size={14} strokeWidth={2.25} />
+        </button>
+      )}
     </div>
   );
 }
 
 // ─── INNER TABS ───────────────────────────────────────────────
-export function InnerTabs({ tabs, active, onTab }: { tabs:[string,string][]; active:string; onTab:(k:string)=>void; }) {
+export function InnerTabs({ tabs, active, onTab }: { tabs: [string, string][]; active: string; onTab: (k: string) => void; }) {
   return (
-    <div className={s.innerTabs}>
-      {tabs.map(([k,l]) => (
-        <div key={k} onClick={()=>onTab(k)} className={`${s.innerTab} ${active===k ? s.innerTabActive : ''}`}>{l}</div>
+    <div className={s.innerTabs} role="tablist">
+      {tabs.map(([k, l]) => (
+        <button
+          key={k}
+          type="button"
+          role="tab"
+          aria-selected={active === k}
+          onClick={() => onTab(k)}
+          className={`${s.innerTab} ${active === k ? s.innerTabActive : ''}`}
+        >
+          {l}
+        </button>
       ))}
     </div>
   );
 }
 
 // ─── TOPBAR ───────────────────────────────────────────────────
-export function Topbar({ title, sub, action }: { title: string; sub?: string; action?: ReactNode; }) {
+export function Topbar({ title, sub, action, maxWidth }: { title: string; sub?: string; action?: ReactNode; maxWidth?: number; }) {
   return (
-    <div className={s.topbar}>
+    <header className={s.topbar} style={maxWidth ? { maxWidth } : undefined}>
       <div className={s.topbarLeft}>
-        <div className={s.topbarTitle}>{title}</div>
-        {sub && <div className={s.topbarSub}>{sub}</div>}
+        <h1 className={s.topbarTitle}>{title}</h1>
+        {sub && <p className={s.topbarSub}>{sub}</p>}
       </div>
+      {action && <div className={s.topbarAction}>{action}</div>}
+    </header>
+  );
+}
+
+// ─── EMPTY STATE ──────────────────────────────────────────────
+export function EmptyState({ icon = '✦', msg, action }: { icon?: ReactNode; msg: string; action?: ReactNode; }) {
+  return (
+    <div className={s.emptyState}>
+      <div className={s.emptyIcon}>
+        {typeof icon === 'string' ? <Glyph g={icon} size={26} strokeWidth={1.5} /> : icon ?? <Sparkles size={26} />}
+      </div>
+      <p className={s.emptyMsg}>{msg}</p>
       {action}
     </div>
   );
 }
 
-// ─── EMPTY STATE ──────────────────────────────────────────────
-export function EmptyState({ icon='✦', msg }: { icon?: string; msg: string; }) {
-  return (
-    <div className={s.emptyState}>
-      <div className={s.emptyIcon}>{icon}</div>
-      <div className={s.emptyMsg}>{msg}</div>
-    </div>
-  );
-}
-
 // ─── TOGGLE ───────────────────────────────────────────────────
-export function Toggle({ checked, onChange }: { checked: boolean; onChange:(v:boolean)=>void; }) {
+export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string; }) {
   return (
-    <div onClick={()=>onChange(!checked)} className={`${s.toggle} ${checked ? s.toggleOn : s.toggleOff}`}>
-      <div className={`${s.toggleThumb} ${checked ? s.toggleThumbOn : s.toggleThumbOff}`} />
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`${s.toggle} ${checked ? s.toggleOn : ''}`}
+    >
+      <span className={s.toggleThumb} />
+    </button>
   );
 }
 
 // ─── USE TOAST ────────────────────────────────────────────────
-export function useToast(): [{ msg:string; color?:string }|null, (msg:string, color?:string)=>void] {
-  const [toast, setToast] = useState<{ msg:string; color?:string }|null>(null);
-  const show = (msg: string, color?: string) => {
-    setToast({ msg, color });
-    setTimeout(() => setToast(null), 2200);
-  };
+export function useToast(): [{ msg: string; color?: string } | null, (msg: string, color?: string) => void] {
+  const [toast, setToast] = useState<{ msg: string; color?: string } | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const show = useCallback((msg: string, color?: string) => {
+    clearTimeout(timer.current);
+    setToast({ msg: msg.replace(/^[✓✔]\s*/, ''), color });
+    timer.current = setTimeout(() => setToast(null), 2600);
+  }, []);
   return [toast, show];
 }
 
-
+// ─── SOUL PICKER ──────────────────────────────────────────────
 export interface SoulPickerProps {
-  souls:     DbSoul[];        // all available souls (pass from parent's loaded list)
-  linkedIds: string[];        // currently linked soul ids
-  onToggle:  (soulId: string) => void;  // parent flips the id in/out of linkedIds
+  souls: DbSoul[];                    // all available souls
+  linkedIds: string[];                // currently linked soul ids
+  onToggle: (soulId: string) => void; // parent flips the id in or out of linkedIds
 }
 
 export function SoulPicker({ souls, linkedIds, onToggle }: SoulPickerProps) {
-  const [query, setQuery] = React.useState('');
-
-  const filtered = query.trim() === ''
-    ? souls
-    : souls.filter(s =>
-        s.name.toLowerCase().includes(query.toLowerCase()) ||
-        (s.role ?? '').toLowerCase().includes(query.toLowerCase())
-      );
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const filtered = !q ? souls : souls.filter(x => x.name.toLowerCase().includes(q) || (x.role ?? '').toLowerCase().includes(q));
 
   return (
-    <div style={{
-      display:       'flex',
-      flexDirection: 'column',
-      gap:           '6px',
-    }}>
-      {/* Filter input */}
-      <input
-        type="text"
-        placeholder="Search souls…"
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        onKeyDown={e => e.stopPropagation()} // never bubble to modal
-        style={{
-          background:   'var(--bg)',
-          border:       '1px solid var(--border)',
-          borderRadius: '6px',
-          color:        'var(--text)',
-          fontFamily:   'var(--font)',
-          fontSize:     '13px',
-          padding:      '6px 10px',
-          outline:      'none',
-          width:        '100%',
-          boxSizing:    'border-box',
-        }}
-      />
+    <div className={s.soulPicker}>
+      <div className={s.searchBar}>
+        <Search size={15} strokeWidth={2} className={s.searchIcon} aria-hidden />
+        <input
+          className={s.searchInput}
+          type="search"
+          placeholder="Find someone"
+          aria-label="Find someone"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => e.stopPropagation()}
+        />
+      </div>
 
-      {/* Soul rows */}
-      <div style={{
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           '2px',
-        maxHeight:     '180px',
-        overflowY:     'auto',
-      }}>
-        {filtered.length === 0 && (
-          <p style={{
-            color:      'var(--text-muted)',
-            fontSize:   '12px',
-            fontFamily: 'var(--font)',
-            padding:    '6px 4px',
-            margin:     0,
-          }}>
-            No souls found
-          </p>
-        )}
-
+      <div className={s.soulList}>
+        {filtered.length === 0 && <p className={s.soulEmpty}>Nobody matches that yet</p>}
         {filtered.map(soul => {
           const linked = linkedIds.includes(soul.id);
           return (
             <button
               key={soul.id}
               type="button"
-              onClick={e => {
-                e.stopPropagation();
-                onToggle(soul.id);
-              }}
-              style={{
-                display:         'flex',
-                alignItems:      'center',
-                gap:             '8px',
-                background:      linked ? `${soul.color}22` : 'transparent',
-                border:          `1px solid ${linked ? soul.color : 'transparent'}`,
-                borderRadius:    '8px',
-                cursor:          'pointer',
-                padding:         '5px 8px',
-                textAlign:       'left',
-                transition:      'background 0.15s, border-color 0.15s',
-                width:           '100%',
-              }}
+              aria-pressed={linked}
+              onClick={e => { e.stopPropagation(); onToggle(soul.id); }}
+              className={`${s.soulRow} ${linked ? s.soulRowOn : ''}`}
+              style={linked ? { background: tint(soul.color, 14), borderColor: tint(soul.color, 60) } : undefined}
             >
-              {/* Emoji avatar */}
-              <span style={{
-                background:   soul.color + '33',
-                borderRadius: '50%',
-                fontSize:     '14px',
-                flexShrink:   0,
-                lineHeight:   1,
-                padding:      '4px',
-              }}>
-                {soul.emoji}
+              <SoulAvatar soul={soul} size={30} />
+              <span className={s.soulText}>
+                <span className={s.soulName}>{soul.name}</span>
+                {soul.role && <span className={s.soulRole}>{soul.role}</span>}
               </span>
-
-              {/* Name + role */}
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{
-                  color:      'var(--text)',
-                  display:    'block',
-                  fontFamily: 'var(--font)',
-                  fontSize:   '13px',
-                  fontWeight: linked ? 600 : 400,
-                  overflow:   'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {soul.name}
-                </span>
-                {soul.role && (
-                  <span style={{
-                    color:      'var(--text-muted)',
-                    display:    'block',
-                    fontFamily: 'var(--font)',
-                    fontSize:   '11px',
-                    overflow:   'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {soul.role}
-                  </span>
-                )}
-              </span>
-
-              {/* Checkmark */}
-              {linked && (
-                <span style={{
-                  color:      soul.color,
-                  flexShrink: 0,
-                  fontSize:   '14px',
-                }}>
-                  ✓
-                </span>
-              )}
+              {linked && <Check size={16} strokeWidth={2.5} style={{ color: soul.color }} />}
             </button>
           );
         })}

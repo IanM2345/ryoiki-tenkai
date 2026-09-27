@@ -1,172 +1,155 @@
-.page {
-  padding: 2rem;
-  max-width: 500px;
-  margin: 0 auto;
-}
-
-.topBar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.back {
-  background: none;
-  border: none;
-  color: #8a6f5a;
-  font-family: 'Comic Sans MS', cursive;
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 0;
-  transition: color 0.15s;
-}
-.back:hover { color: #f5e6d0; }
-
-.scoreboard {
-  display: flex;
-  gap: 1rem;
-  font-family: 'Courier New', monospace;
-  font-size: 0.85rem;
-  font-weight: bold;
-}
-.scoreWin  { color: #4ade80; }
-.scoreLoss { color: #f87171; }
-.scoreDraw { color: #facc15; }
-
-.title {
-  font-family: 'Comic Sans MS', cursive;
-  font-size: 1.8rem;
-  color: #f5e6d0;
-  margin: 0 0 1.5rem;
-}
-
-/* Setup */
-.setup { display: flex; flex-direction: column; gap: 1rem; }
-
-.setupLabel {
-  font-family: 'Comic Sans MS', cursive;
-  font-size: 0.85rem;
-  color: #8a6f5a;
-  margin: 0;
-}
-
-.diffRow {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
-}
-
-.diffBtn {
-  padding: 0.6rem 0.4rem;
-  background: #130d1a;
-  border: 1.5px solid #2a1f35;
-  border-radius: 8px;
-  color: #a07a5a;
-  font-family: 'Comic Sans MS', cursive;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+.stage {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-}
-.diffBtn:hover { border-color: #ff8c00; color: #f5e6d0; }
-.diffBtnActive { border-color: #ff8c00 !important; color: #ff8c00 !important; }
-
-.diffHint {
-  font-size: 0.58rem;
-  color: #5a4a6a;
-  font-family: 'Courier New', monospace;
-  text-align: center;
-  line-height: 1.3;
+  gap: 18px;
+  padding: 8px 0 4px;
 }
 
-.startBtn {
-  padding: 0.75rem 1.5rem;
-  background: #ff8c00;
-  border: none;
-  border-radius: 10px;
-  color: #0d0a0f;
-  font-family: 'Comic Sans MS', cursive;
-  font-size: 1rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: opacity 0.15s;
-  align-self: flex-start;
-}
-.startBtn:hover { opacity: 0.85; }
-
-/* Status */
-.statusBar { margin-bottom: 1.25rem; min-height: 1.5rem; }
-
-.statusText { font-family: 'Comic Sans MS', cursive; font-size: 1rem; color: #a07a5a; }
-.statusWon  { font-family: 'Comic Sans MS', cursive; font-size: 1rem; color: #4ade80; }
-.statusLost { font-family: 'Comic Sans MS', cursive; font-size: 1rem; color: #f87171; }
-.statusDraw { font-family: 'Comic Sans MS', cursive; font-size: 1rem; color: #facc15; }
-
-/* Board */
 .board {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-bottom: 1.5rem;
-  max-width: 320px;
+  gap: 8px;
+  width: min(360px, 100%);
+  aspect-ratio: 1;
 }
 
 .cell {
-  aspect-ratio: 1;
-  background: #1a1025;
-  border: 1.5px solid #2a1f35;
-  border-radius: 10px;
-  font-family: 'Comic Sans MS', cursive;
-  font-size: 2.5rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.1s, border-color 0.1s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: transparent; /* default — overridden by cellX/cellO */
-}
-
-.cell:hover:not(:disabled) { background: #221535; border-color: #ff8c00; }
-
-.cellX    { color: #ff8c00; }
-.cellO    { color: #a855f7; }
-.cellWin  { background: rgba(255,140,0,0.12) !important; border-color: #ff8c00 !important; }
-.cellDone { cursor: default; }
-
-/* Actions */
-.actions { display: flex; gap: 1rem; align-items: center; }
-
-.diffChange {
-  background: none;
-  border: none;
-  color: #8a6f5a;
-  font-family: 'Comic Sans MS', cursive;
-  font-size: 0.85rem;
-  cursor: pointer;
-  text-decoration: underline;
+  display: grid;
+  place-items: center;
   padding: 0;
+  border: 1.5px solid var(--bd);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--tx);
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
 }
-.diffChange:hover { color: #f5e6d0; }
+.cell[aria-disabled='true'] { cursor: default; }
+.cell:focus-visible { outline: 2px solid var(--or); outline-offset: 2px; }
+.cell:not([aria-disabled='true']):active { transform: scale(0.96); }
 
-/* Loading */
-.loading {
+@media (hover: hover) and (pointer: fine) {
+  .cell:not([aria-disabled='true']):hover {
+    background: var(--card-hov);
+    border-color: color-mix(in oklab, var(--or) 60%, transparent);
+  }
+}
+
+.board[data-locked='true'] .cell { cursor: default; }
+
+.cellWin {
+  background: color-mix(in oklab, var(--or) 12%, var(--card));
+  border-color: color-mix(in oklab, var(--or) 55%, transparent);
+}
+
+.mark {
+  width: 58%;
+  height: 58%;
+  animation: markIn var(--dur-base) var(--ease-out) both;
+}
+.markX { color: var(--or); }
+.markO { color: var(--pu-l); }
+
+@keyframes markIn {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.winSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.winLine {
+  stroke: var(--or);
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0.9;
+  animation: drawLine 420ms var(--ease-out) 80ms forwards;
+}
+
+@keyframes drawLine {
+  to { stroke-dashoffset: 0; }
+}
+
+.starter {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: center;
-  height: 60vh;
+  gap: 10px;
 }
-.dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: #ff8c00;
-  animation: pulse 1s ease-in-out infinite;
+
+.starterLabel {
+  color: var(--tx-m);
+  font-size: 0.85rem;
+  font-weight: 700;
 }
-@keyframes pulse {
-  0%, 100% { opacity: 0.2; transform: scale(0.8); }
-  50%       { opacity: 1;   transform: scale(1.2); }
+
+.seg {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+}
+
+.segBtn {
+  min-height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--tx-m);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.segBtn:focus-visible { outline: 2px solid var(--or); outline-offset: 1px; }
+.segOn { background: color-mix(in oklab, var(--pu-l) 22%, transparent); color: var(--tx); }
+
+@media (hover: hover) and (pointer: fine) {
+  .segBtn:hover { color: var(--tx); }
+}
+
+.again {
+  min-height: 40px;
+  padding: 0 20px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--or);
+  color: var(--on-accent);
+  font-family: var(--font);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  animation: fadeUp var(--dur-base) var(--ease-out) both;
+  transition: transform var(--dur-press) var(--ease-out), opacity var(--dur-fast) ease;
+}
+.again:active { transform: scale(0.96); }
+
+@media (hover: hover) and (pointer: fine) {
+  .again:hover { opacity: 0.9; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark, .again { animation: none; }
+  .winLine { animation: none; stroke-dashoffset: 0; }
 }

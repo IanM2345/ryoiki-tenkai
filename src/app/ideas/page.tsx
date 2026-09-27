@@ -1,282 +1,239 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Lightbulb, ArrowRight, RotateCcw, Trash2, Brain, ClipboardList, Hammer, PartyPopper } from 'lucide-react';
 import s from './ideas.module.css';
-import { Btn, Lbl, Tag, Pill, Topbar, Modal, ModalTitle, ModalFooter, Confirm, FInput, FArea, TagInput, EmptyState, Toast, useToast, SoulPicker } from '@/components/ui';
-import { getIdeas, addIdea, updateIdea, deleteIdea, getSoulLinksForItem, setSoulLinks, getSouls } from '@/lib/db';
-import { ensureSession } from '@/lib/supabase';
+import {
+  Btn, Lbl, Tag, Topbar, Modal, ModalTitle, ModalFooter, Confirm, FInput, FArea, TagInput,
+  EmptyState, Toast, useToast, SearchBar,
+} from '@/components/ui';
+import SoulLinkField from '@/components/ui/SoulLinkField';
+import {
+  getIdeas, addIdea, updateIdea, deleteIdea, getSoulLinksForItem, setSoulLinks, deleteSoulLinksForItem, getSouls,
+} from '@/lib/db';
 import type { DbIdea, DbSoul } from '@/lib/db';
+import { ensureSession } from '@/lib/supabase';
+import { PRIORITIES, PRIO_COLOR, PRIO_LABEL, type Priority } from '@/lib/tasks';
+import { fmtDate } from '@/lib/dates';
 
-type IStatus   = 'thinking' | 'planning' | 'doing' | 'done';
-type IPriority = 'high' | 'medium' | 'low';
-
-const STATUS_META: Record<IStatus, { label: string; color: string }> = {
-  thinking: { label: 'Thinking', color: '#a855f7' },
-  planning: { label: 'Planning', color: '#ff8c00' },
-  doing:    { label: 'Doing',    color: '#4ade80' },
-  done:     { label: 'Done',     color: '#8a7060' },
-};
-const PRIO_COL: Record<IPriority, string> = { high: '#f87171', medium: '#ff8c00', low: '#4ade80' };
+type IStatus = DbIdea['status'];
 const ORDER: IStatus[] = ['thinking', 'planning', 'doing', 'done'];
-
-const EMPTY = {
-  title:    '',
-  body:     '',
-  status:   'thinking' as IStatus,
-  priority: 'medium'   as IPriority,
-  tags:     [] as string[],
+const STATUS: Record<IStatus, { label: string; color: string; Icon: typeof Brain; empty: string }> = {
+  thinking: { label: 'Thinking', color: 'var(--pu-l)', Icon: Brain,         empty: 'Half-formed thoughts go here' },
+  planning: { label: 'Planning', color: 'var(--or)',   Icon: ClipboardList, empty: 'Nothing being planned yet' },
+  doing:    { label: 'Doing',    color: 'var(--gr)',   Icon: Hammer,        empty: 'Nothing in progress' },
+  done:     { label: 'Done',     color: 'var(--tx-m)', Icon: PartyPopper,   empty: 'Finished ideas land here' },
 };
 
-type FormState = typeof EMPTY;
+const EMPTY = { title: '', body: '', status: 'thinking' as IStatus, priority: 'medium' as Priority, tags: [] as string[] };
+type Form = typeof EMPTY;
 
 export default function IdeasPage() {
-  const [ideas,            setIdeas]            = useState<DbIdea[]>([]);
-  const [souls,            setSouls]            = useState<DbSoul[]>([]);
-  const [loading,          setLoading]          = useState(true);
-  const [filter,           setFilter]           = useState<'all' | IStatus>('all');
-  const [modal,            setModal]            = useState<'form' | 'delete' | null>(null);
-  const [form,             setForm]             = useState<FormState>(EMPTY);
-  const [editItem,         setEditItem]         = useState<DbIdea | null>(null);
-  const [delItem,          setDelItem]          = useState<DbIdea | null>(null);
-  const [linkedSoulIds,    setLinkedSoulIds]    = useState<string[]>([]);
-  const [soulPickerActive, setSoulPickerActive] = useState(false);
-  const [toast,            show]                = useToast();
+  const [ideas, setIdeas]     = useState<DbIdea[]>([]);
+  const [souls, setSouls]     = useState<DbSoul[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch]   = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [form, setForm]       = useState<Form>(EMPTY);
+  const [editItem, setEditItem] = useState<DbIdea | null>(null);
+  const [soulIds, setSoulIds] = useState<string[]>([]);
+  const [saving, setSaving]   = useState(false);
+  const [delItem, setDelItem] = useState<DbIdea | null>(null);
+  const [toast, show] = useToast();
 
   useEffect(() => {
-    async function load() {
-      await new Promise(r => setTimeout(r, 100));
-      const ready = await ensureSession();
-      if (!ready) { setLoading(false); return; }
+    (async () => {
       try {
-        const [data, soulData] = await Promise.all([getIdeas(), getSouls()]);
+        if (!(await ensureSession())) return;
+        const [data, soulData] = await Promise.all([getIdeas(), getSouls().catch(() => [] as DbSoul[])]);
         setIdeas(data);
         setSouls(soulData);
-      } catch (err) {
-        console.error('Ideas load error:', err);
-        show('Could not load ideas.');
+      } catch {
+        show('Could not load your ideas.', 'var(--red)');
       } finally {
         setLoading(false);
       }
-    }
-    load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    })();
+  }, [show]);
 
-  const items = ideas.filter(i => filter === 'all' || i.status === filter);
+  const q = search.trim().toLowerCase();
+  const columns = useMemo(() => {
+    const rank: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+    const list = ideas
+      .filter(i => !q || `${i.title} ${i.body} ${(i.tags ?? []).join(' ')}`.toLowerCase().includes(q))
+      .sort((a, b) => rank[a.priority] - rank[b.priority] || b.updated_at.localeCompare(a.updated_at));
+    return ORDER.map(st => ({ st, items: list.filter(i => i.status === st) }));
+  }, [ideas, q]);
 
-  const openAdd = () => {
-    setForm({ ...EMPTY, tags: [] });
-    setEditItem(null);
-    setLinkedSoulIds([]);
-    setSoulPickerActive(false);
-    setModal('form');
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(f => ({ ...f, [k]: v }));
+
+  const openAdd = (status: IStatus = 'thinking') => {
+    setEditItem(null); setForm({ ...EMPTY, status, tags: [] }); setSoulIds([]); setFormOpen(true);
   };
-
-  const openEdit = async (i: DbIdea) => {
-    setForm({ title: i.title, body: i.body ?? '', status: i.status, priority: i.priority, tags: [...(i.tags ?? [])] });
+  const openEdit = (i: DbIdea) => {
     setEditItem(i);
-    setLinkedSoulIds([]);
-    setSoulPickerActive(false);
-    setModal('form');
-    try {
-      const links = await getSoulLinksForItem('ideas', i.id);
-      setLinkedSoulIds(links.map(l => l.soul_id));
-      if (links.length > 0) setSoulPickerActive(true);
-    } catch { /* non-fatal */ }
+    setForm({ title: i.title, body: i.body ?? '', status: i.status, priority: i.priority, tags: [...(i.tags ?? [])] });
+    setSoulIds([]);
+    setFormOpen(true);
+    getSoulLinksForItem('ideas', i.id).then(l => setSoulIds(l.map(x => x.soul_id))).catch(() => {});
   };
 
   const save = async () => {
-    if (!form.title.trim()) return;
-    const payload = {
-      title:    form.title.trim(),
-      body:     form.body    || '',
-      status:   form.status,
-      priority: form.priority,
-      tags:     form.tags,
-    };
-
-    if (editItem) {
-      setIdeas(l => l.map(x => x.id === editItem.id ? { ...x, ...payload } : x));
-      setModal(null);
-      try {
-        await updateIdea(editItem.id, payload);
-        if (soulPickerActive) {
-          await setSoulLinks('ideas', editItem.id, payload.title, payload.body || null, linkedSoulIds);
-        }
-        show('Updated!');
-      } catch {
-        setIdeas(l => l.map(x => x.id === editItem.id ? editItem : x));
-        show('Could not update.');
-      }
-    } else {
-      setModal(null);
-      try {
-        const created = await addIdea(payload);
-        setIdeas(l => [created, ...l]);
-        if (soulPickerActive) {
-          await setSoulLinks('ideas', created.id, created.title, created.body || null, linkedSoulIds);
-        }
-        show('Idea saved!');
-      } catch {
-        show('Could not save.');
-      }
+    if (!form.title.trim() || saving) return;
+    setSaving(true);
+    const payload = { title: form.title.trim(), body: form.body.trim(), status: form.status, priority: form.priority, tags: form.tags };
+    try {
+      const saved = editItem ? await updateIdea(editItem.id, payload) : await addIdea(payload);
+      setIdeas(l => editItem ? l.map(x => x.id === saved.id ? saved : x) : [saved, ...l]);
+      await setSoulLinks('ideas', saved.id, saved.title, saved.body || null, soulIds).catch(() => show('Saved, but the people links did not update.', 'var(--red)'));
+      setFormOpen(false);
+      show(editItem ? 'Idea updated' : 'Idea saved');
+    } catch {
+      show('Could not save that idea.', 'var(--red)');
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const moveTo = async (idea: DbIdea, status: IStatus) => {
+    setIdeas(l => l.map(x => x.id === idea.id ? { ...x, status, updated_at: new Date().toISOString() } : x));
+    try { await updateIdea(idea.id, { status }); }
+    catch { setIdeas(l => l.map(x => x.id === idea.id ? idea : x)); show('Could not move that idea.', 'var(--red)'); }
   };
 
   const doDelete = async () => {
-    if (!delItem) return;
-    const snapshot = [...ideas];
-    setIdeas(l => l.filter(x => x.id !== delItem.id));
-    setDelItem(null);
-    setModal(null);
-    try {
-      await deleteIdea(delItem.id);
-      show('Deleted.');
-    } catch {
-      setIdeas(snapshot);
-      show('Could not delete.');
-    }
+    const item = delItem; if (!item) return;
+    const snapshot = ideas;
+    setIdeas(l => l.filter(x => x.id !== item.id));
+    setDelItem(null); setFormOpen(false);
+    try { await deleteIdea(item.id); await deleteSoulLinksForItem('ideas', item.id).catch(() => {}); show('Idea deleted'); }
+    catch { setIdeas(snapshot); show('Could not delete that idea.', 'var(--red)'); }
   };
 
-  const cycle = async (idea: DbIdea) => {
-    const nextStatus = ORDER[(ORDER.indexOf(idea.status) + 1) % ORDER.length];
-    setIdeas(l => l.map(x => x.id === idea.id ? { ...x, status: nextStatus } : x));
-    try {
-      await updateIdea(idea.id, { status: nextStatus });
-    } catch {
-      setIdeas(l => l.map(x => x.id === idea.id ? idea : x));
-      show('Could not update status.');
-    }
-  };
-
-  const fmtDate = (iso: string) => iso.split('T')[0];
+  const active = ideas.filter(i => i.status !== 'done').length;
 
   return (
-    <div className={`${s.page} aFadeUp`}>
+    <div className={s.page}>
       <Topbar
-        title="Ideas 💡"
-        sub={loading ? 'Loading...' : `${ideas.length} ideas`}
-        action={<Btn onClick={openAdd}>+ New Idea</Btn>}
+        title="Ideas"
+        sub={loading ? 'Loading your ideas' : ideas.length ? `${active} in the works, ${ideas.length - active} done` : 'Every big thing starts as a small note'}
+        action={<Btn onClick={() => openAdd()}><Plus size={16} strokeWidth={2.25} /> New idea</Btn>}
       />
 
-      <div className={s.filterBar}>
-        <Pill active={filter === 'all'} onClick={() => setFilter('all')}>All ({ideas.length})</Pill>
-        {ORDER.map(st => (
-          <Pill key={st} active={filter === st} color={STATUS_META[st].color} onClick={() => setFilter(st)}>
-            {STATUS_META[st].label} ({ideas.filter(i => i.status === st).length})
-          </Pill>
-        ))}
+      <div className={s.wrap}>
+        {ideas.length > 3 && (
+          <SearchBar value={search} onChange={setSearch} placeholder="Search ideas" className={s.search} />
+        )}
+
+        {!loading && ideas.length === 0 ? (
+          <EmptyState
+            icon={<Lightbulb size={26} />}
+            msg="No ideas yet. Jot down the first one, even if it's tiny."
+            action={<Btn sm onClick={() => openAdd()}><Plus size={15} /> Add an idea</Btn>}
+          />
+        ) : (
+          <div className={s.board}>
+            {columns.map(({ st, items }) => {
+              const meta = STATUS[st];
+              const next = ORDER[ORDER.indexOf(st) + 1];
+              return (
+                <section key={st} className={s.column} style={{ ['--c' as string]: meta.color }} aria-labelledby={`col-${st}`}>
+                  <header className={s.colHead}>
+                    <h2 id={`col-${st}`} className={s.colTitle}><meta.Icon size={16} strokeWidth={2} /> {meta.label}</h2>
+                    <span className={s.colCount}>{items.length}</span>
+                    {st !== 'done' && (
+                      <button type="button" className={s.colAdd} onClick={() => openAdd(st)} aria-label={`Add to ${meta.label}`}>
+                        <Plus size={16} strokeWidth={2.25} />
+                      </button>
+                    )}
+                  </header>
+
+                  <div className={s.colBody}>
+                    {loading ? (
+                      [0, 1].map(i => <div key={i} className={`skeleton ${s.skel}`} />)
+                    ) : items.length === 0 ? (
+                      <p className={s.colEmpty}>{q ? 'No matches' : meta.empty}</p>
+                    ) : items.map(idea => (
+                      <article key={idea.id} className={`${s.card} ${st === 'done' ? s.cardDone : ''}`}>
+                        <button type="button" className={s.cardMain} onClick={() => openEdit(idea)} aria-label={`Edit ${idea.title}`}>
+                          <span className={s.cardTop}>
+                            <span className={s.prio} style={{ background: PRIO_COLOR[idea.priority] }} title={`${PRIO_LABEL[idea.priority]} priority`} />
+                            <span className={s.cardTitle}>{idea.title}</span>
+                          </span>
+                          {idea.body && <span className={s.cardBody}>{idea.body}</span>}
+                          {(idea.tags?.length ?? 0) > 0 && (
+                            <span className={s.cardTags}>{idea.tags.map(t => <Tag key={t} color="var(--pu-g)">{t}</Tag>)}</span>
+                          )}
+                        </button>
+                        <div className={s.cardFoot}>
+                          <span className={s.cardDate}>{fmtDate(idea.updated_at || idea.created_at)}</span>
+                          <div className={s.cardActions}>
+                            <button type="button" className={`${s.iconBtn} ${s.danger}`} onClick={() => setDelItem(idea)} aria-label={`Delete ${idea.title}`}>
+                              <Trash2 size={15} strokeWidth={2} />
+                            </button>
+                            {next ? (
+                              <button type="button" className={s.moveBtn} onClick={() => moveTo(idea, next)} title={`Move to ${STATUS[next].label}`}>
+                                {STATUS[next].label} <ArrowRight size={14} strokeWidth={2.25} />
+                              </button>
+                            ) : (
+                              <button type="button" className={s.moveBtn} onClick={() => moveTo(idea, 'doing')} title="Back to Doing">
+                                <RotateCcw size={13} strokeWidth={2.25} /> Reopen
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {loading ? (
-        <div className={s.loadingState}>Loading your ideas...</div>
-      ) : items.length === 0 ? (
-        <EmptyState icon="💡" msg={filter === 'all' ? 'No ideas yet — add your first!' : `No ideas in "${STATUS_META[filter as IStatus]?.label ?? filter}".`} />
-      ) : (
-        <div className={s.list}>
-          {items.map(idea => (
-            <div key={idea.id} className={s.ideaCard} onClick={() => openEdit(idea)}>
-              <div
-                className={s.prioDot}
-                style={{ background: PRIO_COL[idea.priority], boxShadow: `0 0 5px ${PRIO_COL[idea.priority]}88` }}
-              />
-              <div className={s.ideaBody}>
-                <div className={s.ideaTop}>
-                  <div className={s.ideaTitle}>{idea.title}</div>
-                  <span
-                    className={s.statusBadge}
-                    onClick={e => { e.stopPropagation(); cycle(idea); }}
-                    style={{
-                      background: `${STATUS_META[idea.status].color}22`,
-                      color:       STATUS_META[idea.status].color,
-                      border:     `1px solid ${STATUS_META[idea.status].color}44`,
-                    }}
-                  >
-                    {STATUS_META[idea.status].label}
-                  </span>
-                </div>
-                {idea.body && <div className={s.ideaPreview}>{idea.body}</div>}
-                <div className={s.ideaMeta}>
-                  {(idea.tags ?? []).map(t => <Tag key={t} color="#a855f7">{t}</Tag>)}
-                  <span className={s.ideaDate}>{fmtDate(idea.created_at)}</span>
-                </div>
-              </div>
-              <div className={s.ideaActions}>
-                <button
-                  onClick={e => { e.stopPropagation(); setDelItem(idea); setModal('delete'); }}
-                  style={{ background: 'rgba(248,113,113,.1)', border: '1px solid rgba(248,113,113,.3)', color: '#f87171', borderRadius: 5, padding: '3px 7px', fontSize: 9, cursor: 'pointer', fontFamily: 'inherit' }}
-                >×</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {formOpen && (
+        <Modal onClose={() => !saving && setFormOpen(false)}>
+          <ModalTitle>{editItem ? 'Edit idea' : 'New idea'}</ModalTitle>
+          <FInput label="Title" value={form.title} onChange={v => set('title', v)} placeholder="What if…" />
+          <FArea label="Details" value={form.body} onChange={v => set('body', v)} rows={4} placeholder="Get it out of your head" />
 
-      {modal === 'form' && (
-        <Modal onClose={() => setModal(null)}>
-          <ModalTitle>{editItem ? 'Edit Idea' : 'New Idea 💡'}</ModalTitle>
-          <FInput label="Title"   value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} />
-          <FArea  label="Details" value={form.body}  onChange={v => setForm(f => ({ ...f, body: v }))}  rows={3} />
-          <div className={s.formGrid}>
-            <div>
-              <Lbl>Status</Lbl>
-              {ORDER.map(st => (
-                <div key={st} className={s.statusOption}
-                  onClick={() => setForm(f => ({ ...f, status: st }))}
-                  style={{ background: form.status === st ? STATUS_META[st].color : 'transparent', border: `1px solid ${STATUS_META[st].color}44`, color: form.status === st ? '#000' : '#c4a882' }}
-                >{STATUS_META[st].label}</div>
-              ))}
-            </div>
-            <div>
-              <Lbl>Priority</Lbl>
-              {(['high', 'medium', 'low'] as IPriority[]).map(p => (
-                <div key={p} className={s.statusOption}
-                  onClick={() => setForm(f => ({ ...f, priority: p }))}
-                  style={{ background: form.priority === p ? PRIO_COL[p] : 'transparent', border: `1px solid ${PRIO_COL[p]}44`, color: form.priority === p ? '#000' : '#c4a882', textTransform: 'capitalize' }}
-                >{p}</div>
-              ))}
-            </div>
+          <Lbl>Stage</Lbl>
+          <div className={s.optRow} role="radiogroup" aria-label="Stage">
+            {ORDER.map(st => {
+              const m = STATUS[st];
+              return (
+                <button key={st} type="button" role="radio" aria-checked={form.status === st}
+                  className={`${s.opt} ${form.status === st ? s.optOn : ''}`} style={{ ['--c' as string]: m.color }}
+                  onClick={() => set('status', st)}>
+                  <m.Icon size={14} strokeWidth={2} /> {m.label}
+                </button>
+              );
+            })}
           </div>
-          <div>
+
+          <Lbl>Priority</Lbl>
+          <div className={s.optRow} role="radiogroup" aria-label="Priority">
+            {PRIORITIES.map(p => (
+              <button key={p} type="button" role="radio" aria-checked={form.priority === p}
+                className={`${s.opt} ${form.priority === p ? s.optOn : ''}`} style={{ ['--c' as string]: PRIO_COLOR[p] }}
+                onClick={() => set('priority', p)}>
+                <span className={s.optDot} /> {PRIO_LABEL[p]}
+              </button>
+            ))}
+          </div>
+
+          <div className={s.field}>
             <Lbl>Tags</Lbl>
-            <TagInput
-              tags={form.tags}
-              color="#a855f7"
-              onAdd={t => setForm(f => ({ ...f, tags: [...f.tags, t] }))}
-              onRemove={t => setForm(f => ({ ...f, tags: f.tags.filter(x => x !== t) }))}
-            />
+            <TagInput tags={form.tags} color="var(--pu-g)" onAdd={t => set('tags', [...form.tags, t])} onRemove={t => set('tags', form.tags.filter(x => x !== t))} />
           </div>
-
-          <div style={{ marginTop: 10, marginBottom: 4 }}>
-            {!soulPickerActive ? (
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); setSoulPickerActive(true); }}
-                style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: 6, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 11, padding: '5px 10px', width: '100%' }}
-              >+ Link souls</button>
-            ) : (
-              <>
-                <Lbl>Linked Souls</Lbl>
-                <SoulPicker
-                  souls={souls}
-                  linkedIds={linkedSoulIds}
-                  onToggle={id => setLinkedSoulIds(prev =>
-                    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-                  )}
-                />
-              </>
-            )}
-          </div>
-
-          <ModalFooter onCancel={() => setModal(null)} onSave={save} saveLabel={editItem ? 'Update' : 'Save Idea'} />
+          <SoulLinkField souls={souls} value={soulIds} onChange={setSoulIds} />
+          <ModalFooter onCancel={() => setFormOpen(false)} onSave={save} saveLabel={saving ? 'Saving' : editItem ? 'Save changes' : 'Save idea'} />
         </Modal>
       )}
 
-      {modal === 'delete' && delItem && (
-        <Modal onClose={() => setModal(null)}>
-          <Confirm
-            msg={`"${delItem.title}" will be deleted.`}
-            onConfirm={doDelete}
-            onCancel={() => setModal(null)}
-          />
+      {delItem && (
+        <Modal onClose={() => setDelItem(null)}>
+          <Confirm msg={`"${delItem.title}" will be deleted for good.`} onConfirm={doDelete} onCancel={() => setDelItem(null)} />
         </Modal>
       )}
 

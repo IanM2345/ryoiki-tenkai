@@ -1,7 +1,9 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { ImagePlus, X } from 'lucide-react';
 import styles from './ImagePicker.module.css';
+import StoredImage from './StoredImage';
 
 interface ImagePickerProps {
   /** Currently saved image URL (from DB) or null */
@@ -16,11 +18,12 @@ interface ImagePickerProps {
 
 /**
  * Drop-in image picker for modals.
- * Shows a dashed upload zone when empty, a thumbnail with ✕ when filled.
+ * Shows a dashed upload zone when empty, a thumbnail with a remove button when filled.
  * Works with both existing DB URLs and fresh local file previews.
  */
 export default function ImagePicker({ value, onChange, onClear, label }: ImagePickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
 
   function handleFile(file: File) {
     const preview = URL.createObjectURL(file);
@@ -36,6 +39,7 @@ export default function ImagePicker({ value, onChange, onClear, label }: ImagePi
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
+    setDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) handleFile(file);
   }
@@ -50,31 +54,32 @@ export default function ImagePicker({ value, onChange, onClear, label }: ImagePi
 
       {value ? (
         <div className={styles.preview}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="Preview" className={styles.previewImg} />
+          <StoredImage src={value} alt="Chosen image" className={styles.previewImg} loading="eager" />
           <button
             type="button"
             className={styles.clearBtn}
             onClick={onClear}
             aria-label="Remove image"
           >
-            ✕
+            <X size={16} strokeWidth={2.25} />
           </button>
         </div>
       ) : (
         <div
-          className={styles.dropZone}
+          className={`${styles.dropZone} ${dragging ? styles.dropZoneOver : ''}`}
+          onDragEnter={() => setDragging(true)}
+          onDragLeave={() => setDragging(false)}
           onClick={() => inputRef.current?.click()}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
+          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && inputRef.current?.click()}
           aria-label="Upload image"
         >
-          <span className={styles.dropIcon}>🖼</span>
-          <span className={styles.dropText}>Click or drag an image here</span>
-          <span className={styles.dropSub}>JPG, PNG, GIF, WEBP</span>
+          <span className={styles.dropIcon}><ImagePlus size={24} strokeWidth={1.75} /></span>
+          <span className={styles.dropText}>Add a photo</span>
+          <span className={styles.dropSub}>Click or drop an image here</span>
         </div>
       )}
 
@@ -87,4 +92,4 @@ export default function ImagePicker({ value, onChange, onClear, label }: ImagePi
       />
     </div>
   );
-}
+}

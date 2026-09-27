@@ -12,12 +12,6 @@ export const supabase = createClient(url, key, {
   },
 });
 
-export async function signInWithEmail(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data;
-}
-
 /**
  * Restore session from tokens returned by the API route.
  * Avoids a second Supabase auth call — no rate limiting risk.
@@ -38,4 +32,4 @@ export async function ensureSession(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
   const { data: { session } } = await supabase.auth.getSession();
   return !!session;
-}
+}

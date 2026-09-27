@@ -1,294 +1,316 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { colors as C, fonts, RATING_CATS, RATING_CAT_ICONS } from '../../lib/token';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  Btn, Lbl, Tag, Stars, Pill, SearchBar, InnerTabs, Topbar,
-  Modal, ModalTitle, ModalFooter, Confirm, FInput, FArea,
-  EmptyState, Toast, useToast, SoulPicker,
+  Plus, Star, Trash2, Clapperboard, BookOpen, Music, MapPin, Tv, Newspaper, Sparkles,
+  ArrowDownWideNarrow, Clock, ArrowDownAZ,
+} from 'lucide-react';
+import s from './ratings.module.css';
+import {
+  Btn, Lbl, Stars, Pill, SearchBar, InnerTabs, Topbar, Modal, ModalTitle, ModalFooter, Confirm,
+  FInput, FArea, EmptyState, Toast, useToast,
 } from '@/components/ui';
-import { getRatings, addRating, updateRating, deleteRating, getSoulLinksForItem, setSoulLinks, getSouls } from '@/lib/db';
-import { ensureSession } from '@/lib/supabase';
+import SoulLinkField from '@/components/ui/SoulLinkField';
+import {
+  getRatings, addRating, updateRating, deleteRating, getSoulLinksForItem, setSoulLinks, deleteSoulLinksForItem, getSouls,
+} from '@/lib/db';
 import type { DbRating, DbSoul } from '@/lib/db';
+import { ensureSession } from '@/lib/supabase';
+import { fmtDate } from '@/lib/dates';
 
-type RCat = typeof RATING_CATS[number];
+const CATS = ['Film', 'Book', 'Music', 'Place', 'Series', 'Article', 'Experience'] as const;
+type RCat = typeof CATS[number];
 
-const STAR_LABELS = ['','Disappointing','It was ok','Pretty good','Really good','Perfect ✨'];
-const EMPTY_FORM = { title: '', category: 'Film' as RCat, rating: 0, notes: '' };
-type FormState = typeof EMPTY_FORM;
+interface CatMeta { Icon: typeof Star; color: string }
+const CAT: Record<RCat, CatMeta> = {
+  Film:       { Icon: Clapperboard, color: 'var(--or)' },
+  Book:       { Icon: BookOpen,     color: 'var(--blue)' },
+  Music:      { Icon: Music,        color: 'var(--pu-l)' },
+  Place:      { Icon: MapPin,       color: 'var(--gr)' },
+  Series:     { Icon: Tv,           color: 'var(--red)' },
+  Article:    { Icon: Newspaper,    color: 'var(--yellow)' },
+  Experience: { Icon: Sparkles,     color: 'var(--pu-g)' },
+};
+const FALLBACK: CatMeta = { Icon: Star, color: 'var(--tx-m)' };
+const catMeta = (c: string): CatMeta => (CAT as Record<string, CatMeta>)[c] ?? FALLBACK;
 
-const card = () => ({ background: C.card, borderRadius: 6, border: `1px solid ${C.bds}` });
+type Sort = 'rating' | 'newest' | 'alpha';
+const SORTS: { k: Sort; label: string; Icon: typeof Star }[] = [
+  { k: 'rating', label: 'Top rated', Icon: ArrowDownWideNarrow },
+  { k: 'newest', label: 'Newest',    Icon: Clock },
+  { k: 'alpha',  label: 'A to Z',    Icon: ArrowDownAZ },
+];
+
+const STAR_LABELS = ['Tap a star to rate', 'Disappointing', 'It was ok', 'Pretty good', 'Really good', 'Perfect'];
+const EMPTY = { title: '', category: 'Film' as string, rating: 0, notes: '' };
+type Form = typeof EMPTY;
+
+const average = (list: DbRating[]) => list.length ? list.reduce((a, b) => a + b.rating, 0) / list.length : 0;
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 export default function RatingsPage() {
-  const [ratings,          setRatings]          = useState<DbRating[]>([]);
-  const [souls,            setSouls]            = useState<DbSoul[]>([]);
-  const [loading,          setLoading]          = useState(true);
-  const [tab,              setTab]              = useState('all');
-  const [sort,             setSort]             = useState<'rating' | 'newest' | 'alpha'>('rating');
-  const [search,           setSearch]           = useState('');
-  const [modal,            setModal]            = useState<'form' | 'delete' | null>(null);
-  const [form,             setForm]             = useState<FormState>(EMPTY_FORM);
-  const [editItem,         setEditItem]         = useState<DbRating | null>(null);
-  const [delItem,          setDelItem]          = useState<DbRating | null>(null);
-  const [linkedSoulIds,    setLinkedSoulIds]    = useState<string[]>([]);
-  const [soulPickerActive, setSoulPickerActive] = useState(false);
-  const [toast,            show]                = useToast();
+  const [ratings, setRatings] = useState<DbRating[]>([]);
+  const [souls, setSouls]     = useState<DbSoul[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab]         = useState<string>('all');
+  const [sort, setSort]       = useState<Sort>('rating');
+  const [search, setSearch]   = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [form, setForm]       = useState<Form>(EMPTY);
+  const [editItem, setEditItem] = useState<DbRating | null>(null);
+  const [soulIds, setSoulIds] = useState<string[]>([]);
+  const [saving, setSaving]   = useState(false);
+  const [delItem, setDelItem] = useState<DbRating | null>(null);
+  const linksReady = useRef(true);
+  const [toast, show] = useToast();
 
   useEffect(() => {
-    async function load() {
-      await new Promise(r => setTimeout(r, 100));
-      const ready = await ensureSession();
-      if (!ready) { setLoading(false); return; }
+    (async () => {
       try {
-        const [data, soulData] = await Promise.all([getRatings(), getSouls()]);
+        if (!(await ensureSession())) return;
+        const [data, soulData] = await Promise.all([getRatings(), getSouls().catch(() => [] as DbSoul[])]);
         setRatings(data);
         setSouls(soulData);
-      } catch (err) {
-        console.error('Ratings load error:', err);
-        show('Could not load ratings.');
+      } catch {
+        show('Could not load your ratings.', 'var(--red)');
       } finally {
         setLoading(false);
       }
-    }
-    load();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    })();
+  }, [show]);
 
-  const filtered = ratings
-    .filter(r => tab === 'all' || r.category.toLowerCase() === tab)
-    .filter(r => !search || (r.title + (r.notes ?? '')).toLowerCase().includes(search.toLowerCase()))
+  const q = search.trim().toLowerCase();
+
+  const catStats = useMemo(() => CATS.map(cat => {
+    const list = ratings.filter(r => r.category === cat);
+    return { cat, count: list.length, avg: average(list) };
+  }), [ratings]);
+
+  const filtered = useMemo(() => ratings
+    .filter(r => tab === 'all' || r.category === tab)
+    .filter(r => !q || `${r.title} ${r.notes ?? ''} ${r.category}`.toLowerCase().includes(q))
     .sort((a, b) =>
-      sort === 'rating' ? b.rating - a.rating :
+      sort === 'rating' ? b.rating - a.rating || b.created_at.localeCompare(a.created_at) :
       sort === 'alpha'  ? a.title.localeCompare(b.title) :
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+      b.created_at.localeCompare(a.created_at)),
+  [ratings, tab, q, sort]);
 
-  const avg = ratings.length
-    ? (ratings.reduce((a, b) => a + b.rating, 0) / ratings.length).toFixed(1)
-    : '—';
+  const groups = useMemo(() => sort === 'rating'
+    ? [5, 4, 3, 2, 1].map(n => ({ n, items: filtered.filter(r => r.rating === n) })).filter(g => g.items.length > 0)
+    : [{ n: 0, items: filtered }],
+  [filtered, sort]);
 
-  const avgByCat = (cat: string) => {
-    const r = ratings.filter(x => x.category === cat);
-    return r.length ? (r.reduce((a, b) => a + b.rating, 0) / r.length).toFixed(1) : '—';
-  };
+  const tabs: [string, string][] = [
+    ['all', `All ${ratings.length}`],
+    ...catStats.map(({ cat, count }) => [cat, count ? `${cat} ${count}` : cat] as [string, string]),
+  ];
+
+  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(f => ({ ...f, [k]: v }));
 
   const openAdd = () => {
-    setForm({ ...EMPTY_FORM });
     setEditItem(null);
-    setLinkedSoulIds([]);
-    setSoulPickerActive(false);
-    setModal('form');
+    setForm({ ...EMPTY, category: tab === 'all' ? 'Film' : tab });
+    setSoulIds([]);
+    linksReady.current = true;
+    setFormOpen(true);
   };
 
-  const openEdit = async (r: DbRating) => {
-    setForm({ title: r.title, category: r.category as RCat, rating: r.rating, notes: r.notes ?? '' });
+  const openEdit = (r: DbRating) => {
     setEditItem(r);
-    setLinkedSoulIds([]);
-    setSoulPickerActive(false);
-    setModal('form');
-    try {
-      const links = await getSoulLinksForItem('ratings', r.id);
-      setLinkedSoulIds(links.map(l => l.soul_id));
-      if (links.length > 0) setSoulPickerActive(true);
-    } catch { /* non-fatal */ }
+    setForm({ title: r.title, category: r.category, rating: r.rating, notes: r.notes ?? '' });
+    setSoulIds([]);
+    linksReady.current = false;
+    setFormOpen(true);
+    getSoulLinksForItem('ratings', r.id)
+      .then(l => { setSoulIds(l.map(x => x.soul_id)); linksReady.current = true; })
+      .catch(() => {});
   };
 
   const save = async () => {
-    if (!form.title.trim() || !form.rating) return;
-    const payload = {
-      title:    form.title.trim(),
-      category: form.category,
-      rating:   form.rating,
-      notes:    form.notes || null,
-    };
-    if (editItem) {
-      setRatings(rs => rs.map(x => x.id === editItem.id ? { ...x, ...payload } : x));
-      setModal(null);
-      try {
-        await updateRating(editItem.id, payload);
-        if (soulPickerActive) {
-          await setSoulLinks('ratings', editItem.id, payload.title, payload.notes, linkedSoulIds);
-        }
-        show('Updated!');
-      } catch {
-        setRatings(rs => rs.map(x => x.id === editItem.id ? editItem : x));
-        show('Could not update.');
+    if (saving) return;
+    if (!form.title.trim()) { show('Give it a name first.', 'var(--red)'); return; }
+    if (!form.rating) { show('Pick a star rating first.', 'var(--red)'); return; }
+    setSaving(true);
+    const payload = { title: form.title.trim(), category: form.category, rating: form.rating, notes: form.notes.trim() || null };
+    try {
+      const saved = editItem ? await updateRating(editItem.id, payload) : await addRating(payload);
+      setRatings(l => editItem ? l.map(x => x.id === saved.id ? saved : x) : [saved, ...l]);
+      if (linksReady.current) {
+        await setSoulLinks('ratings', saved.id, saved.title, saved.notes ?? null, soulIds)
+          .catch(() => show('Saved, but the people links did not update.', 'var(--red)'));
       }
-    } else {
-      setModal(null);
-      try {
-        const created = await addRating(payload);
-        setRatings(rs => [created, ...rs]);
-        if (soulPickerActive) {
-          await setSoulLinks('ratings', created.id, created.title, created.notes ?? null, linkedSoulIds);
-        }
-        show('Rating saved!');
-      } catch {
-        show('Could not save.');
-      }
+      setFormOpen(false);
+      show(editItem ? 'Rating updated' : 'Rating saved');
+    } catch {
+      show('Could not save that rating.', 'var(--red)');
+    } finally {
+      setSaving(false);
     }
   };
 
   const doDelete = async () => {
-    if (!delItem) return;
-    const snapshot = [...ratings];
-    setRatings(rs => rs.filter(x => x.id !== delItem.id));
-    setDelItem(null); setModal(null);
+    const item = delItem; if (!item) return;
+    const snapshot = ratings;
+    setRatings(l => l.filter(x => x.id !== item.id));
+    setDelItem(null); setFormOpen(false);
     try {
-      await deleteRating(delItem.id);
-      show('Deleted.');
+      await deleteRating(item.id);
+      await deleteSoulLinksForItem('ratings', item.id).catch(() => {});
+      show('Rating deleted');
     } catch {
       setRatings(snapshot);
-      show('Could not delete.');
+      show('Could not delete that rating.', 'var(--red)');
     }
   };
 
-  const byStars = sort === 'rating'
-    ? [5,4,3,2,1].map(n => ({ n, items: filtered.filter(r => r.rating === n) })).filter(x => x.items.length > 0)
-    : [{ n: null, items: filtered }];
+  const sub = loading
+    ? 'Loading your ratings'
+    : ratings.length
+      ? `${plural(ratings.length, 'rating')}, ${average(ratings).toFixed(1)} average`
+      : 'No ratings yet';
 
-  const tabsData: [string, string][] = [
-    ['all', `All (${ratings.length})`],
-    ...(['film','book','music','place','series','article'] as string[]).map(k => [k, k.charAt(0).toUpperCase() + k.slice(1)] as [string, string]),
-  ];
+  const activeMeta = tab === 'all' ? null : catMeta(tab);
 
   return (
-    <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', position:'relative' }} className="animate-fade-up">
+    <div className={s.page}>
       <Topbar
-        title="Ratings ★"
-        sub={loading ? 'Loading...' : `${ratings.length} ratings · avg ${avg} ★`}
-        action={<Btn onClick={openAdd}>+ Rate Something</Btn>}
+        title="Ratings"
+        sub={sub}
+        maxWidth={880}
+        action={<Btn onClick={openAdd}><Plus size={16} strokeWidth={2.25} /> Rate something</Btn>}
       />
 
-      <InnerTabs tabs={tabsData} active={tab} onTab={setTab} />
-
-      {tab === 'all' && (
-        <div style={{ display:'flex', gap:7, padding:'8px 14px', borderBottom:`1px solid ${C.bds}`, overflowX:'auto' }}>
-          {RATING_CATS.slice(0, 5).map(cat => (
-            <div
-              key={cat}
-              onClick={() => setTab(cat.toLowerCase())}
-              style={{ ...card(), padding:'5px 10px', cursor:'pointer', display:'flex', alignItems:'center', gap:5, flexShrink:0, transition:'all .15s' }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = C.cardHov}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = C.card}
-            >
-              <span style={{ fontSize:13 }}>{RATING_CAT_ICONS[cat]}</span>
-              <span style={{ fontSize:11, fontWeight:700, color:C.tx }}>{cat}</span>
-              <span style={{ fontFamily:fonts.mono, fontSize:9, color:C.or }}>{avgByCat(cat)}★</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{ display:'flex', gap:7, padding:'7px 14px', borderBottom:`1px solid ${C.bds}`, alignItems:'center' }}>
-        <div style={{ flex:1 }}>
-          <SearchBar value={search} onChange={setSearch} placeholder="Search ratings..." />
-        </div>
-        <Pill active={sort === 'rating'} onClick={() => setSort('rating')}>★</Pill>
-        <Pill active={sort === 'newest'} onClick={() => setSort('newest')}>New</Pill>
-        <Pill active={sort === 'alpha'}  onClick={() => setSort('alpha')}>A–Z</Pill>
-      </div>
-
-      <div style={{ flex:1, overflowY:'auto', padding:'8px 14px' }}>
+      <div className={s.wrap}>
         {loading ? (
-          <EmptyState icon="★" msg="Loading your ratings..." />
-        ) : filtered.length === 0 ? (
-          <EmptyState icon="★" msg="No ratings yet in this category." />
-        ) : byStars.map(({ n, items }) => (
-          <div key={n ?? 'all'} style={{ marginBottom:12 }}>
-            {n && (
-              <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:7 }}>
-                <Stars n={n} size={12} />
-                <span style={{ fontFamily:fonts.mono, fontSize:9, color:C.txm, letterSpacing:1 }}>{items.length} item{items.length !== 1 ? 's' : ''}</span>
-              </div>
+          <>
+            <div className={s.overview}>
+              {CATS.map(c => <div key={c} className={`skeleton ${s.skelChip}`} />)}
+            </div>
+            {[0, 1, 2, 3].map(i => <div key={i} className={`skeleton ${s.skel}`} />)}
+          </>
+        ) : ratings.length === 0 ? (
+          <EmptyState
+            icon={<Star size={26} />}
+            msg="Nothing rated yet. Start with the last film you watched or a book you loved."
+            action={<Btn sm onClick={openAdd}><Plus size={15} /> Rate something</Btn>}
+          />
+        ) : (
+          <>
+            {tab === 'all' && (
+              <section className={s.overview} aria-label="Averages by category">
+                {catStats.map(({ cat, count, avg }) => {
+                  const m = CAT[cat];
+                  return (
+                    <button key={cat} type="button" className={s.catCard} style={{ ['--c' as string]: m.color }}
+                      onClick={() => setTab(cat)} aria-label={`${cat}: ${count ? `${plural(count, 'rating')}, ${avg.toFixed(1)} average` : 'no ratings yet'}`}>
+                      <span className={s.catIcon}><m.Icon size={17} strokeWidth={2} /></span>
+                      <span className={s.catText}>
+                        <span className={s.catName}>{cat}</span>
+                        <span className={s.catCount}>{count ? plural(count, 'rating') : 'None yet'}</span>
+                      </span>
+                      <span className={`${s.catAvg} ${count ? '' : s.catAvgEmpty}`}>
+                        {count ? <>{avg.toFixed(1)}<Star size={12} strokeWidth={2} fill="currentColor" /></> : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </section>
             )}
-            {items.map(r => (
-              <div
-                key={r.id}
-                style={{ ...card(), marginBottom:5, cursor:'pointer', transition:'background .15s', position:'relative' }}
-                onClick={() => openEdit(r)}
-                onMouseEnter={ev => {
-                  ev.currentTarget.style.background = C.cardHov;
-                  (ev.currentTarget.querySelector('.r-del') as HTMLElement | null)?.style && ((ev.currentTarget.querySelector('.r-del') as HTMLElement).style.opacity = '1');
-                }}
-                onMouseLeave={ev => {
-                  ev.currentTarget.style.background = C.card;
-                  (ev.currentTarget.querySelector('.r-del') as HTMLElement | null)?.style && ((ev.currentTarget.querySelector('.r-del') as HTMLElement).style.opacity = '0');
-                }}
-              >
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: r.notes ? 3 : 0 }}>
-                  <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-                    <span style={{ fontSize:14 }}>{RATING_CAT_ICONS[r.category] || '★'}</span>
-                    <Tag color={C.or}>{r.category}</Tag>
-                    <span style={{ fontSize:12, fontWeight:700, color:C.tx }}>{r.title}</span>
-                  </div>
-                  <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-                    <Stars n={r.rating} size={12} />
-                    <button
-                      className="r-del"
-                      onClick={e => { e.stopPropagation(); setDelItem(r); setModal('delete'); }}
-                      style={{ background:'rgba(248,113,113,.1)', border:'1px solid rgba(248,113,113,.3)', color:C.red, borderRadius:5, padding:'2px 7px', fontSize:9, cursor:'pointer', opacity:0, transition:'opacity .15s', fontFamily:fonts.main }}
-                    >×</button>
-                  </div>
-                </div>
-                {r.notes && <div style={{ fontSize:11, color:C.txs, opacity:.65, lineHeight:1.5 }}>{r.notes}</div>}
+
+            <div className={s.tabs}><InnerTabs tabs={tabs} active={tab} onTab={setTab} /></div>
+
+            <div className={s.toolbar}>
+              <SearchBar value={search} onChange={setSearch} placeholder="Search ratings" className={s.search} />
+              <div className={s.sorts} role="group" aria-label="Sort by">
+                {SORTS.map(({ k, label, Icon }) => (
+                  <Pill key={k} active={sort === k} onClick={() => setSort(k)}>
+                    <Icon size={14} strokeWidth={2} /> {label}
+                  </Pill>
+                ))}
               </div>
+            </div>
+
+            {filtered.length === 0 ? (
+              <EmptyState
+                icon={activeMeta ? <activeMeta.Icon size={26} /> : <Star size={26} />}
+                msg={q ? 'Nothing matches that search.' : `No ${tab.toLowerCase()} ratings yet.`}
+                action={q ? undefined : <Btn sm onClick={openAdd}><Plus size={15} /> Rate one</Btn>}
+              />
+            ) : groups.map(({ n, items }) => (
+              <section key={n} className={s.group} aria-label={n ? `${n} stars` : 'Ratings'}>
+                {n > 0 && (
+                  <header className={s.groupHead}>
+                    <Stars n={n} size={14} />
+                    <span className={s.groupLabel}>{STAR_LABELS[n]}</span>
+                    <span className={s.groupCount}>{items.length}</span>
+                  </header>
+                )}
+                <div className={s.list}>
+                  {items.map(r => {
+                    const m = catMeta(r.category);
+                    return (
+                      <article key={r.id} className={s.card} style={{ ['--c' as string]: m.color }}>
+                        <button type="button" className={s.cardMain} onClick={() => openEdit(r)} aria-label={`Edit ${r.title}`}>
+                          <span className={s.cardIcon}><m.Icon size={18} strokeWidth={2} /></span>
+                          <span className={s.cardText}>
+                            <span className={s.cardTitle}>{r.title}</span>
+                            <span className={s.cardMeta}>{r.category} · {fmtDate(r.created_at)}</span>
+                            {r.notes && <span className={s.cardNotes}>{r.notes}</span>}
+                          </span>
+                          <span className={s.cardStars}><Stars n={r.rating} size={13} /></span>
+                        </button>
+                        <button type="button" className={s.delBtn} onClick={() => setDelItem(r)} aria-label={`Delete ${r.title}`}>
+                          <Trash2 size={15} strokeWidth={2} />
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
             ))}
-          </div>
-        ))}
+          </>
+        )}
       </div>
 
-      {modal === 'form' && (
-        <Modal onClose={() => setModal(null)}>
-          <ModalTitle>{editItem ? 'Edit Rating' : 'Rate Something ★'}</ModalTitle>
-          <FInput label="What are you rating?" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} />
-          <div style={{ marginBottom:10 }}>
-            <Lbl>Category</Lbl>
-            <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-              {RATING_CATS.map(c => (
-                <Pill key={c} active={form.category === c} onClick={() => setForm(f => ({ ...f, category: c }))}>
-                  {RATING_CAT_ICONS[c]} {c}
-                </Pill>
-              ))}
-            </div>
-          </div>
-          <div style={{ textAlign:'center', padding:'14px 0', marginBottom:6 }}>
-            <Lbl>Your Rating</Lbl>
-            <Stars n={form.rating} onSet={r => setForm(f => ({ ...f, rating: r }))} size={34} />
-            {form.rating > 0 && (
-              <div style={{ fontSize:13, fontStyle:'italic', color:C.txs, marginTop:8 }}>
-                {STAR_LABELS[form.rating]}
-              </div>
-            )}
-          </div>
-          <FArea label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} rows={3} placeholder="What did you think?" />
+      {formOpen && (
+        <Modal onClose={() => !saving && setFormOpen(false)}>
+          <ModalTitle>{editItem ? 'Edit rating' : 'Rate something'}</ModalTitle>
+          <FInput label="What are you rating?" value={form.title} onChange={v => set('title', v)} placeholder="A film, a book, a trip" />
 
-          <div style={{ marginTop: 10, marginBottom: 4 }}>
-            {!soulPickerActive ? (
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); setSoulPickerActive(true); }}
-                style={{ background: 'none', border: '1px dashed var(--border)', borderRadius: 6, color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 11, padding: '5px 10px', width: '100%' }}
-              >+ Link souls</button>
-            ) : (
-              <>
-                <Lbl>Linked Souls</Lbl>
-                <SoulPicker
-                  souls={souls}
-                  linkedIds={linkedSoulIds}
-                  onToggle={id => setLinkedSoulIds(prev =>
-                    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-                  )}
-                />
-              </>
-            )}
+          <Lbl>Category</Lbl>
+          <div className={s.optRow} role="radiogroup" aria-label="Category">
+            {CATS.map(c => {
+              const m = CAT[c];
+              return (
+                <button key={c} type="button" role="radio" aria-checked={form.category === c}
+                  className={`${s.opt} ${form.category === c ? s.optOn : ''}`} style={{ ['--c' as string]: m.color }}
+                  onClick={() => set('category', c)}>
+                  <m.Icon size={14} strokeWidth={2} /> {c}
+                </button>
+              );
+            })}
           </div>
 
-          <ModalFooter onCancel={() => setModal(null)} onSave={save} saveLabel={editItem ? 'Update' : 'Save Rating'} />
+          <div className={s.starPicker}>
+            <Lbl>Your rating</Lbl>
+            <Stars n={form.rating} onSet={v => set('rating', v)} size={34} />
+            <p className={`${s.starLabel} ${form.rating ? '' : s.starHint}`}>{STAR_LABELS[form.rating]}</p>
+          </div>
+
+          <FArea label="Notes" value={form.notes} onChange={v => set('notes', v)} rows={3} placeholder="What did you think?" />
+          <SoulLinkField souls={souls} value={soulIds} onChange={setSoulIds} />
+
+          {editItem && (
+            <button type="button" className={s.modalDelete} onClick={() => { setFormOpen(false); setDelItem(editItem); }}>
+              <Trash2 size={14} strokeWidth={2} /> Delete this rating
+            </button>
+          )}
+          <ModalFooter onCancel={() => setFormOpen(false)} onSave={save} saveLabel={saving ? 'Saving' : editItem ? 'Save changes' : 'Save rating'} />
         </Modal>
       )}
 
-      {modal === 'delete' && delItem && (
-        <Modal onClose={() => setModal(null)}>
-          <Confirm msg={`"${delItem.title}" will be deleted.`} onConfirm={doDelete} onCancel={() => setModal(null)} />
+      {delItem && (
+        <Modal onClose={() => setDelItem(null)}>
+          <Confirm msg={`"${delItem.title}" will be deleted for good.`} onConfirm={doDelete} onCancel={() => setDelItem(null)} />
         </Modal>
       )}
 

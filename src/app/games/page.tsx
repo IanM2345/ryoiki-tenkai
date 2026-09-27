@@ -1,143 +1,120 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import {
+  ChevronRight, Club, Crown, Flame, Gamepad2, Grid3x3, Hash, Ship, Spade, Trophy,
+} from 'lucide-react';
+import { Topbar, Toast, useToast } from '@/components/ui';
 import { ensureSession } from '@/lib/supabase';
-import { getGameStats, type GameType } from '@/lib/db';
-import styles from './games.module.css';
+import { getGameStats, type GameStats, type GameType } from '@/lib/games';
+import s from './games.module.css';
 
-const FEATURED = {
-  id: 'kadi',
-  title: 'Kadi',
-  emoji: '🎴',
-  description: 'The Kenyan card game — questions, stacking penalties, and calling Kadi on your last card. Easy to learn, hard to beat on Hard.',
-};
+type Accent = 'or' | 'pu' | 'blue' | 'gr';
 
-const GAMES = [
-  { id: 'tic-tac-toe', title: 'Tic Tac Toe', emoji: '✕○', description: 'Classic 3×3. The hard AI uses minimax — good luck.', accent: 'orange' },
-  { id: 'sudoku',      title: 'Sudoku',      emoji: '🔢', description: 'Fill the grid. Numbers don\'t lie.',                   accent: 'purple' },
-  { id: 'battleship',  title: 'Battleship',  emoji: '⚓', description: 'Place your fleet. Sink theirs before they sink yours.', accent: 'cyan'   },
-  { id: 'matatu',      title: 'Matatu',      emoji: '🃏', description: 'East African Uno. Sevens cut the game.',                accent: 'orange' },
-  { id: 'kadi',        title: 'Kadi',        emoji: '🎴', description: 'Questions, stacking penalties, and calling Kadi!',      accent: 'purple' },
-  { id: 'chess',       title: 'Chess',       emoji: '♟', description: 'Classic chess vs AI. Hard uses minimax with alpha-beta pruning.', accent: 'orange' },
+interface GameCard {
+  type: GameType;
+  href: string;
+  title: string;
+  desc: string;
+  levels: string;
+  icon: React.ReactNode;
+  accent: Accent;
+}
+
+const GAMES: GameCard[] = [
+  { type: 'tic', href: '/games/tic-tac-toe', title: 'Tic Tac Toe', desc: 'Three in a row. Quick rounds, and the top level never loses.', levels: 'Easy to Impossible', icon: <Grid3x3 size={22} strokeWidth={2} />, accent: 'or' },
+  { type: 'sudoku', href: '/games/sudoku', title: 'Sudoku', desc: 'Fill every row, column and box with one to nine.', levels: 'Easy, Medium, Hard', icon: <Hash size={22} strokeWidth={2} />, accent: 'pu' },
+  { type: 'chess', href: '/games/chess', title: 'Chess', desc: 'A full game against a computer that thinks a few moves ahead.', levels: 'Easy, Medium, Hard', icon: <Crown size={22} strokeWidth={2} />, accent: 'or' },
+  { type: 'battleship', href: '/games/battleship', title: 'Battleship', desc: 'Hide your fleet, then hunt theirs one shot at a time.', levels: 'Easy, Medium, Hard', icon: <Ship size={22} strokeWidth={2} />, accent: 'blue' },
+  { type: 'kadi', href: '/games/kadi', title: 'Kadi', desc: 'The Kenyan card game of questions, penalties and calling Kadi on your last card.', levels: 'Easy, Medium, Hard', icon: <Spade size={22} strokeWidth={2} />, accent: 'pu' },
+  { type: 'matatu', href: '/games/matatu', title: 'Matatu', desc: 'East African shedding game where a seven can cut the round short.', levels: 'Easy, Medium, Hard', icon: <Club size={22} strokeWidth={2} />, accent: 'gr' },
 ];
 
-const SOON = ['Wordle', 'Memory'];
 
-const ALL_GAME_TYPES: GameType[] = ['tic', 'sudoku', 'chess', 'battleship', 'kadi', 'matatu'];
+const MAX = 1080;
+
+function StatTile({ label, value, icon, loading }: { label: string; value: React.ReactNode; icon: React.ReactNode; loading: boolean }) {
+  return (
+    <div className={s.stat}>
+      <span className={s.statIcon}>{icon}</span>
+      <div>
+        {loading ? <div className={`skeleton ${s.skelNum}`} /> : <div className={s.statNum}>{value}</div>}
+        <div className={s.statLabel}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function CardRecord({ stats, loading }: { stats?: GameStats; loading: boolean }) {
+  if (loading) return <div className={`skeleton ${s.skelLine}`} />;
+  if (!stats || stats.played === 0) return <p className={s.record}>Not played yet</p>;
+  return (
+    <p className={s.record}>
+      <span className={s.recWin}>{stats.wins}W</span>
+      <span className={s.recLoss}>{stats.losses}L</span>
+      <span className={s.recDraw}>{stats.draws}D</span>
+      {stats.streak >= 2 && (
+        <span className={s.streak}><Flame size={12} strokeWidth={2.5} /> {stats.streak} in a row</span>
+      )}
+    </p>
+  );
+}
 
 export default function GamesPage() {
-  const router = useRouter();
-  const [loading,   setLoading]   = useState(true);
-  const [totalWins, setTotalWins] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState<GameStats | null>(null);
+  const [byGame, setByGame] = useState<Partial<Record<GameType, GameStats>>>({});
+  const [toast, show] = useToast();
 
   useEffect(() => {
-    async function init() {
-      await new Promise(r => setTimeout(r, 100));
-      const ready = await ensureSession();
-      if (!ready) { setLoading(false); return; }
-
+    (async () => {
       try {
-        const results = await Promise.all(ALL_GAME_TYPES.map(g => getGameStats(g)));
-        const wins = results.reduce((sum, r) => sum + r.wins, 0);
-        setTotalWins(wins);
+        if (!(await ensureSession())) return;
+        const res = await getGameStats();
+        setTotal(res.total);
+        setByGame(res.byGame);
       } catch {
-        setTotalWins(0);
+        show('Could not load your game stats.', 'var(--red)');
+      } finally {
+        setLoading(false);
       }
+    })();
+  }, [show]);
 
-      setLoading(false);
-    }
-    init();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (loading) {
-    return (
-      <div className={styles.loadingWrap}>
-        <div className={styles.loadingDot} />
-      </div>
-    );
-  }
+  const winRate = total && total.played > 0 ? `${Math.round((total.wins / total.played) * 100)}%` : '0%';
 
   return (
-    <div className={styles.page}>
+    <div className={s.page}>
+      <Topbar title="Arcade" sub="Pick a game and take on the computer." maxWidth={MAX} />
+      <div className={s.wrap}>
+        <div className={s.stats}>
+          <StatTile label="Total wins" value={total?.wins ?? 0} icon={<Trophy size={18} strokeWidth={2} />} loading={loading} />
+          <StatTile label="Win streak" value={total?.streak ?? 0} icon={<Flame size={18} strokeWidth={2} />} loading={loading} />
+          <StatTile label="Games played" value={total?.played ?? 0} icon={<Gamepad2 size={18} strokeWidth={2} />} loading={loading} />
+          <StatTile label="Win rate" value={winRate} icon={<Crown size={18} strokeWidth={2} />} loading={loading} />
+        </div>
 
-      {/* Header */}
-      <div className={styles.header}>
-        <h1 className={styles.title}>🎮 <span className={styles.titleAccent}>arcade</span></h1>
-        <p className={styles.subtitle}>your little corner of the internet, but make it fun</p>
+        <h2 className={s.section}>All games</h2>
+        <div className={s.grid}>
+          {GAMES.map(g => (
+            <Link key={g.type} href={g.href} className={s.card} data-accent={g.accent}>
+              <div className={s.cardTop}>
+                <span className={s.cardIcon}>{g.icon}</span>
+                <span className={s.levels}>{g.levels}</span>
+              </div>
+              <h3 className={s.cardTitle}>{g.title}</h3>
+              <p className={s.cardDesc}>{g.desc}</p>
+              <div className={s.cardFoot}>
+                <CardRecord stats={byGame[g.type]} loading={loading} />
+                <span className={s.play}>Play <ChevronRight size={15} strokeWidth={2.5} /></span>
+              </div>
+            </Link>
+          ))}
+        </div>
+
       </div>
-
-      {/* Stats strip */}
-      <div className={styles.statsStrip}>
-        <div className={styles.statCell}>
-          <div className={styles.statNum}>{GAMES.length}</div>
-          <div className={styles.statLabel}>games</div>
-        </div>
-        <div className={styles.statCell}>
-          <div className={`${styles.statNum} ${styles.statNumPurple}`}>3</div>
-          <div className={styles.statLabel}>difficulty levels</div>
-        </div>
-        <div className={styles.statCell}>
-          <div className={`${styles.statNum} ${styles.statNumCyan}`}>
-            {totalWins === null ? '…' : totalWins}
-          </div>
-          <div className={styles.statLabel}>wins so far</div>
-        </div>
-        <div className={styles.statCell}>
-          <div className={`${styles.statNum} ${styles.statNumGreen}`}>∞</div>
-          <div className={styles.statLabel}>hours to waste</div>
-        </div>
-      </div>
-
-      {/* Featured banner */}
-      <div className={styles.featured}>
-        <div className={styles.featuredBody}>
-          <span className={styles.featuredBadge}>✦ featured game</span>
-          <h2 className={styles.featuredTitle}>{FEATURED.title}</h2>
-          <p className={styles.featuredDesc}>{FEATURED.description}</p>
-        </div>
-        <div className={styles.featuredRight}>
-          <div className={styles.featuredEmoji}>{FEATURED.emoji}</div>
-          <button
-            className={styles.featuredPlay}
-            onClick={() => router.push(`/games/${FEATURED.id}`)}
-          >
-            play now
-          </button>
-        </div>
-      </div>
-
-      {/* Game grid */}
-      <p className={styles.sectionLabel}>all games</p>
-      <div className={styles.grid}>
-        {GAMES.map(game => (
-          <button
-            key={game.id}
-            className={`${styles.card} ${styles[`card-${game.accent}`]}`}
-            onClick={() => router.push(`/games/${game.id}`)}
-          >
-            <div className={styles.cardTop}>
-              <span className={styles.cardEmoji}>{game.emoji}</span>
-              <span className={styles.cardDiff}>easy · medium · hard</span>
-            </div>
-            <h2 className={styles.cardTitle}>{game.title}</h2>
-            <p className={styles.cardDesc}>{game.description}</p>
-            <span className={styles.cardArrow}>play →</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Coming soon */}
-      <p className={styles.sectionLabel}>coming soon</p>
-      <div className={styles.soonGrid}>
-        {SOON.map(name => (
-          <div key={name} className={styles.soonCard}>
-            <span className={styles.soonPill}>coming soon</span>
-            <span className={styles.soonTitle}>{name}</span>
-          </div>
-        ))}
-      </div>
-
+      {toast && <Toast msg={toast.msg} color={toast.color} />}
     </div>
   );
 }

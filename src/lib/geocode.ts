@@ -16,3 +16,10 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
     return null;
   }
 }
+
+/** Directions link: Apple Maps on Apple devices, Google Maps everywhere else. */
+export function directionsUrl(p: { lat: number; lng: number }): string {
+  const dest = `${p.lat},${p.lng}`;
+  const apple = typeof navigator !== 'undefined' && /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent);
+  return apple ? `https://maps.apple.com/?daddr=${dest}` : `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+}

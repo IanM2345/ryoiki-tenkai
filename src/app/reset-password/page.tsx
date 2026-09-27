@@ -1,88 +1,111 @@
 'use client';
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { KeyRound, ArrowLeft, Eye, EyeOff, Check, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import styles from './reset-password.module.css';
+import s from './reset-password.module.css';
+
+function strength(pw: string): { score: number; label: string } {
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const labels = ['Too short', 'Weak', 'Okay', 'Good', 'Strong', 'Very strong'];
+  return { score, label: pw ? labels[score] : '' };
+}
 
 export default function ResetPasswordPage() {
-  const [newPassword,     setNewPassword]     = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error,           setError]           = useState<string | null>(null);
-  const [success,         setSuccess]         = useState(false);
-  const [loading,         setLoading]         = useState(false);
+  const [current, setCurrent] = useState('');
+  const [next, setNext]       = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [show, setShow]       = useState(false);
+  const [error, setError]     = useState('');
+  const [done, setDone]       = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [email, setEmail]     = useState<string | null>(null);
 
-  async function handleSubmit() {
-    setError(null);
-    setSuccess(false);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null), () => {});
+  }, []);
 
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
+  const st = strength(next);
+  const mismatch = !!confirm && next !== confirm;
+  const canSubmit = !!current && next.length >= 8 && next === confirm && !loading;
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setError('');
+    if (next === current) { setError('Your new password needs to be different from the current one.'); return; }
     setLoading(true);
     try {
-      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (!email) throw new Error('You need to be signed in to change your password.');
+      // Confirm it's really her before changing anything
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password: current });
+      if (authError) throw new Error("Your current password isn't right.");
+      const { error: updateError } = await supabase.auth.updateUser({ password: next });
       if (updateError) throw updateError;
-      setSuccess(true);
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setDone(true);
+      setCurrent(''); setNext(''); setConfirm('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
+  const type = show ? 'text' : 'password';
+
   return (
-    <div className={styles.page}>
-      <div className={styles.card}>
-        <div className={styles.seal}>🔑</div>
-        <h1 className={styles.heading}>change password</h1>
-        <p className={styles.sub}>pick something you&apos;ll remember</p>
+    <main className={s.page}>
+      <Link href="/dashboard" className={s.back}><ArrowLeft size={16} /> Back to your world</Link>
+      <div className={s.card}>
+        <div className={s.seal} aria-hidden><KeyRound size={24} strokeWidth={1.75} /></div>
+        <h1 className={s.heading}>Change your password</h1>
+        <p className={s.sub}>Pick something you&apos;ll remember but others won&apos;t guess.</p>
 
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="new-password">new password</label>
-          <input
-            id="new-password"
-            type="password"
-            className={styles.input}
-            value={newPassword}
-            onChange={e => setNewPassword(e.target.value)}
-            placeholder="at least 8 characters"
-            autoComplete="new-password"
-          />
-        </div>
+        {done ? (
+          <div className={s.success} role="status">
+            <span className={s.successIcon}><Check size={22} strokeWidth={2.5} /></span>
+            <p>Your password has been updated. Use the new one next time you sign in.</p>
+            <Link href="/dashboard" className={s.btn}>Back to your world</Link>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className={s.form} noValidate>
+            <label className={s.field}>
+              <span className={s.label}>Current password</span>
+              <input type={type} className={s.input} value={current} onChange={e => setCurrent(e.target.value)} autoComplete="current-password" autoFocus />
+            </label>
+            <label className={s.field}>
+              <span className={s.label}>New password</span>
+              <input type={type} className={s.input} value={next} onChange={e => setNext(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" />
+              {next && (
+                <span className={s.meter} data-score={st.score}>
+                  <span className={s.meterBar}><span style={{ transform: `scaleX(${Math.max(1, st.score) / 5})` }} /></span>
+                  <span className={s.meterLabel}>{st.label}</span>
+                </span>
+              )}
+            </label>
+            <label className={s.field}>
+              <span className={s.label}>Type it again</span>
+              <input type={type} className={`${s.input} ${mismatch ? s.inputError : ''}`} value={confirm} onChange={e => setConfirm(e.target.value)} autoComplete="new-password" aria-invalid={mismatch} />
+              {mismatch && <span className={s.fieldError}>These don&apos;t match yet.</span>}
+            </label>
 
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="confirm-password">confirm password</label>
-          <input
-            id="confirm-password"
-            type="password"
-            className={styles.input}
-            value={confirmPassword}
-            onChange={e => setConfirmPassword(e.target.value)}
-            placeholder="same again"
-            autoComplete="new-password"
-            onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
-          />
-        </div>
+            <button type="button" className={s.showBtn} onClick={() => setShow(v => !v)}>
+              {show ? <EyeOff size={15} /> : <Eye size={15} />} {show ? 'Hide passwords' : 'Show passwords'}
+            </button>
 
-        {error !== null && <p className={styles.error}>{error}</p>}
-        {success && <p className={styles.success}>password updated ✓</p>}
+            {error && <p className={s.error} role="alert">{error}</p>}
 
-        <button
-          className={styles.btn}
-          onClick={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? 'saving...' : 'update password →'}
-        </button>
+            <button type="submit" className={s.btn} disabled={!canSubmit}>
+              {loading ? <><Loader2 size={17} className="aSpin" /> Updating</> : 'Update password'}
+            </button>
+          </form>
+        )}
       </div>
-    </div>
+    </main>
   );
 }

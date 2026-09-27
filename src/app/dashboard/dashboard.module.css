@@ -1,544 +1,316 @@
-/* ─── PAGE ───────────────────────────────────────────────── */
 .page {
-  flex: 1;
-  overflow-y: auto;
-  padding: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  position: relative;
+  width: 100%;
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 36px 28px 72px;
 }
+@media (max-width: 767px) { .page { padding: 20px 16px 56px; } }
+.linkReset { text-decoration: none; }
 
-/* ─── HEADER ─────────────────────────────────────────────── */
-.header {
+/* ─── Hero ─────────────────────────────────────────────── */
+.hero {
   display: flex;
+  align-items: flex-end;
   justify-content: space-between;
-  align-items: flex-start;
   flex-wrap: wrap;
-  gap: 8px;
-  /* left indent clears the hamburger button */
-  padding-left: 48px;
+  gap: 16px;
+  margin-bottom: 26px;
 }
-
-/* On mobile the appMain already has padding-top: 60px so no left indent needed */
-@media (max-width: 767px) {
-  .header { padding-left: 0; }
-}
-
 .greeting {
-  font-size: 21px;
-  font-weight: 700;
-  color: var(--tx);
-}
-
-.date {
-  font-family: var(--mono);
-  font-size: 9px;
-  color: var(--tx-m);
-  letter-spacing: 1px;
-  margin-top: 3px;
-}
-
-/* ─── STATS GRID ─────────────────────────────────────────── */
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-
-.statCard {
-  background: var(--card);
-  border-radius: var(--radius);
-  border: 1px solid var(--bd);
-  padding: 12px;
-  text-align: center;
-  cursor: pointer;
-  transition: background var(--speed), border-color var(--speed), transform var(--speed);
-  text-decoration: none;
-  display: block;
-}
-.statCard:hover { background: var(--card-hov); transform: translateY(-2px); }
-
-.statNum {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.statLabel {
-  font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: var(--tx-s);
-  opacity: 0.5;
-  margin-top: 4px;
-}
-
-/* ─── QUICK STATS ROW ────────────────────────────────────── */
-.quickRow {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.quickCard {
-  background: var(--card);
-  border-radius: var(--radius);
-  border: 1px solid var(--bd);
-  padding: 10px 14px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  text-decoration: none;
-  transition: background var(--speed);
-  flex: 1;
-  min-width: 120px;
-}
-.quickCard:hover { background: var(--card-hov); }
-
-.quickLabel {
-  font-family: var(--mono);
-  font-size: 8px;
-  color: var(--tx-m);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.quickValue {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--or);
-}
-
-.moodDots { display: flex; gap: 3px; }
-.moodDot  { width: 10px; height: 10px; border-radius: 50%; }
-
-.soulsRow   { display: flex; gap: -4px; }
-.soulAvatar {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  margin-left: -4px;
-  border: 1px solid var(--bg);
-}
-.soulAvatar:first-child { margin-left: 0; }
-
-/* ─── MAIN GRID ──────────────────────────────────────────── */
-.mainGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 12px;
+  margin: 0;
+  font-size: clamp(1.7rem, 1.2rem + 2vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--tx);
+  animation: fadeUp var(--dur-slow) var(--ease-out) both;
 }
-
-/* ─── RECENT JOURNAL ─────────────────────────────────────── */
-.widget {
-  background: var(--card);
-  border-radius: var(--radius);
-  border: 1px solid var(--bd);
-  padding: 12px;
-}
-
-.widgetHeader {
+.greetIcon { flex-shrink: 0; color: var(--or); }
+.date {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-}
-
-.widgetTitle {
-  font-family: var(--mono);
-  font-size: 8px;
+  gap: 10px;
+  margin: 8px 0 0;
   color: var(--tx-m);
-  letter-spacing: 2px;
-  text-transform: uppercase;
+  font-size: 0.98rem;
+}
+.time {
+  padding: 2px 10px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-pill);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: var(--tx-s);
 }
 
-.widgetLink {
-  font-size: 11px;
-  color: var(--or);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font);
-  text-decoration: none;
+/* ─── Stats ────────────────────────────────────────────── */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
 }
-.widgetLink:hover { opacity: 0.75; }
-
-.journalEntry {
-  display: flex;
-  justify-content: space-between;
+@media (max-width: 767px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+.stat {
+  --c: var(--or);
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
   align-items: center;
-  padding: 7px 0;
-  border-bottom: 1px solid var(--bds);
+  padding: 16px;
+  overflow: hidden;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  color: var(--tx);
   text-decoration: none;
-  transition: opacity var(--speed);
+  transition: transform var(--dur-base) var(--ease-out), border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
 }
-.journalEntry:hover { opacity: 0.7; }
-.journalEntry:last-child { border-bottom: none; }
+.stat::after {
+  content: '';
+  position: absolute;
+  inset: auto -30% -60% auto;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--c) 22%, transparent), transparent 70%);
+  pointer-events: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .stat:hover { transform: translateY(-2px); border-color: color-mix(in oklab, var(--c) 45%, transparent); background: var(--card-hov); }
+}
+.stat:active { transform: scale(0.98); }
+.statIcon {
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--c) 16%, transparent);
+  color: var(--c);
+}
+.statNum {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--tx);
+}
+.statSkel { display: inline-block; width: 36px; height: 24px; vertical-align: middle; }
+.statLabel { font-size: 0.82rem; color: var(--tx-m); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.journalEntryLeft { flex: 1; min-width: 0; }
+/* ─── Grid ─────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1023px) { .grid { grid-template-columns: 1fr; } }
+.side { display: flex; flex-direction: column; gap: 16px; }
 
-.journalEntryTitle {
-  font-size: 11px;
+.card {
+  padding: 18px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.todayCard {
+  background:
+    radial-gradient(90% 60% at 100% 0%, color-mix(in oklab, var(--or) 9%, transparent), transparent 70%),
+    var(--card);
+}
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.08rem;
   font-weight: 700;
   color: var(--tx);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
-
-.journalEntryDate {
-  font-family: var(--mono);
-  font-size: 9px;
-  color: var(--tx-m);
-  margin-top: 1px;
+.count {
+  min-width: 24px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--or) 18%, transparent);
+  color: var(--or-l);
+  font-size: 0.78rem;
+  text-align: center;
 }
-
-.journalEntryMood { font-size: 15px; margin-left: 8px; }
-
-/* ─── RIGHT COLUMN ───────────────────────────────────────── */
-.rightCol { display: flex; flex-direction: column; gap: 10px; }
-
-.randomCard {
-  background: linear-gradient(135deg, rgba(255,140,0,0.08), rgba(124,58,237,0.08));
-  border-radius: var(--radius);
-  border: 1px solid var(--bd);
-  padding: 12px;
-}
-
-.randomHeader {
-  display: flex;
-  justify-content: space-between;
+.cardLink {
+  display: inline-flex;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 4px;
+  padding: 6px 8px;
+  margin-right: -8px;
+  border-radius: 8px;
+  color: var(--tx-m);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease;
 }
-
-.shuffleBtn {
-  background: none;
-  border: 1px solid var(--bd);
-  border-radius: 5px;
-  padding: 2px 8px;
-  color: var(--tx-s);
-  cursor: pointer;
-  font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 1px;
-  transition: background var(--speed);
-}
-.shuffleBtn:hover { background: rgba(255,140,0,0.07); }
-
-.randomTitle { font-size: 13px; font-weight: 700; color: var(--tx); margin-bottom: 5px; }
-
-.soulsWidget {
-  background: var(--card);
-  border-radius: var(--radius);
-  border: 1px solid var(--bd);
-  padding: 12px;
-}
-
-.soulsAvatarRow { display: flex; gap: 6px; flex-wrap: wrap; }
-
-.soulBubble {
+.cardLink:hover { color: var(--or-l); background: var(--bds); }
+.cardLink svg { transition: transform var(--dur-fast) var(--ease-out); }
+.cardLink:hover svg { transform: translateX(2px); }
+.iconBtn {
+  display: grid;
+  place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: 50%;
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--tx-s);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+.iconBtn:hover { background: var(--bds); color: var(--or-l); }
+.iconBtn:active { transform: scale(0.92) rotate(-8deg); }
+
+/* ─── Today card ───────────────────────────────────────── */
+.quickAdd {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  cursor: pointer;
-  transition: transform var(--speed);
-  text-decoration: none;
-}
-.soulBubble:hover { transform: scale(1.12); }
-
-/* ─── HEADER ACTIONS ─────────────────────────────────────── */
-.headerActions { display: flex; gap: 7px; align-items: center; }
-
-/* ─── TASK SECTION — three-card grid ────────────────────── */
-.taskSection {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
-}
-
-/* ─── TASK CARD ──────────────────────────────────────────── */
-.taskCard {
-  background: var(--card);
-  border-radius: var(--radius);
-  border: 1px solid var(--bd);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
   gap: 8px;
+  min-height: 48px;
+  margin-bottom: 10px;
+  padding: 0 6px 0 14px;
+  border: 1px dashed var(--bd-s);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--bg) 60%, transparent);
+  transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
 }
-
-/* Overdue card — subtle red tint on the border */
-.taskCardOverdue {
-  border-color: rgba(248, 113, 113, 0.28);
-  background: linear-gradient(160deg, rgba(248,113,113,0.04) 0%, var(--card) 60%);
-}
-
-/* Done card — subtle green tint */
-.taskCardDone {
-  border-color: rgba(74, 222, 128, 0.2);
-  background: linear-gradient(160deg, rgba(74,222,128,0.04) 0%, var(--card) 60%);
-}
-
-.taskCardHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-/* ─── COUNT BADGES ───────────────────────────────────────── */
-.taskCount {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--mono);
-  font-size: 8px;
-  background: rgba(255,140,0,0.18);
-  color: var(--or);
-  border-radius: 10px;
-  padding: 1px 6px;
-  margin-left: 6px;
-  letter-spacing: 0;
-}
-
-.taskCountRed {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--mono);
-  font-size: 8px;
-  background: rgba(248,113,113,0.18);
-  color: var(--red);
-  border-radius: 10px;
-  padding: 1px 6px;
-  margin-left: 6px;
-}
-
-/* ─── ALL CLEAR / CLEAR ALL BUTTONS ─────────────────────── */
-.allClearBadge {
-  font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 1px;
-  color: var(--gr);
-  opacity: 0.7;
-}
-
-.clearBtn {
-  font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--red);
-  background: rgba(248,113,113,0.08);
-  border: 1px solid rgba(248,113,113,0.25);
-  border-radius: 5px;
-  padding: 2px 8px;
-  cursor: pointer;
-  transition: background var(--speed);
-}
-.clearBtn:hover { background: rgba(248,113,113,0.18); }
-
-/* ─── PRIORITY CHIPS ─────────────────────────────────────── */
-.prioRow  { display: flex; gap: 4px; }
-
-.prioChip {
-  font-family: var(--mono);
-  font-size: 8px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all var(--speed);
-  border: 1px solid transparent;
-}
-
-/* ─── TASK LIST ──────────────────────────────────────────── */
-.taskList {
+.quickAdd:focus-within { border-style: solid; border-color: var(--or); background: var(--bg); }
+.quickIcon { color: var(--or); flex-shrink: 0; }
+.quickInput {
   flex: 1;
-  max-height: 170px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.taskEmpty {
-  font-size: 11px;
-  color: var(--tx-m);
-  opacity: 0.4;
-  padding: 12px 0;
-  text-align: center;
-}
-
-/* ─── TASK ROW ───────────────────────────────────────────── */
-.taskRow {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  padding: 5px 2px;
-  border-radius: 5px;
-  transition: background var(--speed);
-  position: relative;
-}
-.taskRow:hover         { background: rgba(255,255,255,0.03); }
-.taskRow:hover .taskDel { opacity: 1; }
-
-.taskRowDone { opacity: 0.5; }
-
-/* ─── CHECKBOX ───────────────────────────────────────────── */
-.taskCheck {
-  width: 15px;
-  height: 15px;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  margin-top: 1px;
-  transition: all var(--speed);
-}
-.taskCheckOff { border: 1.5px solid var(--bd); background: transparent; }
-.taskCheckOn  { border: 1.5px solid var(--or); background: var(--or); }
-.taskCheckMark { color: #000; font-size: 9px; font-weight: 900; }
-
-/* ─── PRIORITY DOT ───────────────────────────────────────── */
-.taskPrioDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 4px;
-}
-
-/* ─── TASK BODY ──────────────────────────────────────────── */
-.taskBody {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   min-width: 0;
-}
-
-.taskText     { font-size: 11px; color: var(--tx); line-height: 1.4; }
-.taskTextDone { text-decoration: line-through; }
-
-/* ─── META BADGES ────────────────────────────────────────── */
-.overdueTag {
-  font-family: var(--mono);
-  font-size: 8px;
-  color: var(--red);
-  letter-spacing: 0.5px;
-}
-
-.dueTag {
-  font-family: var(--mono);
-  font-size: 8px;
-  color: var(--tx-m);
-  opacity: 0.55;
-  letter-spacing: 0.5px;
-}
-
-.doneTag {
-  font-family: var(--mono);
-  font-size: 8px;
-  color: var(--gr);
-  opacity: 0.7;
-  letter-spacing: 0.5px;
-}
-
-/* ─── DELETE BUTTON ──────────────────────────────────────── */
-.taskDel {
-  background: none;
+  min-height: 44px;
   border: none;
-  color: var(--tx-m);
-  cursor: pointer;
-  font-size: 14px;
-  opacity: 0;
-  transition: opacity var(--speed);
-  padding: 0;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-/* ─── ADD ROW ────────────────────────────────────────────── */
-.addRow {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  padding-top: 6px;
-  border-top: 1px solid var(--bds);
-}
-
-.taskInput {
-  background: rgba(255,140,0,0.06);
-  border: 1px solid var(--bd);
-  border-radius: var(--radius);
-  padding: 5px 9px;
-  font-size: 11px;
-  flex: 1;
+  background: transparent;
   color: var(--tx);
-  outline: none;
   font-family: var(--font);
-  min-width: 0;
-  transition: border var(--speed);
+  font-size: 0.97rem;
 }
-.taskInput:focus { border-color: var(--or); }
-.taskInput::placeholder { color: var(--tx-m); }
+.quickInput:focus { outline: none; box-shadow: none; }
+.quickInput::placeholder { color: var(--tx-d); }
 
-.dateInput {
-  background: rgba(255,140,0,0.06);
-  border: 1px solid var(--bd);
-  border-radius: var(--radius);
-  padding: 5px 7px;
-  font-size: 10px;
+.group + .group { margin-top: 8px; }
+.groupLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
   color: var(--tx-m);
-  outline: none;
-  font-family: var(--mono);
-  width: 110px;
+}
+.groupLabel[data-tone="red"] { color: var(--red); }
+.allClear {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 12px;
+  color: var(--tx-m);
+  font-size: 0.95rem;
+}
+.allClear svg { color: var(--or-l); }
+.doneNote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 12px 0;
+  border-top: 1px solid var(--bds);
+  color: var(--gr);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.skels { display: flex; flex-direction: column; gap: 8px; }
+.rowSkel { height: 44px; }
+.muted { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--tx-m); font-size: 0.9rem; line-height: 1.5; }
+
+/* ─── Journal ──────────────────────────────────────────── */
+.entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 -8px;
+  padding: 8px;
+  border-radius: var(--radius);
+  color: var(--tx);
+  text-decoration: none;
+  transition: background-color var(--dur-fast) ease;
+}
+.entry:hover { background: var(--bds); }
+.entryMood {
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
-  cursor: pointer;
-  transition: border var(--speed);
-  color-scheme: dark;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--pu-l) 14%, transparent);
+  color: var(--pu-g);
+  font-size: 18px;
 }
-.dateInput:focus { border-color: var(--or); }
+.entryText { display: flex; flex-direction: column; min-width: 0; }
+.entryTitle { font-weight: 700; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entryDate { font-size: 0.8rem; color: var(--tx-m); }
 
-/* ═══════════════════════════════════════════════════
-   RESPONSIVE — iPad (768-1023px) & iPhone (≤767px)
-═══════════════════════════════════════════════════ */
-
-/* iPad */
-@media (max-width: 1023px) {
-  .statsGrid  { grid-template-columns: repeat(2, 1fr); }
-  .taskSection { grid-template-columns: 1fr 1fr; }
+/* ─── Random pick ──────────────────────────────────────── */
+.randomCard {
+  background:
+    radial-gradient(80% 80% at 0% 100%, color-mix(in oklab, var(--pu-l) 12%, transparent), transparent 70%),
+    var(--card);
 }
+.randLink {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--tx);
+  text-decoration: none;
+  animation: fadeUp var(--dur-base) var(--ease-out) both;
+}
+.randTitle { font-size: 1.15rem; font-weight: 700; line-height: 1.35; }
+.randMeta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.randMeta > span:first-child { margin: 0; }
 
-/* iPhone */
-@media (max-width: 767px) {
-  .page       { padding: 12px; padding-top: 58px; gap: 10px; }
-  .greeting   { font-size: 17px; }
-  .statsGrid  { grid-template-columns: repeat(2, 1fr); gap: 6px; }
-  .statNum    { font-size: 20px; }
-  .mainGrid   { grid-template-columns: 1fr; }
-  .rightCol   { flex-direction: row; flex-wrap: wrap; }
-  .randomCard { flex: 1; min-width: 140px; }
-  .soulsWidget{ flex: 1; min-width: 140px; }
-  .taskSection { grid-template-columns: 1fr; }
-  .taskList   { max-height: 130px; }
-  .addRow     { flex-wrap: wrap; }
-  .dateInput  { width: 100%; }
-  /* touch: always show delete btn */
-  .taskDel    { opacity: 0.45; }
+/* ─── Souls ────────────────────────────────────────────── */
+.avatars { display: flex; flex-wrap: wrap; gap: 10px; }
+.avatar {
+  --c: var(--or);
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  border: 2px solid color-mix(in oklab, var(--c) 55%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--c) 70%, transparent), color-mix(in oklab, var(--c) 22%, transparent));
+  font-size: 22px;
+  text-decoration: none;
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-fast) ease;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+@media (hover: hover) and (pointer: fine) {
+  .avatar:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 8px 20px -8px var(--c); }
 }

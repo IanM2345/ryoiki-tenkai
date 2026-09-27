@@ -1,0 +1,176 @@
+/* Card faces stay paper coloured in every theme so red and black suits read clearly. */
+.card {
+  --paper: color-mix(in oklab, #fffaf1 94%, var(--or));
+  --ink-red: color-mix(in oklab, var(--red) 45%, #c1121f);
+  --ink-dark: color-mix(in oklab, #17121d 88%, var(--pu-l));
+  --w: 72px;
+  --h: 104px;
+  position: relative;
+  flex: none;
+  display: block;
+  width: var(--w);
+  height: var(--h);
+  padding: 0;
+  border: 1px solid color-mix(in oklab, var(--ink-dark) 18%, transparent);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 6px 16px -8px rgba(0, 0, 0, 0.55);
+  font-family: var(--font);
+  text-align: left;
+  user-select: none;
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out);
+}
+.sm { --w: 40px; --h: 58px; border-radius: 7px; }
+.md { --w: 72px; --h: 104px; }
+.lg { --w: 92px; --h: 132px; border-radius: 12px; }
+@media (max-width: 767px) {
+  .md { --w: 62px; --h: 90px; }
+  .lg { --w: 80px; --h: 116px; }
+}
+
+button.card { cursor: pointer; }
+button.card:disabled { cursor: default; }
+
+.red { color: var(--ink-red); }
+.dark { color: var(--ink-dark); }
+
+/* Corners */
+.corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1;
+}
+.tl { top: 6px; left: 6px; }
+.br { right: 6px; bottom: 6px; transform: rotate(180deg); }
+.rank { font-size: calc(var(--w) * 0.22); font-weight: 700; letter-spacing: -0.02em; }
+.cornerSuit { width: calc(var(--w) * 0.17); height: calc(var(--w) * 0.17); }
+.centre { position: absolute; inset: 0; display: grid; place-items: center; }
+.bigSuit { width: calc(var(--w) * 0.46); height: calc(var(--w) * 0.46); }
+.court {
+  display: grid;
+  place-items: center;
+  width: 56%;
+  height: 58%;
+  border: 1.5px solid currentColor;
+  border-radius: 6px;
+  background: color-mix(in oklab, currentColor 8%, transparent);
+}
+.courtRank { font-size: calc(var(--w) * 0.34); font-weight: 700; line-height: 1; }
+.courtSuit { width: calc(var(--w) * 0.2); height: calc(var(--w) * 0.2); }
+.sm .corner { top: 3px; left: 4px; }
+.sm .br { display: none; }
+.sm .bigSuit { width: calc(var(--w) * 0.5); height: calc(var(--w) * 0.5); }
+
+/* Jokers */
+.joker {
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in oklab, var(--yellow) 30%, transparent), transparent 60%),
+    linear-gradient(160deg, var(--paper), color-mix(in oklab, var(--paper) 82%, var(--pu-l)));
+  border-color: color-mix(in oklab, var(--pu-l) 50%, transparent);
+}
+.jokerWord {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-size: calc(var(--w) * 0.11);
+  font-weight: 700;
+  letter-spacing: -0.12em;
+}
+.jokerCrown {
+  width: calc(var(--w) * 0.5);
+  height: calc(var(--w) * 0.5);
+  fill: color-mix(in oklab, var(--yellow) 55%, transparent);
+}
+.joker.dark .jokerCrown { fill: color-mix(in oklab, var(--pu-l) 30%, transparent); }
+
+/* Back */
+.back {
+  border-color: color-mix(in oklab, var(--or) 55%, transparent);
+  background:
+    repeating-linear-gradient(45deg, color-mix(in oklab, var(--pu-l) 38%, transparent) 0 5px, transparent 5px 10px),
+    repeating-linear-gradient(-45deg, color-mix(in oklab, var(--pu-l) 38%, transparent) 0 5px, transparent 5px 10px),
+    linear-gradient(150deg, var(--pu), var(--pu-d));
+}
+.backArt {
+  position: absolute;
+  inset: 5px;
+  border: 1.5px solid color-mix(in oklab, var(--or) 70%, transparent);
+  border-radius: 6px;
+  background: radial-gradient(circle at 50% 50%, color-mix(in oklab, var(--or) 45%, transparent) 0 14%, transparent 15%);
+}
+.sm .backArt { inset: 3px; border-radius: 4px; }
+
+/* Playable cards lift, unplayable ones dim */
+.playable { transform: translateY(-8px); box-shadow: 0 0 0 2px color-mix(in oklab, var(--or) 70%, transparent), 0 10px 20px -8px rgba(0, 0, 0, 0.6); }
+.dim { opacity: 0.5; filter: saturate(0.6); }
+@media (hover: hover) and (pointer: fine) {
+  button.playable:hover { transform: translateY(-14px); }
+}
+button.playable:active { transform: translateY(-4px) scale(0.97); }
+
+/* Deal: cards slide in when they mount. Flip: the new top card turns over. */
+@starting-style {
+  .card { opacity: 0; transform: translateY(-28px) scale(0.92); }
+  .flip { opacity: 0; transform: rotateY(90deg) scale(0.96); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+}
+
+/* Hand */
+.hand {
+  display: flex;
+  gap: 8px;
+  padding: 16px 6px 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  justify-content: safe center;
+}
+.handCompact { gap: 0; padding-top: 4px; }
+.handCompact > * + * { margin-left: -22px; }
+@media (max-width: 767px) {
+  .hand { justify-content: flex-start; gap: 0; }
+  .hand > * + * { margin-left: -18px; }
+  .handCompact > * + * { margin-left: -26px; }
+}
+
+/* Suit picker */
+.picker {
+  padding: 14px;
+  border: 1px solid var(--bd-s);
+  border-radius: var(--radius);
+  background: var(--raised);
+  text-align: center;
+}
+.pickerTitle { margin: 0 0 10px; font-weight: 700; }
+.pickerRow { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.suitBtn, .cancelBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-pill);
+  background: var(--card);
+  color: var(--tx);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+.suitRed svg { color: var(--red); }
+.suitDark svg { color: var(--tx); }
+.cancelBtn { padding: 0 12px; color: var(--tx-m); }
+@media (hover: hover) and (pointer: fine) {
+  .suitBtn:hover, .cancelBtn:hover { background: var(--card-hov); border-color: var(--or); }
+}
+.suitBtn:active, .cancelBtn:active { transform: scale(0.96); }
