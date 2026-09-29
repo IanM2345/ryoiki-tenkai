@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { Plus, Users, Pencil } from 'lucide-react';
+import { Plus, Users, Pencil, Cake } from 'lucide-react';
+import { nextBirthday, fmtBirthday, countdownLabel } from '@/lib/birthdays';
 import s from './souls.module.css';
 import { Btn, SearchBar, Topbar, Modal, Confirm, EmptyState, Toast, useToast } from '@/components/ui';
 import SoulAvatar from '@/components/souls/SoulAvatar';
@@ -77,6 +78,7 @@ export default function SoulsPage() {
                   {soul.role && <span className={s.role}>{soul.role}</span>}
                   {soul.description && <span className={s.desc}>{soul.description}</span>}
                   {soul.since && <span className={s.since}>Since {soul.since}</span>}
+                  {soul.birthday && <span className={s.since}><Cake size={12} /> {fmtBirthday(soul.birthday)} · {countdownLabel(nextBirthday(soul.birthday).days).toLowerCase()}</span>}
                 </Link>
                 <button type="button" className={s.editBtn} onClick={() => setEditing(soul)} aria-label={`Edit ${soul.name}`}>
                   <Pencil size={14} strokeWidth={2} />

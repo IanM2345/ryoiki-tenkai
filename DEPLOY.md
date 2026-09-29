@@ -8,7 +8,7 @@ Read this top to bottom once before you start. Nothing here reads, changes or de
 
 ```powershell
 npm install
-npx supabase db push          # applies the security + photo storage migration to STAGING
+npx supabase db push          # applies every new migration to STAGING
 npm run dev
 ```
 
@@ -35,10 +35,19 @@ git push -u origin redesign
 
 Vercel builds a **Preview** that talks to staging (you set that up earlier). Test it on your phone.
 
-## 3. Apply the database change to HER project
+## 3. Apply the database changes to HER project
 
-Only one migration needs to run on her database: `20260926220000_security_and_storage.sql`.
-It only changes permissions and creates the private photo bucket if missing. It does not touch any rows.
+These migrations go to her database. Each one only adds things (a permission fix, new columns
+with defaults, new tables, realtime switched on). None of them reads, changes or deletes her rows.
+
+| Migration | What it does |
+|---|---|
+| `20260926220000_security_and_storage` | locks down permissions, creates the private photo bucket |
+| `20260927120000_more_game_types` | lets the new Arcade games save results |
+| `20260928100000_places_wishlist` | bucket list column on places |
+| `20260929100000_enable_realtime` | live sync between her phone and laptop |
+| `20260930100000_soul_birthdays` | birthday column on souls |
+| `20260930110000_time_capsules` | new table for time capsule letters |
 
 ```powershell
 # point the CLI at her project
@@ -53,15 +62,21 @@ That file creates all the tables, which already exist. Mark it as applied so it 
 
 ```powershell
 npx supabase migration repair --status applied 20260729150314
-npx supabase migration list      # now only 20260926220000 should be pending
-npx supabase db push             # applies just the security migration
+npx supabase migration list      # now only the six migrations above should be pending
+npx supabase db push             # applies them
 ```
 
 Then point the CLI back at staging so future experiments stay safe:
 
 ```powershell
-npx supabase link --project-ref ugbeudjrtqnpdkxytafs
+npx supabase link --project-ref pdxozrjepmdjxmxmietz
 ```
+
+### Optional: leave her surprise letters
+Open `supabase/letters_for_her.sql`, put in her email, your name, the letter and the date it should open,
+and run it in the Supabase SQL editor of **her** project. It only inserts the letter; the only thing it
+looks up is her account id. She'll see a sealed envelope "From you" with a countdown, and can't read it
+until the day comes.
 
 ## 4. Check Vercel production settings
 
@@ -97,6 +112,10 @@ She can do the first real login.
 - People can have profile photos now: tap the circle at the top of the edit form.
 - Older photos keep working. They no longer expire after a year.
 - Arcade stats start counting from now (old games were never saved).
+- **Put it on her phone:** App & backup page → Install on your phone. On iPhone it's Safari → Share → Add to Home Screen.
+- **Birthdays:** add one to anyone in Souls; the dashboard counts down and reminds her 3 days before. Turning on
+  reminders on App & backup also shows a phone notification when she opens the app.
+- **Back up:** App & backup → Download everything. Worth doing every few months.
 
 ## 7. Housekeeping on your PC
 

@@ -1,0 +1,163 @@
+.wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+
+/* The board: a warm carved slab, tinted from the theme so every preset still fits. */
+.board {
+  --gap: clamp(4px, 1.2vw, 8px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  width: min(96vw, 580px);
+  padding: clamp(10px, 2.4vw, 18px);
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 255, 255, 0.06), transparent 60%),
+    linear-gradient(160deg,
+      color-mix(in oklab, var(--or) 30%, #3a2210),
+      color-mix(in oklab, var(--or) 16%, #1f1208));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.35),
+    0 14px 34px rgba(0, 0, 0, 0.45);
+}
+.sideLabel {
+  text-align: center;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 240, 220, 0.6);
+}
+.row { display: grid; grid-template-columns: repeat(8, 1fr); gap: var(--gap); }
+.divider {
+  height: 3px;
+  margin: 2px 6%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.45), transparent);
+}
+
+/* ─── Pits ──────────────────────────────────────────────── */
+.pit {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.28) 70%);
+  box-shadow: inset 0 3px 7px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.07);
+  cursor: default;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform var(--dur-press, 90ms) var(--ease-out);
+}
+.pit:disabled { opacity: 1; }
+.outer { background: radial-gradient(circle at 50% 38%, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.2) 70%); }
+
+.pickable { cursor: pointer; border-color: color-mix(in oklab, var(--or) 55%, transparent); }
+.pickable:hover { border-color: var(--or); box-shadow: inset 0 3px 7px rgba(0, 0, 0, 0.55), 0 0 12px color-mix(in oklab, var(--or) 45%, transparent); }
+.pickable:active { transform: scale(0.94); }
+.picked {
+  border-color: var(--or) !important;
+  box-shadow: inset 0 3px 7px rgba(0, 0, 0, 0.55), 0 0 0 3px color-mix(in oklab, var(--or) 35%, transparent), 0 0 18px color-mix(in oklab, var(--or) 60%, transparent) !important;
+}
+.hit { animation: hit 260ms var(--ease-out); border-color: color-mix(in oklab, var(--pu-l) 80%, transparent); }
+@keyframes hit { 0% { transform: scale(1); } 45% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.captured {
+  border-color: var(--red);
+  box-shadow: inset 0 3px 7px rgba(0, 0, 0, 0.55), 0 0 16px color-mix(in oklab, var(--red) 70%, transparent);
+  animation: grab 360ms ease;
+}
+@keyframes grab { 0%, 100% { transform: scale(1); } 40% { transform: scale(0.86); } }
+
+/* ─── Seeds ─────────────────────────────────────────────── */
+.dots {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 2px;
+  width: 72%;
+  pointer-events: none;
+}
+.seed {
+  width: clamp(5px, 1.5vw, 9px);
+  height: clamp(5px, 1.5vw, 9px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6e0, #e8b86a 45%, #8a5a22);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+.theirs .seed { background: radial-gradient(circle at 35% 30%, #f3e8ff, color-mix(in oklab, var(--pu-l) 70%, #fff) 45%, color-mix(in oklab, var(--pu-l) 60%, #000)); }
+.bigCount {
+  font-family: var(--font);
+  font-size: clamp(0.8rem, 3.2vw, 1.15rem);
+  font-weight: 800;
+  color: #ffe9c7;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.theirs .bigCount { color: color-mix(in oklab, var(--pu-l) 45%, #fff); }
+.count {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 17px;
+  pointer-events: none;
+}
+
+/* ─── Direction picker ──────────────────────────────────── */
+.dirBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+.dirBarOn { opacity: 1; transform: none; pointer-events: auto; }
+.dirBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--or), color-mix(in oklab, var(--or) 60%, var(--pu-l)));
+  color: var(--on-accent);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--or) 35%, transparent);
+  transition: transform var(--dur-press, 90ms) var(--ease-out), filter var(--dur-fast) ease;
+}
+.dirBtn:hover { filter: brightness(1.07); }
+.dirBtn:active { transform: scale(0.95); }
+.dirCancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--bd-s);
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--tx) 8%, transparent);
+  color: var(--tx-s);
+  cursor: pointer;
+}
+.dirCancel:hover { color: var(--tx); border-color: var(--tx-m); }
+
+@media (max-width: 420px) {
+  .dirBtn { padding: 0 12px; font-size: 0.82rem; }
+}

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   House, LibraryBig, NotebookPen, ListChecks, Lightbulb, ListVideo, MapPin,
-  Search, Star, Cloudy, Gamepad2, Palette, Users, Images, ChartColumn, KeyRound,
+  Search, Star, Cloudy, Gamepad2, Palette, Users, Images, Hourglass, HardDriveDownload, ChartColumn, KeyRound,
   LogOut, Sparkles, type LucideIcon,
 } from 'lucide-react';
 import s from './sidebar.module.css';
@@ -31,7 +31,9 @@ const YOU: NavItem[] = [
   { icon: Palette,     label: 'Theme',    href: '/theme'          },
   { icon: Users,       label: 'Souls',    href: '/souls'          },
   { icon: Images,      label: 'Gallery',  href: '/gallery'        },
+  { icon: Hourglass,   label: 'Time capsule', href: '/capsules'   },
   { icon: ChartColumn, label: 'Stats',    href: '/stats'          },
+  { icon: HardDriveDownload, label: 'App & backup', href: '/settings' },
   { icon: KeyRound,    label: 'Password', href: '/reset-password' },
 ];
 

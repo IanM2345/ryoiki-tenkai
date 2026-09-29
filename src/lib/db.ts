@@ -538,6 +538,7 @@ export interface DbSoul {
   created_at:  string;
   updated_at:  string;
   image_url?:  string | null;
+  birthday?:   string | null;   // YYYY-MM-DD; year 1904 = year unknown
 }
 
 export interface DbSoulMedia {
@@ -585,6 +586,8 @@ export async function addSoul(soul: {
   description?: string | null;
   notes?: string | null;
   tags?: string[];
+  image_url?: string | null;
+  birthday?: string | null;
 }): Promise<DbSoul> {
   const { data, error } = await supabase
     .from('souls')
@@ -1010,4 +1013,44 @@ export async function getAllImagesWithStatus(): Promise<{ images: GalleryImage[]
     images.push({ id: `places-${item.id}`, image_url: item.image_url, title: item.name, source: 'places', href: '/places' });
   }
   return { images, failed };
+}
+
+// ─── TIME CAPSULES ────────────────────────────────────────────
+export interface DbCapsule {
+  id:         string;
+  user_id:    string;
+  from_name:  string | null;
+  title:      string;
+  body:       string;
+  open_on:    string;          // YYYY-MM-DD
+  opened_at:  string | null;
+  created_at: string;
+}
+
+export async function getCapsules(): Promise<DbCapsule[]> {
+  const { data, error } = await supabase
+    .from('time_capsules')
+    .select('*')
+    .order('open_on', { ascending: true });
+  return unwrap(data, error) ?? [];
+}
+
+export async function addCapsule(c: { title: string; body: string; open_on: string; from_name?: string | null }): Promise<DbCapsule> {
+  const { data, error } = await supabase.from('time_capsules').insert(c).select().single();
+  return unwrap(data, error);
+}
+
+export async function markCapsuleOpened(id: string): Promise<DbCapsule> {
+  const { data, error } = await supabase
+    .from('time_capsules')
+    .update({ opened_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  return unwrap(data, error);
+}
+
+export async function deleteCapsule(id: string): Promise<void> {
+  const { error } = await supabase.from('time_capsules').delete().eq('id', id);
+  if (error) throw error;
 }

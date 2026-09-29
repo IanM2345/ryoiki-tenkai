@@ -1,0 +1,131 @@
+.card {
+  padding: 18px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 70% at 100% 0%, color-mix(in oklab, var(--pu-l) 12%, transparent), transparent 60%),
+    var(--card);
+  box-shadow: var(--shadow);
+}
+.head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.title { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 1.02rem; }
+.title svg { color: var(--or); }
+.link { display: inline-flex; align-items: center; gap: 4px; color: var(--tx-m); font-size: 0.82rem; text-decoration: none; }
+.link:hover { color: var(--or); }
+.muted { margin: 0; color: var(--tx-m); font-size: 0.88rem; line-height: 1.5; }
+.skel { height: 56px; border-radius: var(--radius); }
+
+.list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--tx);
+  text-decoration: none;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.row:hover { background: color-mix(in oklab, var(--tx) 5%, transparent); }
+.soon { border-color: color-mix(in oklab, var(--or) 30%, transparent); background: color-mix(in oklab, var(--or) 7%, transparent); }
+.today {
+  border-color: color-mix(in oklab, var(--or) 55%, transparent);
+  background: linear-gradient(120deg, color-mix(in oklab, var(--or) 18%, transparent), color-mix(in oklab, var(--pu-l) 14%, transparent));
+}
+
+.face {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 2px solid var(--c);
+  background: color-mix(in oklab, var(--c) 18%, var(--bg));
+  font-size: 1.1rem;
+}
+.face img { width: 100%; height: 100%; object-fit: cover; }
+
+.text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.name { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta { color: var(--tx-m); font-size: 0.8rem; }
+.when {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--pu-l) 16%, transparent);
+  color: var(--pu-g);
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.soon .when, .today .when { background: var(--or); color: var(--on-accent); }
+
+.notifyBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--bd-s);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--tx-s);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.notifyBtn:hover { color: var(--or); border-color: var(--or); }
+
+/* ─── Reminder banner ───────────────────────────────────── */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in oklab, var(--or) 40%, transparent);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(120deg, color-mix(in oklab, var(--or) 14%, var(--card)), color-mix(in oklab, var(--pu-l) 10%, var(--card)));
+  box-shadow: var(--shadow);
+  animation: fadeUp var(--dur-base) var(--ease-out) both;
+}
+.bannerToday { border-color: var(--or); box-shadow: 0 0 0 1px var(--or), 0 8px 28px color-mix(in oklab, var(--or) 30%, transparent); }
+.bannerText { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; margin: 0; font-size: 0.92rem; }
+.bannerText span { color: var(--tx-s); font-size: 0.84rem; }
+.bannerLink {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--or);
+  color: var(--on-accent);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+.bannerClose {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--tx-m);
+  cursor: pointer;
+}
+.bannerClose:hover { background: color-mix(in oklab, var(--tx) 8%, transparent); color: var(--tx); }
+@media (max-width: 520px) {
+  .banner { flex-wrap: wrap; }
+  .bannerText { flex-basis: calc(100% - 100px); }
+  .bannerLink { margin-left: 50px; }
+}

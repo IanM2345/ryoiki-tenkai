@@ -22,6 +22,7 @@ import { useLiveTables } from '@/lib/realtime';
 import { type Task, isOverdue, isDueToday, sortOpen } from '@/lib/tasks';
 import { localDateStr, fmtDate, relDay } from '@/lib/dates';
 import BirthdayCard from '@/components/ui/BirthdayCard';
+import { UpcomingBirthdaysCard, BirthdayReminder } from '@/components/souls/UpcomingBirthdays';
 import StoredImage from '@/components/ui/StoredImage';
 
 const LIBRARY_COLOR: Record<DbLibraryEntry['type'], string> = {
@@ -158,6 +159,8 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      <BirthdayReminder souls={souls} />
+
       {/* Stats */}
       <nav className={s.stats} aria-label="Your collections">
         {stats.map(({ n, label, href, Icon, c }) => (
@@ -220,6 +223,8 @@ export default function DashboardPage() {
         </section>
 
         <div className={s.side}>
+          <UpcomingBirthdaysCard souls={souls} loading={loading} />
+
           {/* Journal */}
           <section className={s.card} aria-labelledby="journal-h">
             <div className={s.cardHead}>

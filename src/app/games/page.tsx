@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  ChevronRight, CircleDot, Club, Crown, Flame, Gamepad2, Grid2x2, Grid3x3, Hash, Images, SearchCode, Ship, Spade, Trophy, Type,
+  ChevronRight, CircleDot, Club, Crown, Flame, Gamepad2, Grid2x2, Grid3x3, Hash, Images, SearchCode, Ship, Sprout, Spade, Trophy, Type,
 } from 'lucide-react';
 import { Topbar, Toast, useToast } from '@/components/ui';
 import { ensureSession } from '@/lib/supabase';
@@ -34,6 +34,7 @@ const GAMES: GameCard[] = [
   { type: 'g2048', href: '/games/2048', title: '2048', desc: 'Slide the tiles, add them up, and reach 2048.', levels: 'Solo, endless', icon: <Grid2x2 size={22} strokeWidth={2} />, accent: 'pu' },
   { type: 'wordle', href: '/games/wordle', title: 'Daily Wordle', desc: 'Six guesses at the same five-letter word everyone gets today.', levels: 'One a day', icon: <Type size={22} strokeWidth={2} />, accent: 'gr' },
   { type: 'wordsearch', href: '/games/word-search', title: 'Word Search', desc: 'Trace the hidden words in a themed grid of letters.', levels: 'Easy, Medium, Hard', icon: <SearchCode size={22} strokeWidth={2} />, accent: 'or' },
+  { type: 'bao', href: '/games/bao', title: 'Bao', desc: 'The Swahili sowing game. Capture seeds from the front row and leave the computer with no moves.', levels: 'Easy, Medium, Hard', icon: <Sprout size={22} strokeWidth={2} />, accent: 'gr' },
 ];
 
 

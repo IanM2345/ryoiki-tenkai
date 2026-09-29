@@ -1,0 +1,72 @@
+.page { padding-bottom: 72px; }
+.wrap { width: 100%; max-width: 860px; margin: 0 auto; padding: 0 28px; display: flex; flex-direction: column; gap: 18px; }
+@media (max-width: 767px) { .wrap { padding: 0 16px; } }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 80% at 100% 0%, color-mix(in oklab, var(--pu-l) 10%, transparent), transparent 60%),
+    var(--card);
+  box-shadow: var(--shadow);
+}
+.cardHead { display: flex; gap: 14px; align-items: flex-start; }
+.bigIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, color-mix(in oklab, var(--or) 25%, transparent), color-mix(in oklab, var(--pu-l) 22%, transparent));
+  color: var(--or);
+}
+.title { margin: 0 0 4px; font-size: 1.12rem; }
+.sub { margin: 0; color: var(--tx-s); font-size: 0.9rem; line-height: 1.55; }
+.muted { color: var(--tx-m); font-size: 0.82rem; font-weight: 400; }
+
+.steps { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.steps li { display: flex; align-items: center; gap: 12px; font-size: 0.92rem; line-height: 1.45; }
+.stepIcon {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 10px;
+  background: color-mix(in oklab, var(--or) 14%, transparent);
+  color: var(--or);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--tx) 3%, transparent);
+}
+.rowText { display: inline-flex; align-items: center; gap: 8px; font-size: 0.92rem; font-weight: 700; flex-wrap: wrap; }
+.rowText svg { color: var(--pu-l); }
+.ok { color: var(--gr); font-weight: 800; font-size: 0.88rem; }
+
+.contents { display: flex; flex-direction: column; gap: 6px; margin: 0; padding-left: 18px; color: var(--tx-s); font-size: 0.88rem; line-height: 1.5; }
+.contents b { color: var(--tx); }
+
+.progress { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+.progressText { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 700; }
+.bar { height: 8px; border-radius: 4px; background: color-mix(in oklab, var(--tx) 10%, transparent); overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--or), var(--pu-l)); transition: width 200ms ease; }
+.spin { animation: spin 0.8s linear infinite; color: var(--or); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.done { display: flex; align-items: flex-start; gap: 8px; margin: 0; color: var(--gr); font-size: 0.9rem; font-weight: 700; line-height: 1.5; }
+.done svg { flex-shrink: 0; margin-top: 2px; }
+.footnote { display: flex; align-items: flex-start; gap: 7px; margin: 0; color: var(--tx-m); font-size: 0.8rem; line-height: 1.5; }
+.footnote svg { flex-shrink: 0; margin-top: 2px; color: var(--gr); }

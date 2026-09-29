@@ -118,3 +118,30 @@
   cursor: pointer;
 }
 .removePhoto:hover { color: var(--red); }
+
+/* Birthday picker */
+.lblIcon { vertical-align: -2px; margin-right: 3px; color: var(--or); }
+.bdayRow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bdaySelect, .bdayYear {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--tx);
+  font-family: var(--font);
+  font-size: 0.95rem;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+.bdaySelect { flex: 0 0 auto; cursor: pointer; color-scheme: dark; }
+.bdaySelect:first-child { width: 84px; }
+.bdaySelect:nth-child(2) { width: 140px; }
+.bdayYear { flex: 1 1 110px; min-width: 0; }
+.bdaySelect:focus, .bdayYear:focus { outline: none; border-color: var(--or); box-shadow: 0 0 0 3px color-mix(in oklab, var(--or) 22%, transparent); }
+.bdayClear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border: 1px solid var(--bd-s); border-radius: 50%;
+  background: transparent; color: var(--tx-m); cursor: pointer;
+}
+.bdayClear:hover { color: var(--red); border-color: var(--red); }
+.bdayHint { margin: 6px 0 0; color: var(--tx-m); font-size: 0.78rem; }

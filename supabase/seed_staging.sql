@@ -192,6 +192,18 @@ BEGIN
     END LOOP;
   END LOOP;
 
+  -- Birthdays (needs the 20260930100000 migration). One is only days away so the reminder shows.
+  UPDATE souls SET birthday = (make_date(1996, extract(month from current_date + 2)::int, extract(day from current_date + 2)::int))
+    WHERE id = s_amara;
+  UPDATE souls SET birthday = DATE '1904-11-14' WHERE id = s_leo;       -- year unknown
+  UPDATE souls SET birthday = DATE '1968-12-24' WHERE id = s_mum;
+
+  -- Time capsule letters (needs the 20260930110000 migration): one ready, one sealed, one from someone else.
+  INSERT INTO time_capsules (user_id, from_name, title, body, open_on, created_at) VALUES
+    (uid, NULL, 'Summer promises', E'I hope you kept swimming every Sunday.\nAnd that the plants survived.', current_date, now() - interval '90 days'),
+    (uid, NULL, 'Dear me, one year on', 'Hello from a year ago.', current_date + 365, now() - interval '5 days'),
+    (uid, 'Ian', 'A little surprise', 'This one is sealed until it opens.', current_date + 45, now() - interval '10 days');
+
   RAISE NOTICE 'Sample data added for %', test_email;
 END
 $seed$;
@@ -220,6 +232,7 @@ BEGIN
   DELETE FROM queue           WHERE user_id = uid;
   DELETE FROM ratings         WHERE user_id = uid;
   DELETE FROM mood_logs       WHERE user_id = uid;
+  DELETE FROM time_capsules   WHERE user_id = uid;
   DELETE FROM souls           WHERE user_id = uid;
   RAISE NOTICE 'Sample data removed for %', test_email;
 END

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Plus, Trash2, Palette, Cloud, CloudSun, History, Check } from 'lucide-react';
 import s from './mood.module.css';
+import YearInPixels from './YearInPixels';
 import {
   Btn, Lbl, Topbar, Modal, ModalTitle, Confirm, FInput, FArea, EmptyState, Toast, useToast,
 } from '@/components/ui';
@@ -684,6 +685,9 @@ export default function MoodBubblePage() {
             )}
           </section>
         </div>
+
+        {/* ── Year in pixels ─────────────────────────────── */}
+        {!loading && <YearInPixels logs={moodLogs} />}
 
         {/* ── History ────────────────────────────────────── */}
         <section className={s.history} aria-labelledby="history-title">

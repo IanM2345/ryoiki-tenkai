@@ -1,11 +1,12 @@
 'use client';
 import React, { useRef, useState } from 'react';
-import { Trash2, Camera, X } from 'lucide-react';
+import { Trash2, Camera, X, Cake } from 'lucide-react';
 import { Btn, Lbl, TagInput, ModalTitle, ModalFooter, FInput, FArea } from '@/components/ui';
 import StoredImage from '@/components/ui/StoredImage';
 import { addSoul, updateSoul, type DbSoul } from '@/lib/db';
 import { prepareImage } from '@/lib/upload';
 import s from './souls.module.css';
+import { MONTHS, UNKNOWN_YEAR } from '@/lib/birthdays';
 
 export const SOUL_EMOJIS = ['🌟', '🫶', '🔥', '✨', '🌙', '🎭', '🌊', '🦋', '🌸', '💫', '🎨', '🎵', '🌿', '🍀', '🐉', '🌺', '🌻', '🎸', '💐', '🐾'];
 export const SOUL_COLORS = ['#ff8c00', '#a855f7', '#ffb347', '#c084fc', '#22d3ee', '#4ade80', '#f43f5e', '#818cf8', '#fb923c', '#f59e0b', '#ec4899', '#14b8a6'];
@@ -25,6 +26,9 @@ export default function SoulForm({ soul, onSaved, onCancel, onDelete, onError }:
     name: soul?.name ?? '', emoji: soul?.emoji ?? SOUL_EMOJIS[0], color: soul?.color ?? SOUL_COLORS[0],
     role: soul?.role ?? '', since: soul?.since ?? '', description: soul?.description ?? '',
     notes: soul?.notes ?? '', tags: [...(soul?.tags ?? [])],
+    bDay: soul?.birthday ? String(Number(soul.birthday.slice(8, 10))) : '',
+    bMonth: soul?.birthday ? String(Number(soul.birthday.slice(5, 7))) : '',
+    bYear: soul?.birthday && Number(soul.birthday.slice(0, 4)) !== UNKNOWN_YEAR ? soul.birthday.slice(0, 4) : '',
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(soul?.image_url ?? null);
@@ -37,6 +41,16 @@ export default function SoulForm({ soul, onSaved, onCancel, onDelete, onError }:
   };
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF(x => ({ ...x, [k]: v }));
 
+  // Day + month make a birthday; the year is optional.
+  const birthday = (() => {
+    const d = Number(f.bDay), m = Number(f.bMonth);
+    if (!d || !m) return null;
+    const yNum = Number(f.bYear);
+    const y = f.bYear.length === 4 && yNum > 1900 && yNum <= new Date().getFullYear() ? yNum : UNKNOWN_YEAR;
+    const maxDay = new Date(y, m, 0).getDate();
+    return `${y}-${String(m).padStart(2, '0')}-${String(Math.min(d, maxDay)).padStart(2, '0')}`;
+  })();
+
   const save = async () => {
     if (!f.name.trim() || saving) return;
     setSaving(true);
@@ -47,7 +61,7 @@ export default function SoulForm({ soul, onSaved, onCancel, onDelete, onError }:
         name: f.name.trim(), emoji: f.emoji, color: f.color,
         role: f.role.trim() || null, since: f.since.trim() || null,
         description: f.description.trim() || null, notes: f.notes.trim() || null,
-        tags: f.tags, image_url: img.value,
+        tags: f.tags, image_url: img.value, birthday,
       };
       const saved = soul ? await updateSoul(soul.id, payload) : await addSoul(payload);
       await img.cleanup();
@@ -118,8 +132,27 @@ export default function SoulForm({ soul, onSaved, onCancel, onDelete, onError }:
         <FInput label="Who they are to you" value={f.role} onChange={v => set('role', v)} placeholder="Best friend, sister…" />
         <FInput label="Since" value={f.since} onChange={v => set('since', v)} placeholder="2019, or forever" />
       </div>
+      <div className={s.field}>
+        <Lbl><Cake size={13} strokeWidth={2.25} className={s.lblIcon} /> Birthday</Lbl>
+        <div className={s.bdayRow}>
+          <select className={s.bdaySelect} value={f.bDay} onChange={e => set('bDay', e.target.value)} aria-label="Birthday day">
+            <option value="">Day</option>
+            {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={String(i + 1)}>{i + 1}</option>)}
+          </select>
+          <select className={s.bdaySelect} value={f.bMonth} onChange={e => set('bMonth', e.target.value)} aria-label="Birthday month">
+            <option value="">Month</option>
+            {MONTHS.map((mo, i) => <option key={mo} value={String(i + 1)}>{mo}</option>)}
+          </select>
+          <input className={s.bdayYear} inputMode="numeric" maxLength={4} placeholder="Year (optional)"
+            value={f.bYear} onChange={e => set('bYear', e.target.value.replace(/\D/g, ''))} aria-label="Birth year, optional" />
+          {(f.bDay || f.bMonth || f.bYear) && (
+            <button type="button" className={s.bdayClear} onClick={() => setF(x => ({ ...x, bDay: '', bMonth: '', bYear: '' }))} aria-label="Clear birthday"><X size={14} strokeWidth={2.5} /></button>
+          )}
+        </div>
+        <p className={s.bdayHint}>Add the year to see how old they are turning. You&apos;ll get a reminder a few days before.</p>
+      </div>
       <FArea label="About them" value={f.description} onChange={v => set('description', v)} rows={2} placeholder="How would you describe them?" />
-      <FArea label="Private notes" value={f.notes} onChange={v => set('notes', v)} rows={3} placeholder="Birthdays, favourite things, little details" />
+      <FArea label="Private notes" value={f.notes} onChange={v => set('notes', v)} rows={3} placeholder="Favourite things, little details" />
       <div className={s.field}>
         <Lbl>Tags</Lbl>
         <TagInput tags={f.tags} color={f.color} onAdd={t => set('tags', [...f.tags, t])} onRemove={t => set('tags', f.tags.filter(x => x !== t))} />

@@ -348,5 +348,26 @@ Seven pages redesigned: three helpers worked in parallel under one set of conven
 - Three levels: Easy (10x10, 7 words, straight lines only), Medium (12x12, 9 words, diagonals + reverse), Hard (14x14, 11 words). Each "New game" reshuffles the theme and layout. Finishing records a win on the Arcade stats.
 - No database change (the `wordsearch` type was already allowed) and no new packages.
 
-### The Arcade now has 12 games
+### The Arcade now has 11 games
 Tic Tac Toe, Sudoku, Chess, Battleship, Kadi, Matatu, Connect Four, Memory, 2048, Daily Wordle, and Word Search — plus stats across all of them.
+
+## Session 22 (30 Sep 2026): Bao
+- **Bao** added to the Arcade: the Swahili sowing game, sitting alongside Kadi and Matatu. This is the learner's version (*Bao la Kujifunza*): four rows of eight pits, two seeds in each, and each player owns the two rows on their side.
+- Tap a pit with two or more seeds, then choose **Clockwise** or **Anticlockwise**. Seeds are sown one per pit with a step-by-step animation. Landing in an occupied pit keeps the sowing going (relay), and landing in an occupied front-row pit captures the computer's seeds opposite, which are then sown into her front row from the nearer end.
+- She wins when the computer's front row is empty or it has no pit with two or more seeds. The scoreboard shows seeds on each side plus wins and losses this session, and every result records to the Arcade stats.
+- Three levels. Easy plays loosely (good for learning), Medium always takes the best capture it can see, and Hard plans a few turns ahead. Tested headlessly: across 2,000 random games no seeds were ever lost and every game ended, and each level clearly beats the one below it (Medium beats Easy 94%, Hard beats Medium 78%). The computer never thinks for more than about 50 ms.
+- The rules engine lives in `games/bao/engine.ts`, separate from the board UI. No database change (the `bao` type was already allowed) and no new packages.
+
+### The Arcade now has 12 games
+Tic Tac Toe, Sudoku, Chess, Battleship, Kadi, Matatu, Connect Four, Memory, 2048, Daily Wordle, Word Search, and Bao.
+
+## Session 23 (30 Sep 2026): birthdays, time capsule, year in colour, install on phone, backup
+- **Birthdays for Souls.** Each person's form has a Birthday field (day, month, optional year). The dashboard has a Birthdays card counting down to the next few ("In 2 days · turning 30"), and a reminder banner appears 3 days before (dismissible for the day). Souls cards and profiles show the birthday too. With reminders turned on, a phone or computer notification also appears when she opens the site. It only works when she opens yourworld; a notification with the site closed would need a push server. No year = no age shown. 29 February birthdays are celebrated on 28 February in other years.
+- **Time capsule** (new sidebar page). Write a letter, pick when it opens (quick picks: a month, 6 months, a year, New Year's Day, 5 years, or any date) and seal it. Sealed letters show as envelopes with a countdown and progress bar; on the day, the envelope glows, she taps "Open it", the flap lifts and the letter unfolds on lined paper. Opened letters stay readable.
+  - **Letters from you:** `supabase/letters_for_her.sql` inserts a sealed letter "From Ian" into her account. It only inserts; the only thing it looks up is her account id. She can't read or delete it until the date.
+- **Your year in colour** on the Mood page: one square per day, 12 months by 31 days, coloured by that day's strongest feeling. Tap a square to see the day's feelings; the legend counts days per feeling; switch between years.
+- **Install on her phone.** Web app manifest, proper app icons (including Android's full-bleed icon and the iPhone home-screen icon), full-screen standalone mode, and a small service worker (installability, a friendly offline screen, notification taps). It never caches her data. The new **App & backup** page shows an Install button where the browser supports it, and step-by-step instructions on iPhone (Safari → Share → Add to Home Screen) and Android.
+- **Back up everything** (App & backup page). One button downloads `yourworld-backup-<date>.zip` with `journal.html` (her journal as a readable book, plus opened letters), `backup.json` (every row of every table) and a `photos/` folder with every uploaded photo (optional). Built entirely in the browser with a small built-in zip writer; nothing is sent anywhere. Verified: the zip opens cleanly and every file's checksum passes.
+- **Two migrations:** `20260930100000_soul_birthdays.sql` (one nullable column) and `20260930110000_time_capsules.sql` (new owner-only table, with live sync). Both are safe on her project. `seed_staging.sql` now adds birthdays and sample letters on staging. DEPLOY.md lists all six migrations for her project.
+
+**Action:** on staging, `npx supabase db push`. No `npm install` needed.

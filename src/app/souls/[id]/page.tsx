@@ -10,6 +10,8 @@ import s from './profile.module.css';
 import { Btn, Tag, InnerTabs, Modal, Confirm, Toast, useToast, EmptyState } from '@/components/ui';
 import SoulAvatar from '@/components/souls/SoulAvatar';
 import SoulForm from '@/components/souls/SoulForm';
+import { Cake } from 'lucide-react';
+import { nextBirthday, fmtBirthday, countdownLabel } from '@/lib/birthdays';
 import {
   getSoul, deleteSoul, getSoulMedia, addSoulMedia, deleteSoulMedia, getJournalEntries, getSoulLinks,
   getJournalEntryIdsForSoul, type DbSoul, type DbSoulMedia, type DbSoulLink, type DbJournalEntry,
@@ -171,6 +173,9 @@ export default function SoulProfilePage() {
               <p className={s.role}>
                 {soul.role && <span>{soul.role}</span>}
                 {soul.since && <span className={s.since}><CalendarHeart size={14} /> Since {soul.since}</span>}
+                {soul.birthday && (() => { const nb = nextBirthday(soul.birthday); return (
+                  <span className={s.since}><Cake size={14} /> {fmtBirthday(soul.birthday, true)} · {nb.days === 0 ? 'birthday today!' : `${countdownLabel(nb.days).toLowerCase()}${nb.turning !== null ? `, turning ${nb.turning}` : ''}`}</span>
+                ); })()}
               </p>
               {soul.description && <p className={s.desc}>{soul.description}</p>}
               {(soul.tags?.length ?? 0) > 0 && <div className={s.tags}>{soul.tags.map(t => <Tag key={t} color={soul.color}>{t}</Tag>)}</div>}

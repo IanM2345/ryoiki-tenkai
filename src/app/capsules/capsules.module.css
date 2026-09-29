@@ -1,0 +1,148 @@
+.page { padding-bottom: 72px; }
+.wrap { width: 100%; max-width: 1000px; margin: 0 auto; padding: 0 28px; }
+@media (max-width: 767px) { .wrap { padding: 0 16px; } }
+
+.section { margin-bottom: 30px; }
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 14px;
+  font-size: 0.95rem;
+  color: var(--tx-s);
+}
+.sectionTitle svg { color: var(--or); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.skel { height: 190px; border-radius: var(--radius-lg); }
+
+/* ─── Envelope card ─────────────────────────────────────── */
+.envelope {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 190px;
+  padding: 58px 18px 16px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--or) 22%, var(--bd));
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(160deg, color-mix(in oklab, var(--or) 10%, var(--card)), color-mix(in oklab, var(--pu-l) 8%, var(--card)));
+  box-shadow: var(--shadow);
+  animation: fadeUp var(--dur-base) var(--ease-out) both;
+}
+/* The flap: a folded triangle across the top. */
+.flap {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 70px;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--or) 20%, var(--card)), color-mix(in oklab, var(--or) 12%, var(--card)));
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transform-origin: top center;
+  transition: transform 600ms var(--ease-out);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25));
+}
+.seal {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  margin-left: -19px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--red) 60%, #fff), var(--red) 55%, color-mix(in oklab, var(--red) 60%, #000));
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  transition: transform 500ms var(--ease-out), opacity 400ms ease;
+}
+.envBody { display: flex; flex-direction: column; gap: 3px; margin-top: 18px; text-align: center; }
+.from { color: var(--or); font-size: 0.74rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.title { font-size: 1.05rem; font-weight: 800; color: var(--tx); overflow-wrap: anywhere; }
+.meta { display: inline-flex; align-items: center; justify-content: center; gap: 5px; color: var(--tx-m); font-size: 0.8rem; }
+
+.progress { height: 5px; border-radius: 3px; background: color-mix(in oklab, var(--tx) 10%, transparent); overflow: hidden; }
+.progress span { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--or), var(--pu-l)); }
+.envFoot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.until { color: var(--tx-s); font-size: 0.82rem; font-weight: 700; }
+.iconBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border: none; border-radius: 50%;
+  background: transparent; color: var(--tx-m); cursor: pointer;
+}
+.iconBtn:hover { color: var(--red); background: color-mix(in oklab, var(--red) 12%, transparent); }
+
+/* Ready: glowing, with the button centred */
+.readyEnv {
+  align-items: center;
+  border-color: color-mix(in oklab, var(--or) 60%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--or) 30%, transparent), 0 10px 30px color-mix(in oklab, var(--or) 25%, transparent);
+  animation: fadeUp var(--dur-base) var(--ease-out) both, glow 2.4s ease-in-out infinite;
+}
+.readyEnv .seal { background: radial-gradient(circle at 35% 30%, color-mix(in oklab, var(--or) 60%, #fff), var(--or) 55%, color-mix(in oklab, var(--or) 60%, #000)); }
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 0 1px color-mix(in oklab, var(--or) 30%, transparent), 0 10px 30px color-mix(in oklab, var(--or) 20%, transparent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in oklab, var(--or) 55%, transparent), 0 10px 40px color-mix(in oklab, var(--or) 40%, transparent); }
+}
+.unsealing .flap { transform: rotateX(180deg) translateY(-8px); }
+.unsealing .seal { transform: scale(0.2) rotate(40deg); opacity: 0; }
+
+/* Opened list */
+.openedList { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.openedRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--tx);
+  font-family: var(--font);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+.openedRow:hover { border-color: var(--or); }
+.openedRow svg { color: var(--pu-l); flex-shrink: 0; }
+.openedTitle { flex: 1; min-width: 0; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.openedRow .meta { justify-content: flex-end; }
+
+/* ─── Writing ───────────────────────────────────────────── */
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.preset {
+  padding: 6px 12px;
+  border: 1px solid var(--bd-s);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--tx-s);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.preset:hover { border-color: var(--or); color: var(--tx); }
+.presetOn { border-color: var(--or); background: color-mix(in oklab, var(--or) 16%, transparent); color: var(--or); }
+.hint { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; color: var(--tx-m); font-size: 0.8rem; }
+
+/* ─── Reading: the letter on paper ──────────────────────── */
+.paper {
+  padding: 26px 24px;
+  border-radius: 10px;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 29px, rgba(120, 90, 60, 0.14) 29px 30px),
+    linear-gradient(180deg, #fffaf0, #f8efdf);
+  color: #3a2a1c;
+  box-shadow: inset 0 0 40px rgba(160, 120, 70, 0.18);
+  animation: unfold 520ms var(--ease-out) both;
+  transform-origin: top center;
+}
+@keyframes unfold { from { opacity: 0; transform: scaleY(0.6) translateY(-10px); } to { opacity: 1; transform: none; } }
+.paperFrom { display: block; margin-bottom: 6px; color: #9a6b3c; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+.paperTitle { margin: 0 0 14px; color: #3a2a1c; font-size: 1.35rem; }
+.paperBody { font-size: 1.02rem; line-height: 30px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 55vh; overflow-y: auto; }
+.readFoot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
