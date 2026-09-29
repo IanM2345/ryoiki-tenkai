@@ -1,0 +1,103 @@
+.wrap { display: flex; justify-content: center; }
+
+.board {
+  --gap: 10px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: var(--gap);
+  width: min(92vw, 440px);
+  aspect-ratio: 1;
+  padding: var(--gap);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--pu-l) 14%, var(--card));
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.28), var(--shadow);
+  touch-action: none;
+  user-select: none;
+}
+
+.cell {
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--tx) 8%, transparent);
+}
+
+/* A tile is positioned over the background grid by its row/col, and slides via transform. */
+.tile {
+  position: absolute;
+  width: calc((100% - 2 * var(--gap) - 3 * var(--gap)) / 4);
+  height: calc((100% - 2 * var(--gap) - 3 * var(--gap)) / 4);
+  top: var(--gap);
+  left: var(--gap);
+  transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap))));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-family: var(--font);
+  font-weight: 800;
+  font-size: clamp(1.1rem, 6vw, 1.9rem);
+  color: #1a1210;
+  background: #eee4da;
+  transition: transform 110ms var(--ease-out);
+  will-change: transform;
+}
+
+/* Colour ramp — warm low tiles moving into the site's orange/purple at the top end. */
+.tile[data-value="2"]    { background: #eee4da; }
+.tile[data-value="4"]    { background: #ede0c8; }
+.tile[data-value="8"]    { background: #f2b179; color: #fff; }
+.tile[data-value="16"]   { background: #f59563; color: #fff; }
+.tile[data-value="32"]   { background: #f67c5f; color: #fff; }
+.tile[data-value="64"]   { background: #f65e3b; color: #fff; }
+.tile[data-value="128"]  { background: #edcf72; color: #fff; font-size: clamp(1rem, 5.2vw, 1.7rem); }
+.tile[data-value="256"]  { background: #edcc61; color: #fff; font-size: clamp(1rem, 5.2vw, 1.7rem); }
+.tile[data-value="512"]  { background: #edc850; color: #fff; font-size: clamp(1rem, 5.2vw, 1.7rem); }
+.tile[data-value="1024"] { background: var(--pu-l); color: #fff; font-size: clamp(0.85rem, 4.4vw, 1.4rem); }
+.tile[data-value="2048"] { background: var(--or); color: var(--on-accent); font-size: clamp(0.85rem, 4.4vw, 1.4rem); box-shadow: 0 0 22px color-mix(in oklab, var(--or) 70%, transparent); }
+.tile[data-value="4096"],
+.tile[data-value="8192"] { background: color-mix(in oklab, var(--or) 60%, var(--pu-l)); color: #fff; font-size: clamp(0.8rem, 4vw, 1.3rem); }
+
+.tileNew { animation: pop 150ms var(--ease-out) both; }
+.tileMerged { animation: bump 150ms var(--ease-out); }
+
+@keyframes pop { from { transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap)))) scale(0); } to { transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap)))) scale(1); } }
+@keyframes bump {
+  0% { transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap)))) scale(1); }
+  50% { transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap)))) scale(1.12); }
+  100% { transform: translate(calc(var(--c) * (100% + var(--gap))), calc(var(--r) * (100% + var(--gap)))) scale(1); }
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--bg) 78%, transparent);
+  backdrop-filter: blur(3px);
+  animation: fadeIn var(--dur-base) var(--ease-out) both;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.overTitle { margin: 0; font-family: var(--font); font-size: 1.5rem; font-weight: 800; color: var(--tx); }
+.overScore { margin: 0; color: var(--tx-s); font-weight: 700; }
+.overRow { display: flex; gap: 10px; }
+.overBtn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--or);
+  color: var(--on-accent);
+  font-family: var(--font);
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform var(--dur-press, 90ms) var(--ease-out), filter var(--dur-fast) ease;
+}
+.overBtn:hover { filter: brightness(1.06); }
+.overBtn:active { transform: scale(0.96); }
+.overGhost { background: color-mix(in oklab, var(--tx) 12%, transparent); color: var(--tx); }

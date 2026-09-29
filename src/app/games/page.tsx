@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  ChevronRight, CircleDot, Club, Crown, Flame, Gamepad2, Grid3x3, Hash, Images, Ship, Spade, Trophy,
+  ChevronRight, CircleDot, Club, Crown, Flame, Gamepad2, Grid2x2, Grid3x3, Hash, Images, SearchCode, Ship, Spade, Trophy, Type,
 } from 'lucide-react';
 import { Topbar, Toast, useToast } from '@/components/ui';
 import { ensureSession } from '@/lib/supabase';
@@ -31,6 +31,9 @@ const GAMES: GameCard[] = [
   { type: 'matatu', href: '/games/matatu', title: 'Matatu', desc: 'East African shedding game where a seven can cut the round short.', levels: 'Easy, Medium, Hard', icon: <Club size={22} strokeWidth={2} />, accent: 'gr' },
   { type: 'connect4', href: '/games/connect-four', title: 'Connect Four', desc: 'Drop pieces and line up four before the computer does.', levels: 'Easy, Medium, Hard', icon: <CircleDot size={22} strokeWidth={2} />, accent: 'blue' },
   { type: 'memory', href: '/games/memory', title: 'Memory', desc: 'Match the pairs, made from your own photos.', levels: 'Easy, Medium, Hard', icon: <Images size={22} strokeWidth={2} />, accent: 'or' },
+  { type: 'g2048', href: '/games/2048', title: '2048', desc: 'Slide the tiles, add them up, and reach 2048.', levels: 'Solo, endless', icon: <Grid2x2 size={22} strokeWidth={2} />, accent: 'pu' },
+  { type: 'wordle', href: '/games/wordle', title: 'Daily Wordle', desc: 'Six guesses at the same five-letter word everyone gets today.', levels: 'One a day', icon: <Type size={22} strokeWidth={2} />, accent: 'gr' },
+  { type: 'wordsearch', href: '/games/word-search', title: 'Word Search', desc: 'Trace the hidden words in a themed grid of letters.', levels: 'Easy, Medium, Hard', icon: <SearchCode size={22} strokeWidth={2} />, accent: 'or' },
 ];
 
 

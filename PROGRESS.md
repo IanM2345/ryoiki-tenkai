@@ -329,3 +329,24 @@ Seven pages redesigned: three helpers worked in parallel under one set of conven
 - **One migration** `20260929100000_enable_realtime.sql` turns on Realtime broadcasting for the tables. It only adds them to Supabase's realtime publication — it broadcasts changes and never reads, changes or deletes any data. Row Level Security still applies, so each person only ever receives their own rows. Safe on staging and on her project, and re-runnable.
 
 **Action:** on staging, `npx supabase db push` (applies the realtime migration). No `npm install` needed. Realtime is on by default for Supabase projects; if a table ever doesn't sync, check Database → Replication in the Supabase dashboard.
+
+## Session 19 (29 Sep 2026): 2048
+- **2048** added to the Arcade. Slide the tiles with arrow keys, WASD, or a swipe on her phone; matching numbers merge and double. Reach the 2048 tile to win, then "Keep going" to chase a higher score.
+- Signature sliding-tile feel (tiles glide and pop), a warm colour ramp that climbs into the site's orange and purple at the top end, and a "Game over / Nice run" overlay.
+- Score and a personal **Best** (kept on the device) show in the scoreboard. A win or a game-over is saved to the Arcade stats.
+- No database change (the `g2048` game type was already allowed) and no new packages.
+
+## Session 20 (29 Sep 2026): Daily Wordle
+- **Daily Wordle** added to the Arcade. Six tries at one five-letter word, the same word for the whole day, resetting at midnight. Tiles flip to reveal: green (right letter, right place), yellow (right letter, wrong place), grey (not in the word), and the on-screen keyboard colours in to match.
+- Type with the keyboard or tap the on-screen keys (works on her phone). Guesses are checked against a built-in dictionary of ~4,300 common words, with a gentle "Not in word list" nudge and a shake for a bad guess.
+- Today's progress is saved on the device, so she can close the tab and come back to the same puzzle; the day's result (win or out of guesses) records once to the Arcade stats.
+- New file `lib/words5.ts` holds the word lists (800 answers, generated from common-word frequencies). No database change and no new packages.
+
+## Session 21 (29 Sep 2026): Word Search
+- **Word Search** added to the Arcade. A themed grid of letters (Animals, Kitchen, Nature, Happy, Travel) with the hidden words listed beside it. Press on the first letter and drag to the last to trace a word; found words light up green and get struck off the list.
+- Works with mouse or finger (drag across the grid). Words can run across, down, diagonally, and forwards or backwards depending on the level.
+- Three levels: Easy (10x10, 7 words, straight lines only), Medium (12x12, 9 words, diagonals + reverse), Hard (14x14, 11 words). Each "New game" reshuffles the theme and layout. Finishing records a win on the Arcade stats.
+- No database change (the `wordsearch` type was already allowed) and no new packages.
+
+### The Arcade now has 12 games
+Tic Tac Toe, Sudoku, Chess, Battleship, Kadi, Matatu, Connect Four, Memory, 2048, Daily Wordle, and Word Search — plus stats across all of them.
