@@ -491,28 +491,45 @@
 .toggle {
   position: relative;
   flex-shrink: 0;
-  width: 44px;
-  height: 26px;
+  width: 48px;
+  height: 28px;
   padding: 0;
   border: 1px solid var(--bd-s);
   border-radius: var(--radius-pill);
-  background: color-mix(in oklab, var(--tx) 10%, transparent);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.02)),
+    color-mix(in oklab, var(--tx) 9%, transparent);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.28);
   cursor: pointer;
-  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
-.toggleOn { background: var(--or); border-color: var(--or); }
+.toggle:hover { border-color: color-mix(in oklab, var(--tx) 28%, transparent); }
+.toggle:focus-visible { outline: none; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.28), 0 0 0 3px color-mix(in oklab, var(--or) 30%, transparent); }
+.toggleOn {
+  border-color: transparent;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(0, 0, 0, 0.06)),
+    linear-gradient(135deg, var(--or), color-mix(in oklab, var(--or) 55%, var(--pu-l)));
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.16),
+    0 2px 10px color-mix(in oklab, var(--or) 45%, transparent);
+}
 .toggleThumb {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
-  transition: transform var(--dur-base) var(--ease-out);
+  background: linear-gradient(180deg, #ffffff, #e9e6ef);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
-.toggleOn .toggleThumb { transform: translateX(18px); }
+.toggleOn .toggleThumb {
+  transform: translateX(20px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+.toggleOn:focus-visible { box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.16), 0 0 0 3px color-mix(in oklab, var(--or) 34%, transparent); }
 
 /* ─── SOUL PICKER ────────────────────────────────────────── */
 .soulPicker { display: flex; flex-direction: column; gap: 8px; }
@@ -611,3 +628,129 @@
   background: var(--bg);
   animation: fadeUp var(--dur-fast) var(--ease-out) both;
 }
+
+/* ─── DATE PICKER ─────────────────────────────────────────── */
+.dp { position: relative; }
+.dpTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--tx);
+  font-family: var(--font);
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+.dpTrigger svg { flex-shrink: 0; color: var(--or); }
+.dpTrigger:hover { border-color: var(--bd-s); }
+.dpTriggerOpen {
+  border-color: var(--or);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--or) 22%, transparent);
+}
+.dpTriggerEmpty .dpValue { color: var(--tx-m); }
+.dpValue { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dpTriggerSm {
+  width: auto;
+  min-height: 32px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--tx) 5%, transparent);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.dpTriggerSm svg { width: 15px; height: 15px; }
+
+.dpPop {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 292px;
+  max-width: min(92vw, 320px);
+  padding: 14px;
+  border: 1px solid color-mix(in oklab, var(--or) 26%, var(--bd-s));
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in oklab, var(--pu-l) 12%, transparent), transparent 60%),
+    radial-gradient(120% 90% at 0% 0%, color-mix(in oklab, var(--or) 12%, transparent), transparent 60%),
+    color-mix(in oklab, var(--card) 92%, var(--bg));
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  backdrop-filter: blur(10px);
+  animation: dpIn var(--dur-base) var(--ease-out) both;
+}
+@keyframes dpIn { from { opacity: 0; transform: translateY(-6px) scale(0.97); } to { opacity: 1; transform: none; } }
+
+.dpHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.dpTitle { font-family: var(--font); font-size: 0.98rem; font-weight: 800; color: var(--tx); letter-spacing: 0.01em; }
+.dpNav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--bd-s);
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--tx) 4%, transparent);
+  color: var(--tx-s);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, border-color var(--dur-fast) ease, transform var(--dur-press, 90ms) var(--ease-out);
+}
+.dpNav:hover { background: color-mix(in oklab, var(--or) 16%, transparent); border-color: var(--or); color: var(--tx); }
+.dpNav:active { transform: scale(0.92); }
+
+.dpWeek { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 4px; }
+.dpWd { text-align: center; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tx-m); padding: 4px 0; }
+.dpGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dpDay {
+  aspect-ratio: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--tx);
+  font-family: var(--font);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, border-color var(--dur-fast) ease, transform var(--dur-press, 90ms) var(--ease-out);
+}
+.dpDay:hover { background: color-mix(in oklab, var(--or) 18%, transparent); }
+.dpDay:active { transform: scale(0.9); }
+.dpOut { color: var(--tx-m); opacity: 0.45; }
+.dpToday { border-color: color-mix(in oklab, var(--or) 55%, transparent); color: var(--or); font-weight: 800; }
+.dpSel {
+  background: linear-gradient(135deg, var(--or), color-mix(in oklab, var(--or) 55%, var(--pu-l)));
+  border-color: transparent;
+  color: var(--on-accent);
+  font-weight: 800;
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--or) 40%, transparent);
+}
+.dpSel:hover { background: linear-gradient(135deg, var(--or), color-mix(in oklab, var(--or) 55%, var(--pu-l))); }
+.dpDis { color: var(--tx-m); opacity: 0.28; cursor: not-allowed; }
+.dpDis:hover { background: transparent; }
+
+.dpFoot { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--bd); }
+.dpTodayBtn, .dpClear {
+  padding: 6px 14px;
+  border: 1px solid var(--bd-s);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--tx-s);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+.dpTodayBtn:hover { border-color: var(--or); color: var(--or); background: color-mix(in oklab, var(--or) 12%, transparent); }
+.dpClear:hover { border-color: var(--red, #ef4444); color: var(--red, #ef4444); background: color-mix(in oklab, var(--red, #ef4444) 12%, transparent); }
+.dpTodayBtn:disabled { opacity: 0.4; cursor: not-allowed; }

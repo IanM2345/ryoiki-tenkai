@@ -169,3 +169,120 @@
 .hint { margin: -8px 0 14px; color: var(--tx-m); font-size: 0.8rem; }
 .twoCol { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field { margin-bottom: 14px; }
+
+/* Bucket list: been vs want-to-go */
+.tabs {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0 4px 16px;
+  padding: 4px;
+  border: 1px solid var(--bd-s);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--card) 70%, transparent);
+}
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--tx-m);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.tab:hover { color: var(--tx); }
+.tabOn { background: var(--or); color: var(--on-accent); }
+.tab:nth-child(2).tabOn { background: var(--pu-l); }
+
+.cardWish { border-color: color-mix(in oklab, var(--pu-l) 40%, var(--bd-s)); }
+.wishBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--pu-l) 20%, transparent);
+  color: var(--pu-l);
+  font-size: 0.68rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+.actGo { color: var(--pu-l) !important; }
+
+.wishRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--bd-s);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--pu-l) 7%, transparent);
+  cursor: pointer;
+}
+.wishLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tx);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.wishLabel svg { color: var(--pu-l); }
+
+/* Map legend for been / wishlist pins */
+.legend {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--bd-s);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--card) 88%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--tx-s);
+}
+.legend > span { display: inline-flex; align-items: center; gap: 7px; }
+.dotBeen, .dotWish { width: 11px; height: 11px; border-radius: 50%; }
+.dotBeen { background: var(--or); }
+.dotWish { background: var(--pu-l); }
+.popupWish { color: var(--pu-l) !important; font-weight: 700; opacity: 1 !important; }
+
+/* Use-my-location button under the address field */
+.addrRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: -8px 0 14px; }
+.addrRow .hint { margin: 0; }
+.locBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in oklab, var(--or) 40%, var(--bd-s));
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--or) 10%, transparent);
+  color: var(--or);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, transform var(--dur-press, 90ms) var(--ease-out);
+}
+.locBtn:hover:not(:disabled) { background: color-mix(in oklab, var(--or) 18%, transparent); border-color: var(--or); }
+.locBtn:active:not(:disabled) { transform: scale(0.96); }
+.locBtn:disabled { opacity: 0.7; cursor: default; }
+.spin { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

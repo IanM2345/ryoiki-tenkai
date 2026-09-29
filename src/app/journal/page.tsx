@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { PenLine, Pin, PinOff, Trash2, NotebookPen } from 'lucide-react';
 import s from './journal.module.css';
@@ -7,6 +7,7 @@ import { Btn, Tag, SearchBar, Topbar, Pill, Modal, Confirm, Toast, useToast, Emp
 import { getJournalEntries, updateJournalEntry, deleteJournalEntry, getSouls } from '@/lib/db';
 import type { DbJournalEntry, DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { useLiveTables } from '@/lib/realtime';
 import { parseLocalDate, relDay } from '@/lib/dates';
 import { MOODS, renderMentions } from '@/lib/journal';
 
@@ -57,8 +58,7 @@ export default function JournalPage() {
   const [delItem, setDelItem] = useState<DbJournalEntry | null>(null);
   const [toast, show]         = useToast();
 
-  useEffect(() => {
-    (async () => {
+  const reload = useCallback(async () => {
       try {
         if (!(await ensureSession())) return;
         const [e, so] = await Promise.all([getJournalEntries(), getSouls().catch(() => [] as DbSoul[])]);
@@ -69,8 +69,10 @@ export default function JournalPage() {
       } finally {
         setLoading(false);
       }
-    })();
   }, [show]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useLiveTables(['journal_entries', 'journal_entry_souls', 'souls'], reload);
 
   // Only offer mood filters for moods actually used
   const usedMoods = useMemo(() => {

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  ChevronRight, Club, Crown, Flame, Gamepad2, Grid3x3, Hash, Ship, Spade, Trophy,
+  ChevronRight, CircleDot, Club, Crown, Flame, Gamepad2, Grid3x3, Hash, Images, Ship, Spade, Trophy,
 } from 'lucide-react';
 import { Topbar, Toast, useToast } from '@/components/ui';
 import { ensureSession } from '@/lib/supabase';
@@ -29,6 +29,8 @@ const GAMES: GameCard[] = [
   { type: 'battleship', href: '/games/battleship', title: 'Battleship', desc: 'Hide your fleet, then hunt theirs one shot at a time.', levels: 'Easy, Medium, Hard', icon: <Ship size={22} strokeWidth={2} />, accent: 'blue' },
   { type: 'kadi', href: '/games/kadi', title: 'Kadi', desc: 'The Kenyan card game of questions, penalties and calling Kadi on your last card.', levels: 'Easy, Medium, Hard', icon: <Spade size={22} strokeWidth={2} />, accent: 'pu' },
   { type: 'matatu', href: '/games/matatu', title: 'Matatu', desc: 'East African shedding game where a seven can cut the round short.', levels: 'Easy, Medium, Hard', icon: <Club size={22} strokeWidth={2} />, accent: 'gr' },
+  { type: 'connect4', href: '/games/connect-four', title: 'Connect Four', desc: 'Drop pieces and line up four before the computer does.', levels: 'Easy, Medium, Hard', icon: <CircleDot size={22} strokeWidth={2} />, accent: 'blue' },
+  { type: 'memory', href: '/games/memory', title: 'Memory', desc: 'Match the pairs, made from your own photos.', levels: 'Easy, Medium, Hard', icon: <Images size={22} strokeWidth={2} />, accent: 'or' },
 ];
 
 

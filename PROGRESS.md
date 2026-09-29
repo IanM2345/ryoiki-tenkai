@@ -293,3 +293,39 @@ Seven pages redesigned: three helpers worked in parallel under one set of conven
   - Deleted `lib/token.ts` and `types/index.ts` here. They're unused; delete them on your PC too.
 - Lint: 0 errors, 0 warnings. Types: clean. Production build: passes.
 - Added **DEPLOY.md** with step-by-step go-live instructions, including the one critical step: mark the baseline migration as applied on her database so it never re-runs.
+
+## Session 14 (27 Sep 2026): two low-cost features
+- **Daily journal prompt.** On a blank entry, a gentle question appears (for example "What made you smile today?"). "Start with this" drops it into the entry, and the shuffle button offers another. 18 prompts, in `lib/journal`. No database change.
+- **Connect Four** added to the Arcade. Easy, Medium and Hard (the computer looks further ahead as the level rises, and always takes a win or blocks yours). Drop animation and a highlighted winning line. Results are saved, so it counts on the Arcade stats.
+- **One small migration** `20260927120000_more_game_types.sql` widens the allowed game list so Connect Four (and future games) can save results. Safe on staging and on her project; it only widens a rule.
+
+**Action:** on staging, `npx supabase db push` (applies the new migration), then `npm install` is not needed (no new packages).
+
+## Session 15 (27 Sep 2026): Memory match
+- **Memory** added to the Arcade. Flip cards to find pairs, and the cards are made from her own photos (Gallery, Souls, Places and Library). If there aren't enough photos, it fills the rest with colourful tiles, so it always works, even with no photos yet.
+- Easy (6 pairs), Medium (8), Hard (12). Tracks moves, a timer and the best moves per level. Finishing records a win on the Arcade stats.
+- No database change (reuses `getAllImages` and the game type added last session).
+
+## Session 16 (28 Sep 2026): Bucket list
+- **Places now holds dreams, not just memories.** Each place can be somewhere she's *been* or somewhere she *wants to go*.
+- The Places list has two tabs: **Been** and **Want to go**, with counts. The subtitle reads "X visited, Y on the list".
+- Wishlist places show a purple "Want to go" badge, a purple card border, and a **Mark as visited** button. One tap moves it to Been, stamps today's date and shows "You made it to <place>!".
+- The add/edit form has a **"Somewhere I want to go"** toggle. When it's on, the date and times-visited fields are hidden, the rating reads "How keen are you?", and the notes and companions prompts change to future tense.
+- On the **map**, wishlist places get purple pins (been places stay orange), with a small legend in the corner and an "On your bucket list" line in the popup.
+- **One small migration** `20260928100000_places_wishlist.sql` adds a single `wishlist` column (default false) to the places table. Safe on staging and on her project; it adds a column with a default and touches no existing rows. Her existing places all stay as "been".
+
+**Action:** on staging, `npx supabase db push` (applies the new migration). No `npm install` needed (no new packages).
+
+## Session 17 (29 Sep 2026): calendar, toggle, pink theme, fonts
+- **Proper date picker.** The native browser date popup is gone. A custom `DatePicker` (in `components/ui`) opens a themed month calendar — orange/purple, Comic font, rounded — with prev/next month, a "Today" ring on today's date, a filled gradient on the chosen day, dimmed out-of-month and disabled days, and a "Today"/"Clear" footer. It replaces every date field: Journal, Tasks (both the inline "Due" and the edit form) and Places. `FInput type="date"` now renders it automatically, so any future date field gets it for free.
+- **Nicer toggle switch.** Bigger, with an inset track shadow, a soft gradient thumb with a highlight, and when on, an orange→purple gradient with a subtle glow (rgba throughout). Also a focus ring for keyboard users.
+- **New theme: Bubblegum.** A pink-forward preset (pink accent, violet secondary, deep plum background). Sits alongside the existing presets on the Theme page.
+- **Four new fonts** on the Theme page: **Handwriting** (Caveat), **Rounded** (Fredoka), **Modern** (Space Grotesk) and **Storybook** (Lora) — joining Comic, Georgia, Mono and System. Loaded from Google Fonts, so they show once the page has internet (they fall back gracefully offline).
+- No database change. No new npm packages (fonts come from Google Fonts over the web).
+
+## Session 18 (29 Sep 2026): detect location + live sync
+- **"Use my location"** on the Places form. One tap asks the browser for her current position, names the spot (reverse-geocoded from OpenStreetMap) and drops the pin — no typing. It falls back gracefully if she blocks location or it can't find her, and the coordinates come straight from the device so they're exact.
+- **Live sync across devices.** If she adds or changes something on her phone, the same page open on her laptop updates within about a second — and the other way round. It's powered by Supabase Realtime and wired into every data page (Dashboard, Tasks, Journal, Places, Souls, Library, Ideas, Queue, Ratings, Mood). Pages also refresh when the tab is brought back into focus, so nothing is stale after the laptop wakes.
+- **One migration** `20260929100000_enable_realtime.sql` turns on Realtime broadcasting for the tables. It only adds them to Supabase's realtime publication — it broadcasts changes and never reads, changes or deletes any data. Row Level Security still applies, so each person only ever receives their own rows. Safe on staging and on her project, and re-runnable.
+
+**Action:** on staging, `npx supabase db push` (applies the realtime migration). No `npm install` needed. Realtime is on by default for Supabase projects; if a table ever doesn't sync, check Database → Replication in the Supabase dashboard.

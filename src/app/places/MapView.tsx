@@ -51,7 +51,12 @@ export default function MapView({ places, selected, onSelect }: {
   const light = typeof document !== 'undefined' && document.documentElement.dataset.scheme === 'light';
   const pinned = places.filter((p): p is PinnedPlace => p.lat != null && p.lng != null);
   const accent = useMemo(() => cssVar('--or', '#ff8c00'), []);
-  const icons = useMemo(() => ({ normal: pinIcon(accent, false), active: pinIcon(accent, true) }), [accent]);
+  const wish = useMemo(() => cssVar('--pu-l', '#a855f7'), []);
+  const icons = useMemo(() => ({
+    been: pinIcon(accent, false), beenActive: pinIcon(accent, true),
+    wish: pinIcon(wish, false), wishActive: pinIcon(wish, true),
+  }), [accent, wish]);
+  const hasWish = pinned.some(p => p.wishlist);
 
   const tiles = token
     ? {
@@ -74,12 +79,13 @@ export default function MapView({ places, selected, onSelect }: {
           <Marker
             key={p.id}
             position={[p.lat, p.lng]}
-            icon={selected?.id === p.id ? icons.active : icons.normal}
+            icon={p.wishlist ? (selected?.id === p.id ? icons.wishActive : icons.wish) : (selected?.id === p.id ? icons.beenActive : icons.been)}
             eventHandlers={{ click: () => onSelect(p) }}
           >
             <Popup>
               <div className={s.popup}>
                 <strong>{p.name}</strong>
+                {p.wishlist && <span className={s.popupWish}>On your bucket list</span>}
                 {p.address && <span>{p.address}</span>}
                 <a href={directionsUrl(p)} target="_blank" rel="noopener noreferrer">Get directions</a>
               </div>
@@ -87,6 +93,12 @@ export default function MapView({ places, selected, onSelect }: {
           </Marker>
         ))}
       </MapContainer>
+      {hasWish && (
+        <div className={s.legend}>
+          <span><span className={s.dotBeen} /> Been</span>
+          <span><span className={s.dotWish} /> Want to go</span>
+        </div>
+      )}
     </div>
   );
 }

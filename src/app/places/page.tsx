@@ -1,11 +1,11 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Plus, MapPin, List, Map as MapIcon, Navigation, Pencil, Trash2, Footprints, CalendarDays, MapPinOff } from 'lucide-react';
+import { Plus, MapPin, List, Map as MapIcon, Navigation, Pencil, Trash2, Footprints, CalendarDays, MapPinOff, Bookmark, Check, LocateFixed, Loader2 } from 'lucide-react';
 import s from './places.module.css';
 import {
   Btn, Lbl, Tag, Stars, TagInput, SearchBar, Topbar, Modal, ModalTitle, ModalFooter, Confirm,
-  FInput, FArea, EmptyState, Toast, useToast,
+  FInput, FArea, EmptyState, Toast, useToast, Toggle,
 } from '@/components/ui';
 import ImagePicker from '@/components/ui/ImagePicker';
 import StoredImage from '@/components/ui/StoredImage';
@@ -15,24 +15,27 @@ import {
 } from '@/lib/db';
 import type { DbPlace, DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { useLiveTables } from '@/lib/realtime';
 import { prepareImage, deleteImage, preloadSignedUrls } from '@/lib/upload';
-import { geocodeAddress, directionsUrl } from '@/lib/geocode';
-import { fmtDate } from '@/lib/dates';
+import { geocodeAddress, directionsUrl, detectLocation } from '@/lib/geocode';
+import { fmtDate, localDateStr } from '@/lib/dates';
 
 const MapView = dynamic(() => import('./MapView'), {
   ssr: false,
   loading: () => <div className={`${s.mapWrap} skeleton`} />,
 });
 
-const EMPTY = { name: '', address: '', visit_date: '', rating: 0, notes: '', tags: [] as string[], visits: 1 };
+const EMPTY = { name: '', address: '', visit_date: '', rating: 0, notes: '', tags: [] as string[], visits: 1, wishlist: false };
 type Form = typeof EMPTY;
 
-function PlaceActions({ p, onVisit, onEdit, onDelete }: {
-  p: DbPlace; onVisit: (p: DbPlace) => void; onEdit: (p: DbPlace) => void; onDelete: (p: DbPlace) => void;
+function PlaceActions({ p, onVisit, onMarkVisited, onEdit, onDelete }: {
+  p: DbPlace; onVisit: (p: DbPlace) => void; onMarkVisited: (p: DbPlace) => void; onEdit: (p: DbPlace) => void; onDelete: (p: DbPlace) => void;
 }) {
   return (
     <div className={s.actions}>
-      <button type="button" className={s.actBtn} onClick={() => onVisit(p)}><Footprints size={14} strokeWidth={2} /> Visited again</button>
+      {p.wishlist
+        ? <button type="button" className={`${s.actBtn} ${s.actGo}`} onClick={() => onMarkVisited(p)}><Check size={15} strokeWidth={2.5} /> Mark as visited</button>
+        : <button type="button" className={s.actBtn} onClick={() => onVisit(p)}><Footprints size={14} strokeWidth={2} /> Visited again</button>}
       {p.lat != null && p.lng != null && (
         <a className={s.actBtn} href={directionsUrl({ lat: p.lat, lng: p.lng })} target="_blank" rel="noopener noreferrer"><Navigation size={14} strokeWidth={2} /> Directions</a>
       )}
@@ -47,6 +50,7 @@ export default function PlacesPage() {
   const [souls, setSouls]     = useState<DbSoul[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView]       = useState<'list' | 'map'>('list');
+  const [tab, setTab]         = useState<'been' | 'wishlist'>('been');
   const [search, setSearch]   = useState('');
   const [selected, setSelected] = useState<DbPlace | null>(null);
 
@@ -57,24 +61,43 @@ export default function PlacesPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [saving, setSaving]     = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [detected, setDetected] = useState<{ lat: number; lng: number; address: string } | null>(null);
   const [delItem, setDelItem]   = useState<DbPlace | null>(null);
   const [toast, show] = useToast();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!(await ensureSession())) return;
-        const [data, soulData] = await Promise.all([getPlaces(), getSouls().catch(() => [] as DbSoul[])]);
-        await preloadSignedUrls(data.map(p => p.image_url)).catch(() => {});
-        setPlaces(data);
-        setSouls(soulData);
-      } catch {
-        show('Could not load your places.', 'var(--red)');
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const useMyLocation = async () => {
+    if (locating) return;
+    setLocating(true);
+    try {
+      const d = await detectLocation();
+      const address = d.address ?? `${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}`;
+      setForm(f => ({ ...f, address }));
+      setDetected({ lat: d.lat, lng: d.lng, address });
+      show(d.address ? `Found you near ${d.address}` : 'Location found');
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Couldn't find your location.", 'var(--red)');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const reload = useCallback(async () => {
+    try {
+      if (!(await ensureSession())) return;
+      const [data, soulData] = await Promise.all([getPlaces(), getSouls().catch(() => [] as DbSoul[])]);
+      await preloadSignedUrls(data.map(p => p.image_url)).catch(() => {});
+      setPlaces(data);
+      setSouls(soulData);
+    } catch {
+      show('Could not load your places.', 'var(--red)');
+    } finally {
+      setLoading(false);
+    }
   }, [show]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useLiveTables(['places', 'soul_links'], reload);
 
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => places
@@ -82,15 +105,18 @@ export default function PlacesPage() {
     .sort((a, b) => (b.visit_date ?? b.created_at).localeCompare(a.visit_date ?? a.created_at)),
   [places, q]);
   const unpinned = filtered.filter(p => p.lat == null || p.lng == null);
+  const beenCount = places.filter(p => !p.wishlist).length;
+  const wishCount = places.filter(p => p.wishlist).length;
+  const byTab = filtered.filter(p => tab === 'wishlist' ? p.wishlist : !p.wishlist);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm(f => ({ ...f, [k]: v }));
 
   const openAdd = () => {
-    setEditItem(null); setForm({ ...EMPTY, tags: [] }); setSoulIds([]); setImageFile(null); setImagePreview(null); setFormOpen(true);
+    setEditItem(null); setDetected(null); setForm({ ...EMPTY, tags: [], wishlist: tab === 'wishlist' }); setSoulIds([]); setImageFile(null); setImagePreview(null); setFormOpen(true);
   };
   const openEdit = (p: DbPlace) => {
-    setEditItem(p);
-    setForm({ name: p.name, address: p.address ?? '', visit_date: p.visit_date ?? '', rating: p.rating ?? 0, notes: p.notes ?? '', tags: [...(p.tags ?? [])], visits: p.visits ?? 1 });
+    setEditItem(p); setDetected(null);
+    setForm({ name: p.name, address: p.address ?? '', visit_date: p.visit_date ?? '', rating: p.rating ?? 0, notes: p.notes ?? '', tags: [...(p.tags ?? [])], visits: p.visits ?? 1, wishlist: p.wishlist ?? false });
     setSoulIds([]); setImageFile(null); setImagePreview(p.image_url ?? null);
     setFormOpen(true);
     getSoulLinksForItem('places', p.id).then(l => setSoulIds(l.map(x => x.soul_id))).catch(() => {});
@@ -104,16 +130,21 @@ export default function PlacesPage() {
       // Only look the address up again when it changed
       const address = form.address.trim();
       let lat = editItem?.lat ?? null, lng = editItem?.lng ?? null, notFound = false;
-      if (address !== (editItem?.address ?? '')) {
+      if (detected && detected.address === address) {
+        // Coordinates came straight from the device — no need to geocode.
+        lat = detected.lat; lng = detected.lng;
+      } else if (address !== (editItem?.address ?? '')) {
         const c = address ? await geocodeAddress(address) : null;
         lat = c?.lat ?? null; lng = c?.lng ?? null;
         notFound = !!address && !c;
       }
       img = await prepareImage({ current: editItem?.image_url, file: imageFile, cleared: !imagePreview, folder: 'places' });
       const payload = {
-        name: form.name.trim(), address: address || null, visit_date: form.visit_date || null,
+        name: form.name.trim(), address: address || null,
+        visit_date: form.wishlist ? null : (form.visit_date || null),
         rating: form.rating, notes: form.notes.trim() || null, tags: form.tags,
-        visits: Math.max(1, form.visits || 1), lat, lng, image_url: img.value,
+        visits: form.wishlist ? 1 : Math.max(1, form.visits || 1),
+        wishlist: form.wishlist, lat, lng, image_url: img.value,
       };
       const saved = editItem ? await updatePlace(editItem.id, payload) : await addPlace(payload);
       setPlaces(l => editItem ? l.map(x => x.id === saved.id ? saved : x) : [saved, ...l]);
@@ -138,6 +169,15 @@ export default function PlacesPage() {
     catch { setPlaces(l => l.map(x => x.id === p.id ? p : x)); show('Could not log that visit.', 'var(--red)'); }
   };
 
+  const markVisited = async (p: DbPlace) => {
+    const updates = { wishlist: false, visit_date: p.visit_date ?? localDateStr(), visits: Math.max(1, p.visits ?? 1) };
+    setPlaces(l => l.map(x => x.id === p.id ? { ...x, ...updates } : x));
+    if (selected?.id === p.id) setSelected({ ...p, ...updates });
+    setTab('been');
+    try { await updatePlace(p.id, updates); show(`You made it to ${p.name}!`); }
+    catch { setPlaces(l => l.map(x => x.id === p.id ? p : x)); show('Could not update that place.', 'var(--red)'); }
+  };
+
   const doDelete = async () => {
     const item = delItem; if (!item) return;
     const snapshot = places;
@@ -155,7 +195,7 @@ export default function PlacesPage() {
     <div className={s.page}>
       <Topbar
         title="Places"
-        sub={loading ? 'Loading your places' : places.length ? `${places.length} ${places.length === 1 ? 'place' : 'places'} you've been` : 'Everywhere worth remembering'}
+        sub={loading ? 'Loading your places' : places.length ? `${beenCount} visited, ${wishCount} on the list` : 'Everywhere you have been, and want to go'}
         action={<Btn onClick={openAdd}><Plus size={16} strokeWidth={2.25} /> Add place</Btn>}
       />
 
@@ -167,6 +207,17 @@ export default function PlacesPage() {
               <button type="button" role="tab" aria-selected={view === 'list'} className={view === 'list' ? s.viewOn : ''} onClick={() => setView('list')}><List size={16} /> List</button>
               <button type="button" role="tab" aria-selected={view === 'map'} className={view === 'map' ? s.viewOn : ''} onClick={() => setView('map')}><MapIcon size={16} /> Map</button>
             </div>
+          </div>
+        )}
+
+        {places.length > 0 && view === 'list' && (
+          <div className={s.tabs} role="tablist" aria-label="Which places">
+            <button type="button" role="tab" aria-selected={tab === 'been'} className={`${s.tab} ${tab === 'been' ? s.tabOn : ''}`} onClick={() => setTab('been')}>
+              <Footprints size={15} strokeWidth={2} /> Been{beenCount ? ` (${beenCount})` : ''}
+            </button>
+            <button type="button" role="tab" aria-selected={tab === 'wishlist'} className={`${s.tab} ${tab === 'wishlist' ? s.tabOn : ''}`} onClick={() => setTab('wishlist')}>
+              <Bookmark size={15} strokeWidth={2} /> Want to go{wishCount ? ` (${wishCount})` : ''}
+            </button>
           </div>
         )}
 
@@ -185,7 +236,7 @@ export default function PlacesPage() {
                   {selected.address && <p className={s.muted}>{selected.address}</p>}
                   {selected.rating > 0 && <Stars n={selected.rating} size={14} />}
                   {selected.notes && <p className={s.detailNotes}>{selected.notes}</p>}
-                  <PlaceActions p={selected} onVisit={logVisit} onEdit={openEdit} onDelete={setDelItem} />
+                  <PlaceActions p={selected} onVisit={logVisit} onMarkVisited={markVisited} onEdit={openEdit} onDelete={setDelItem} />
                 </div>
               </div>
             )}
@@ -195,29 +246,38 @@ export default function PlacesPage() {
               </p>
             )}
           </>
-        ) : filtered.length === 0 ? (
-          <EmptyState icon={<MapPin size={26} />} msg="No places match that search." />
+        ) : byTab.length === 0 ? (
+          <EmptyState
+            icon={tab === 'wishlist' ? <Bookmark size={26} /> : <MapPin size={26} />}
+            msg={q ? 'No places match that search.'
+              : tab === 'wishlist' ? 'Your bucket list is empty. Add a place you dream of going.'
+              : 'No places here yet. Add the first spot you want to remember.'}
+            action={!q ? <Btn sm onClick={openAdd}><Plus size={15} /> {tab === 'wishlist' ? 'Add a dream place' : 'Add a place'}</Btn> : undefined}
+          />
         ) : (
           <div className={s.grid}>
-            {filtered.map(p => (
-              <article key={p.id} className={s.card}>
+            {byTab.map(p => (
+              <article key={p.id} className={`${s.card} ${p.wishlist ? s.cardWish : ''}`}>
                 <button type="button" className={s.cardMain} onClick={() => openEdit(p)} aria-label={`Edit ${p.name}`}>
                   {p.image_url
                     ? <StoredImage src={p.image_url} alt="" className={s.cardImg} />
                     : <span className={s.cardIcon}><MapPin size={22} strokeWidth={1.75} /></span>}
                   <span className={s.cardBody}>
-                    <span className={s.cardName}>{p.name}</span>
+                    <span className={s.cardName}>
+                      {p.name}
+                      {p.wishlist && <span className={s.wishBadge}><Bookmark size={11} strokeWidth={2.5} /> Want to go</span>}
+                    </span>
                     {p.address && <span className={s.muted}>{p.address}</span>}
                     <span className={s.cardMeta}>
                       {p.rating > 0 && <Stars n={p.rating} size={13} />}
-                      {p.visit_date && <span><CalendarDays size={13} /> {fmtDate(p.visit_date)}</span>}
-                      {(p.visits ?? 1) > 1 && <span><Footprints size={13} /> {p.visits} visits</span>}
+                      {!p.wishlist && p.visit_date && <span><CalendarDays size={13} /> {fmtDate(p.visit_date)}</span>}
+                      {!p.wishlist && (p.visits ?? 1) > 1 && <span><Footprints size={13} /> {p.visits} visits</span>}
                     </span>
                     {p.notes && <span className={s.cardNotes}>{p.notes}</span>}
                     {(p.tags?.length ?? 0) > 0 && <span>{p.tags.map(t => <Tag key={t}>{t}</Tag>)}</span>}
                   </span>
                 </button>
-                <PlaceActions p={p} onVisit={logVisit} onEdit={openEdit} onDelete={setDelItem} />
+                <PlaceActions p={p} onVisit={logVisit} onMarkVisited={markVisited} onEdit={openEdit} onDelete={setDelItem} />
               </article>
             ))}
           </div>
@@ -228,20 +288,32 @@ export default function PlacesPage() {
         <Modal onClose={() => !saving && setFormOpen(false)}>
           <ModalTitle>{editItem ? 'Edit place' : 'Add a place'}</ModalTitle>
           <FInput label="Name" value={form.name} onChange={v => set('name', v)} placeholder="The little cafe by the station" />
-          <FInput label="Address" value={form.address} onChange={v => set('address', v)} placeholder="Street, town or landmark" />
-          <p className={s.hint}>Type an address and the pin drops itself on the map.</p>
-          <div className={s.twoCol}>
-            <FInput label="Date visited" type="date" value={form.visit_date} onChange={v => set('visit_date', v)} />
-            <FInput label="Times visited" type="number" value={String(form.visits)} onChange={v => set('visits', Math.max(1, parseInt(v) || 1))} />
+          <FInput label="Address" value={form.address} onChange={v => { set('address', v); setDetected(null); }} placeholder="Street, town or landmark" />
+          <div className={s.addrRow}>
+            <p className={s.hint}>Type an address and the pin drops itself on the map.</p>
+            <button type="button" className={s.locBtn} onClick={useMyLocation} disabled={locating}>
+              {locating ? <Loader2 size={14} className={s.spin} /> : <LocateFixed size={14} strokeWidth={2} />}
+              {locating ? 'Finding you' : 'Use my location'}
+            </button>
           </div>
-          <div className={s.field}><Lbl>Your rating</Lbl><Stars n={form.rating} onSet={r => set('rating', r)} size={24} /></div>
-          <FArea label="Notes" value={form.notes} onChange={v => set('notes', v)} rows={3} placeholder="What made it special?" />
+          <label className={s.wishRow}>
+            <span className={s.wishLabel}><Bookmark size={16} strokeWidth={2} /> Somewhere I want to go</span>
+            <Toggle checked={form.wishlist} onChange={v => set('wishlist', v)} label="Somewhere I want to go" />
+          </label>
+          {!form.wishlist && (
+            <div className={s.twoCol}>
+              <FInput label="Date visited" type="date" value={form.visit_date} onChange={v => set('visit_date', v)} />
+              <FInput label="Times visited" type="number" value={String(form.visits)} onChange={v => set('visits', Math.max(1, parseInt(v) || 1))} />
+            </div>
+          )}
+          <div className={s.field}><Lbl>{form.wishlist ? 'How keen are you?' : 'Your rating'}</Lbl><Stars n={form.rating} onSet={r => set('rating', r)} size={24} /></div>
+          <FArea label="Notes" value={form.notes} onChange={v => set('notes', v)} rows={3} placeholder={form.wishlist ? 'Why you want to go, what to do there' : 'What made it special?'} />
           <div className={s.field}>
             <Lbl>Tags</Lbl>
             <TagInput tags={form.tags} onAdd={t => set('tags', [...form.tags, t])} onRemove={t => set('tags', form.tags.filter(x => x !== t))} />
           </div>
           <ImagePicker label="Photo" value={imagePreview} onChange={(f, p) => { setImageFile(f); setImagePreview(p); }} onClear={() => { setImageFile(null); setImagePreview(null); }} />
-          <SoulLinkField souls={souls} value={soulIds} onChange={setSoulIds} label="Who were you with?" />
+          <SoulLinkField souls={souls} value={soulIds} onChange={setSoulIds} label={form.wishlist ? 'Who do you want to go with?' : 'Who were you with?'} />
           <ModalFooter onCancel={() => setFormOpen(false)} onSave={save} saveLabel={saving ? 'Saving' : editItem ? 'Save changes' : 'Save place'} />
         </Modal>
       )}

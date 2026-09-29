@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, Lightbulb, ArrowRight, RotateCcw, Trash2, Brain, ClipboardList, Hammer, PartyPopper } from 'lucide-react';
 import s from './ideas.module.css';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/lib/db';
 import type { DbIdea, DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { useLiveTables } from '@/lib/realtime';
 import { PRIORITIES, PRIO_COLOR, PRIO_LABEL, type Priority } from '@/lib/tasks';
 import { fmtDate } from '@/lib/dates';
 
@@ -40,8 +41,7 @@ export default function IdeasPage() {
   const [delItem, setDelItem] = useState<DbIdea | null>(null);
   const [toast, show] = useToast();
 
-  useEffect(() => {
-    (async () => {
+  const reload = useCallback(async () => {
       try {
         if (!(await ensureSession())) return;
         const [data, soulData] = await Promise.all([getIdeas(), getSouls().catch(() => [] as DbSoul[])]);
@@ -52,8 +52,10 @@ export default function IdeasPage() {
       } finally {
         setLoading(false);
       }
-    })();
   }, [show]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useLiveTables(['ideas', 'soul_links'], reload);
 
   const q = search.trim().toLowerCase();
   const columns = useMemo(() => {

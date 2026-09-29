@@ -344,3 +344,52 @@
 .leaveTitle { margin: 0 0 8px; font-size: var(--fs-lg); }
 .leaveMsg { margin: 0 0 20px; color: var(--tx-s); font-size: 0.93rem; line-height: 1.55; }
 .leaveActions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+
+/* Blank-entry prompt */
+.prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 6px;
+  padding: 10px 12px;
+  border: 1px dashed var(--bd-s);
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--pu-l) 7%, transparent);
+  animation: fadeUp var(--dur-base) var(--ease-out) both;
+}
+.promptIcon { flex-shrink: 0; color: var(--pu-g); }
+.promptText { flex: 1; min-width: 0; color: var(--tx-s); font-size: 0.95rem; line-height: 1.4; }
+.promptActions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.promptUse {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--bd);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--tx-s);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.promptUse:hover { border-color: var(--pu-l); color: var(--tx); background: var(--bds); }
+.promptShuffle {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--tx-m);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+.promptShuffle:hover { background: var(--bds); color: var(--pu-g); }
+.promptShuffle:active { transform: rotate(-25deg); }
+@media (max-width: 600px) {
+  .prompt { flex-wrap: wrap; }
+  .promptText { flex-basis: 100%; }
+}

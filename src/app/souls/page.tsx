@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { Plus, Users, Pencil } from 'lucide-react';
 import s from './souls.module.css';
@@ -8,6 +8,7 @@ import SoulAvatar from '@/components/souls/SoulAvatar';
 import SoulForm from '@/components/souls/SoulForm';
 import { getSouls, deleteSoul, type DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { useLiveTables } from '@/lib/realtime';
 import { deleteImage, preloadSignedUrls } from '@/lib/upload';
 
 export default function SoulsPage() {
@@ -18,8 +19,7 @@ export default function SoulsPage() {
   const [delSoul, setDelSoul] = useState<DbSoul | null>(null);
   const [toast, show] = useToast();
 
-  useEffect(() => {
-    (async () => {
+  const reload = useCallback(async () => {
       try {
         if (!(await ensureSession())) return;
         const data = await getSouls();
@@ -30,8 +30,10 @@ export default function SoulsPage() {
       } finally {
         setLoading(false);
       }
-    })();
   }, [show]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useLiveTables(['souls', 'soul_media'], reload);
 
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => souls

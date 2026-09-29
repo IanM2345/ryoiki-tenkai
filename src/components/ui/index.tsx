@@ -1,10 +1,11 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback, ReactNode, KeyboardEvent } from 'react';
-import { Star, X, Search, CircleCheck, TriangleAlert, Check, Sparkles } from 'lucide-react';
+import { Star, X, Search, CircleCheck, TriangleAlert, Check, Sparkles, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import s from './ui.module.css';
 import { Glyph } from './icons';
 import type { DbSoul } from '@/lib/db';
 import SoulAvatar from '@/components/souls/SoulAvatar';
+import { localDateStr, parseLocalDate } from '@/lib/dates';
 
 export { Glyph, glyphIcon } from './icons';
 
@@ -212,13 +213,15 @@ function useFieldId() {
   return ref.current;
 }
 
-interface FInputProps { label?: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; style?: React.CSSProperties; }
-export function FInput({ label, value, onChange, placeholder, type = 'text', style }: FInputProps) {
+interface FInputProps { label?: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; style?: React.CSSProperties; min?: string; max?: string; }
+export function FInput({ label, value, onChange, placeholder, type = 'text', style, min, max }: FInputProps) {
   const id = useFieldId();
   return (
     <div className={s.fieldWrap} style={style}>
       {label && <label htmlFor={id} className={s.lbl}>{label}</label>}
-      <input id={id} type={type} className={s.fieldInput} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />
+      {type === 'date'
+        ? <DatePicker id={id} value={value} onChange={onChange} placeholder={placeholder} min={min} max={max} />
+        : <input id={id} type={type} className={s.fieldInput} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} />}
     </div>
   );
 }
@@ -326,6 +329,104 @@ export function EmptyState({ icon = '✦', msg, action }: { icon?: ReactNode; ms
       </div>
       <p className={s.emptyMsg}>{msg}</p>
       {action}
+    </div>
+  );
+}
+
+// ─── DATE PICKER ──────────────────────────────────────────────
+const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** Days (Mon-first) to lay out for the month containing `view`, padded with the
+ *  spill-over days from the neighbouring months so every week has seven cells. */
+function monthMatrix(view: Date): Date[] {
+  const y = view.getFullYear(), m = view.getMonth();
+  const first = new Date(y, m, 1);
+  const lead = (first.getDay() + 6) % 7;           // Mon=0 … Sun=6
+  const start = new Date(y, m, 1 - lead);
+  return Array.from({ length: 42 }, (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+}
+
+const prettyLong = (ymd: string) => {
+  const d = parseLocalDate(ymd);
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+interface DatePickerProps {
+  value: string;                       // YYYY-MM-DD, or '' for none
+  onChange: (v: string) => void;
+  min?: string;                        // YYYY-MM-DD inclusive
+  max?: string;                        // YYYY-MM-DD inclusive
+  placeholder?: string;
+  id?: string;
+  compact?: boolean;                   // slimmer trigger for inline rows
+  clearable?: boolean;                 // show a "clear" action in the footer
+}
+
+export function DatePicker({ value, onChange, min, max, placeholder = 'Pick a date', id, compact, clearable }: DatePickerProps) {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState(() => parseLocalDate(value || localDateStr()));
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const today = localDateStr();
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  const disabled = (ymd: string) => (min && ymd < min) || (max && ymd > max);
+  const pick = (d: Date) => { const ymd = localDateStr(d); if (disabled(ymd)) return; onChange(ymd); setOpen(false); };
+  const step = (n: number) => setView(v => new Date(v.getFullYear(), v.getMonth() + n, 1));
+  const cells = monthMatrix(view);
+  const viewMonth = view.getMonth();
+
+  return (
+    <div className={s.dp} ref={wrapRef}>
+      <button
+        type="button" id={id}
+        className={`${s.dpTrigger} ${compact ? s.dpTriggerSm : ''} ${open ? s.dpTriggerOpen : ''} ${value ? '' : s.dpTriggerEmpty}`}
+        onClick={() => { if (!open) setView(parseLocalDate(value || localDateStr())); setOpen(o => !o); }}
+        aria-haspopup="dialog" aria-expanded={open}
+      >
+        <CalendarIcon size={compact ? 15 : 16} strokeWidth={2} />
+        <span className={s.dpValue}>{value ? prettyLong(value) : placeholder}</span>
+      </button>
+
+      {open && (
+        <div className={s.dpPop} role="dialog" aria-label="Choose a date">
+          <div className={s.dpHead}>
+            <button type="button" className={s.dpNav} onClick={() => step(-1)} aria-label="Previous month"><ChevronLeft size={17} strokeWidth={2.5} /></button>
+            <span className={s.dpTitle}>{MONTHS[viewMonth]} {view.getFullYear()}</span>
+            <button type="button" className={s.dpNav} onClick={() => step(1)} aria-label="Next month"><ChevronRight size={17} strokeWidth={2.5} /></button>
+          </div>
+          <div className={s.dpWeek}>{WEEKDAYS.map(w => <span key={w} className={s.dpWd}>{w}</span>)}</div>
+          <div className={s.dpGrid}>
+            {cells.map((d, i) => {
+              const ymd = localDateStr(d);
+              const cls = [
+                s.dpDay,
+                d.getMonth() !== viewMonth ? s.dpOut : '',
+                ymd === value ? s.dpSel : '',
+                ymd === today ? s.dpToday : '',
+                disabled(ymd) ? s.dpDis : '',
+              ].join(' ');
+              return (
+                <button key={i} type="button" className={cls} onClick={() => pick(d)} disabled={!!disabled(ymd)} aria-pressed={ymd === value}>
+                  {d.getDate()}
+                </button>
+              );
+            })}
+          </div>
+          <div className={s.dpFoot}>
+            <button type="button" className={s.dpTodayBtn} onClick={() => pick(new Date())} disabled={!!disabled(today)}>Today</button>
+            {clearable && value && <button type="button" className={s.dpClear} onClick={() => { onChange(''); setOpen(false); }}>Clear</button>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

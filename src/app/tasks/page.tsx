@@ -1,14 +1,15 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, ListChecks, PartyPopper, CalendarDays, Sparkles, Eraser } from 'lucide-react';
 import s from './tasks.module.css';
 import {
   Btn, InnerTabs, SearchBar, Topbar, Pill, Modal, ModalTitle, ModalFooter, Confirm,
-  Toast, useToast, FInput, EmptyState, Lbl,
+  Toast, useToast, FInput, EmptyState, Lbl, DatePicker,
 } from '@/components/ui';
 import TaskRow from '@/components/tasks/TaskRow';
 import { getTasks, addTask, updateTask, deleteTask, clearDoneTasks } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { useLiveTables } from '@/lib/realtime';
 import {
   type Task, type Priority, PRIORITIES, PRIO_COLOR, PRIO_LABEL,
   isOverdue, isDueToday, isUpcoming, sortOpen, sortDone,
@@ -59,8 +60,7 @@ export default function TasksPage() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [toast, show] = useToast();
 
-  useEffect(() => {
-    (async () => {
+  const reload = useCallback(async () => {
       try {
         if (!(await ensureSession())) return;
         setTasks(await getTasks());
@@ -69,8 +69,10 @@ export default function TasksPage() {
       } finally {
         setLoading(false);
       }
-    })();
   }, [show]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useLiveTables(['tasks'], reload);
 
   const today = localDateStr();
   const buckets = useMemo(() => {
@@ -183,10 +185,10 @@ export default function TasksPage() {
           </div>
           <div className={s.addBottom}>
             <PriorityPicker value={newPrio} onChange={setNewPrio} />
-            <label className={s.dateWrap}>
+            <div className={s.dateWrap}>
               <span className={s.dateLabel}>Due</span>
-              <input type="date" className={s.dateInput} value={newDue} min={today} onChange={e => setNewDue(e.target.value)} aria-label="Due date" />
-            </label>
+              <DatePicker compact clearable value={newDue} min={today} onChange={setNewDue} placeholder="Add a date" />
+            </div>
             <Btn type="submit" sm disabled={!newText.trim() || adding} className={s.addBtn}>
               {adding ? 'Adding' : 'Add task'}
             </Btn>

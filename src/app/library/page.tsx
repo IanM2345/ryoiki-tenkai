@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, Link2, Clapperboard, MapPin, StickyNote, Lightbulb, ExternalLink, Trash2, LibraryBig } from 'lucide-react';
 import s from './library.module.css';
 import {
@@ -15,6 +15,7 @@ import {
 } from '@/lib/db';
 import type { DbLibraryEntry, DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { useLiveTables } from '@/lib/realtime';
 import { prepareImage, deleteImage, preloadSignedUrls } from '@/lib/upload';
 
 type LibType = DbLibraryEntry['type'];
@@ -56,8 +57,7 @@ export default function LibraryPage() {
   const [delItem, setDelItem]   = useState<DbLibraryEntry | null>(null);
   const [toast, show] = useToast();
 
-  useEffect(() => {
-    (async () => {
+  const reload = useCallback(async () => {
       try {
         if (!(await ensureSession())) return;
         const [data, soulData] = await Promise.all([getLibrary(), getSouls().catch(() => [] as DbSoul[])]);
@@ -69,8 +69,10 @@ export default function LibraryPage() {
       } finally {
         setLoading(false);
       }
-    })();
   }, [show]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useLiveTables(['library', 'soul_links'], reload);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: items.length };

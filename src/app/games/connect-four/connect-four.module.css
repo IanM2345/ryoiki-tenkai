@@ -1,0 +1,41 @@
+.frame {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 10px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(160deg, color-mix(in oklab, var(--pu) 45%, var(--card)), color-mix(in oklab, var(--pu-d) 60%, var(--card)));
+  box-shadow: var(--shadow-lg), 0 1px 0 color-mix(in oklab, #fff 12%, transparent) inset;
+}
+.cols { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.col {
+  display: grid;
+  grid-template-rows: repeat(6, 1fr);
+  gap: 4px;
+  padding: 4px 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+.col:disabled { cursor: default; }
+@media (hover: hover) and (pointer: fine) {
+  .col:not(:disabled):hover { background: color-mix(in oklab, #fff 10%, transparent); }
+}
+.slot { display: grid; place-items: center; aspect-ratio: 1; }
+.disc {
+  width: 82%;
+  height: 82%;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--bg) 70%, #000);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4) inset;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.you { background: radial-gradient(circle at 35% 30%, #ff8f6b, var(--red)); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.ai  { background: radial-gradient(circle at 35% 30%, #ffe07a, var(--yellow)); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.dropIn { animation: cf-drop var(--dur-slow) var(--ease-out); }
+@keyframes cf-drop { from { transform: translateY(-340%); } to { transform: translateY(0); } }
+.winDisc { animation: cf-pulse 1s ease-in-out infinite; }
+@keyframes cf-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); box-shadow: 0 0 12px currentColor; } }
+@media (prefers-reduced-motion: reduce) { .dropIn, .winDisc { animation: none; } }

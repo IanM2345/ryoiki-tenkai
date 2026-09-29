@@ -417,6 +417,7 @@ export interface DbPlace {
   rating:     number;
   notes:      string | null;
   tags:       string[];
+  wishlist:   boolean;
   created_at: string;
   updated_at: string;
   image_url?:  string | null;
@@ -440,6 +441,8 @@ export async function addPlace(place: {
   rating?: number;
   notes?: string | null;
   tags?: string[];
+  wishlist?: boolean;
+  image_url?: string | null;
 }): Promise<DbPlace> {
   const { data, error } = await supabase
     .from('places')
@@ -803,7 +806,7 @@ export async function deleteSoulLinksForItem(tableName: DbSoulLink['table_name']
 //  Append this block to the bottom of src/lib/db.ts
 // ================================================================
 
-export type GameType = 'tic' | 'sudoku' | 'chess' | 'battleship' | 'kadi' | 'matatu';
+export type GameType = 'tic' | 'sudoku' | 'chess' | 'battleship' | 'kadi' | 'matatu' | 'connect4' | 'memory' | 'wordle' | 'g2048' | 'wordsearch' | 'bao';
 export type GameDifficulty = 'easy' | 'medium' | 'hard';
 export type GameStatus = 'in_progress' | 'finished';
 export type GameResult = 'win' | 'loss' | 'draw';

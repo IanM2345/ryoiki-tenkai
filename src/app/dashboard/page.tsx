@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Sunrise, Sun, Sunset, MoonStar, Plus, ArrowRight, Shuffle, LibraryBig, MapPin,
@@ -18,6 +18,7 @@ import {
   getSettings, saveSettings,
 } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { useLiveTables } from '@/lib/realtime';
 import { type Task, isOverdue, isDueToday, sortOpen } from '@/lib/tasks';
 import { localDateStr, fmtDate, relDay } from '@/lib/dates';
 import BirthdayCard from '@/components/ui/BirthdayCard';
@@ -61,8 +62,7 @@ export default function DashboardPage() {
   const [toast, show] = useToast();
   const now = useNow();
 
-  useEffect(() => {
-    (async () => {
+  const reload = useCallback(async () => {
       try {
         if (!(await ensureSession())) return;
         const results = await Promise.allSettled([
@@ -80,8 +80,10 @@ export default function DashboardPage() {
       } finally {
         setLoading(false);
       }
-    })();
   }, [show]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useLiveTables(['tasks', 'journal_entries', 'library', 'souls', 'places', 'ratings', 'user_settings'], reload);
 
   const today = localDateStr(now ?? undefined);
   const { overdue, dueToday, doneToday } = useMemo(() => {

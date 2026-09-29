@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Plus, Tv, Headphones, BookOpen, Compass, Play, Check, RotateCcw, Trash2, ListVideo } from 'lucide-react';
 import s from './queue.module.css';
 import {
@@ -13,6 +13,7 @@ import {
 } from '@/lib/db';
 import type { DbQueueItem, DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { useLiveTables } from '@/lib/realtime';
 import { localDateStr, fmtDate } from '@/lib/dates';
 
 type QStatus = DbQueueItem['status'];
@@ -108,8 +109,7 @@ export default function QueuePage() {
   const [delItem, setDelItem] = useState<DbQueueItem | null>(null);
   const [toast, show] = useToast();
 
-  useEffect(() => {
-    (async () => {
+  const reload = useCallback(async () => {
       try {
         if (!(await ensureSession())) return;
         const [data, soulData] = await Promise.all([getQueue(), getSouls().catch(() => [] as DbSoul[])]);
@@ -123,8 +123,10 @@ export default function QueuePage() {
       } finally {
         setLoading(false);
       }
-    })();
   }, [show]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useLiveTables(['queue'], reload);
 
   const q = search.trim().toLowerCase();
   const order: Record<QStatus, number> = { progress: 0, todo: 1, done: 2 };

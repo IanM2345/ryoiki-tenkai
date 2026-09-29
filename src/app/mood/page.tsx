@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Plus, Trash2, Palette, Cloud, CloudSun, History, Check } from 'lucide-react';
 import s from './mood.module.css';
 import {
@@ -11,6 +11,7 @@ import {
   type DbMoodDef, type DbMoodLog,
 } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { useLiveTables } from '@/lib/realtime';
 import { localDateStr, localTimeStr, relDay } from '@/lib/dates';
 
 // ─── TYPES & DATA ─────────────────────────────────────────────
@@ -410,8 +411,7 @@ export default function MoodBubblePage() {
   }, []);
 
   // ── Load ───────────────────────────────────────────────────
-  useEffect(() => {
-    (async () => {
+  const reload = useCallback(async () => {
       try {
         if (!(await ensureSession())) return;
         const [defs, logs] = await Promise.all([getMoodDefs(), getMoodLogs()]);
@@ -429,8 +429,10 @@ export default function MoodBubblePage() {
       } finally {
         setLoading(false);
       }
-    })();
   }, [show]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useLiveTables(['mood_defs', 'mood_logs'], reload);
 
   // ── Canvas engine lifecycle ────────────────────────────────
   useEffect(() => {

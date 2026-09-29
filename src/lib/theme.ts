@@ -19,15 +19,20 @@ export const PRESET_THEMES: Theme[] = [
   { name: 'Sage',     bg: '#0a1a0a', accent: '#4ade80', secondary: '#a3e635', text: '#d4f5d4' },
   { name: 'Rose',     bg: '#1a0a10', accent: '#f43f5e', secondary: '#fb7185', text: '#ffe4e8' },
   { name: 'Ocean',    bg: '#04111a', accent: '#22d3ee', secondary: '#38bdf8', text: '#e0f2fe' },
+  { name: 'Bubblegum', bg: '#160811', accent: '#ff5db1', secondary: '#b57bff', text: '#ffe4f3' },
 ];
 
 export const DEFAULT_THEME = PRESET_THEMES[0];
 
 export const APP_FONTS: Record<string, { label: string; family: string }> = {
-  comic:   { label: 'Comic',   family: "var(--font-comic), 'Comic Sans MS', cursive" },
-  georgia: { label: 'Georgia', family: 'Georgia, "Times New Roman", serif' },
-  mono:    { label: 'Mono',    family: "ui-monospace, 'Cascadia Mono', 'Courier New', monospace" },
-  system:  { label: 'System',  family: 'system-ui, -apple-system, "Segoe UI", sans-serif' },
+  comic:   { label: 'Comic',       family: "var(--font-comic), 'Comic Sans MS', cursive" },
+  caveat:  { label: 'Handwriting', family: "'Caveat', 'Comic Sans MS', cursive" },
+  fredoka: { label: 'Rounded',     family: "'Fredoka', system-ui, sans-serif" },
+  space:   { label: 'Modern',      family: "'Space Grotesk', system-ui, sans-serif" },
+  storybook: { label: 'Storybook', family: "'Lora', Georgia, serif" },
+  georgia: { label: 'Georgia',     family: 'Georgia, "Times New Roman", serif' },
+  mono:    { label: 'Mono',        family: "ui-monospace, 'Cascadia Mono', 'Courier New', monospace" },
+  system:  { label: 'System',      family: 'system-ui, -apple-system, "Segoe UI", sans-serif' },
 };
 export const DEFAULT_FONT_KEY = 'comic';
 
@@ -51,9 +56,14 @@ export interface StoredTheme {
 /** Map any stored font family (including legacy values) to a font key. */
 export function fontKeyFromFamily(family?: string | null): string {
   if (!family) return DEFAULT_FONT_KEY;
+  if (/caveat/i.test(family)) return 'caveat';
+  if (/fredoka/i.test(family)) return 'fredoka';
+  if (/space grotesk/i.test(family)) return 'space';
+  if (/lora/i.test(family)) return 'storybook';
   if (/comic/i.test(family)) return 'comic';
-  if (/georgia|serif/i.test(family) && !/sans/i.test(family)) return 'georgia';
+  if (/georgia/i.test(family)) return 'georgia';
   if (/mono|courier/i.test(family)) return 'mono';
+  if (/serif/i.test(family) && !/sans/i.test(family)) return 'storybook';
   if (/system|sans-serif/i.test(family)) return 'system';
   return DEFAULT_FONT_KEY;
 }

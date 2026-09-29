@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Plus, Star, Trash2, Clapperboard, BookOpen, Music, MapPin, Tv, Newspaper, Sparkles,
   ArrowDownWideNarrow, Clock, ArrowDownAZ,
@@ -15,6 +15,7 @@ import {
 } from '@/lib/db';
 import type { DbRating, DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
+import { useLiveTables } from '@/lib/realtime';
 import { fmtDate } from '@/lib/dates';
 
 const CATS = ['Film', 'Book', 'Music', 'Place', 'Series', 'Article', 'Experience'] as const;
@@ -63,8 +64,7 @@ export default function RatingsPage() {
   const linksReady = useRef(true);
   const [toast, show] = useToast();
 
-  useEffect(() => {
-    (async () => {
+  const reload = useCallback(async () => {
       try {
         if (!(await ensureSession())) return;
         const [data, soulData] = await Promise.all([getRatings(), getSouls().catch(() => [] as DbSoul[])]);
@@ -75,8 +75,10 @@ export default function RatingsPage() {
       } finally {
         setLoading(false);
       }
-    })();
   }, [show]);
+
+  useEffect(() => { reload(); }, [reload]);
+  useLiveTables(['ratings', 'soul_links'], reload);
 
   const q = search.trim().toLowerCase();
 

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Trash2, Pin, AtSign, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Pin, AtSign, Check, Loader2, Sparkles, Shuffle } from 'lucide-react';
 import s from '../journal.module.css';
 import { Btn, Lbl, TagInput, Toggle, Modal, Confirm, Toast, useToast } from '@/components/ui';
 import {
@@ -11,7 +11,7 @@ import {
 import type { DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
 import { localDateStr, localTimeStr, parseLocalDate } from '@/lib/dates';
-import { MOODS, wordCount } from '@/lib/journal';
+import { MOODS, wordCount, JOURNAL_PROMPTS } from '@/lib/journal';
 import SoulAvatar from '@/components/souls/SoulAvatar';
 
 interface Draft { title: string; body: string; mood: string; tags: string[]; pinned: boolean; souls: string[]; }
@@ -38,6 +38,14 @@ export default function JournalEditorPage() {
   const [mentionQ, setMentionQ] = useState<string | null>(null);
   const [mentionIdx, setMentionIdx] = useState(0);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  // A gentle prompt for a blank entry. Seeded after mount to avoid a hydration mismatch.
+  const [promptSeed, setPromptSeed] = useState<number | null>(null);
+  useEffect(() => {
+    const t = setTimeout(() => setPromptSeed(Math.floor(Math.random() * JOURNAL_PROMPTS.length)), 0);
+    return () => clearTimeout(t);
+  }, []);
+  const prompt = promptSeed === null ? null : JOURNAL_PROMPTS[promptSeed % JOURNAL_PROMPTS.length];
 
   const dirty = !same(draft, original);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft(d => ({ ...d, [k]: v }));
@@ -233,6 +241,26 @@ export default function JournalEditorPage() {
           ))}
           <span className={s.moodName}>{draft.mood ? `Feeling ${MOODS[draft.mood]}` : 'How are you feeling?'}</span>
         </div>
+
+        {prompt && !draft.body.trim() && (
+          <div className={s.prompt}>
+            <Sparkles size={16} strokeWidth={2} className={s.promptIcon} aria-hidden />
+            <span className={s.promptText}>{prompt}</span>
+            <span className={s.promptActions}>
+              <button
+                type="button"
+                className={s.promptUse}
+                onClick={() => {
+                  setDraft(d => ({ ...d, body: `${prompt}\n\n` }));
+                  requestAnimationFrame(() => { const ta = bodyRef.current; if (ta) { ta.focus(); const n = ta.value.length; ta.setSelectionRange(n, n); } });
+                }}
+              >Start with this</button>
+              <button type="button" className={s.promptShuffle} onClick={() => setPromptSeed(v => (v ?? 0) + 1)} aria-label="Another prompt">
+                <Shuffle size={15} strokeWidth={2.25} />
+              </button>
+            </span>
+          </div>
+        )}
 
         <div className={s.bodyWrap}>
           <textarea

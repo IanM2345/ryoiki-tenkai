@@ -5,6 +5,7 @@ export type { GameType, GameResult, GameDifficulty };
 
 export const GAME_LABEL: Record<GameType, string> = {
   tic: 'Tic Tac Toe', sudoku: 'Sudoku', chess: 'Chess', battleship: 'Battleship', kadi: 'Kadi', matatu: 'Matatu',
+  connect4: 'Connect Four', memory: 'Memory', wordle: 'Wordle', g2048: '2048', wordsearch: 'Word Search', bao: 'Bao',
 };
 
 /** Map any in-game difficulty name onto the three the database accepts. */
