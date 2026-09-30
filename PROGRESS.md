@@ -371,3 +371,38 @@ Tic Tac Toe, Sudoku, Chess, Battleship, Kadi, Matatu, Connect Four, Memory, 2048
 - **Two migrations:** `20260930100000_soul_birthdays.sql` (one nullable column) and `20260930110000_time_capsules.sql` (new owner-only table, with live sync). Both are safe on her project. `seed_staging.sql` now adds birthdays and sample letters on staging. DEPLOY.md lists all six migrations for her project.
 
 **Action:** on staging, `npx supabase db push`. No `npm install` needed.
+
+## Session 24 (30 Sep 2026): push notifications for her iPhone and iPad
+- **Real push notifications**, even when yourworld is closed. Every morning at about 8am UK time, a Vercel Cron job (`vercel.json` → `/api/cron/daily`) sends:
+  - birthday reminders 3 days before, the day before, and on the day ("🎂 It's Amara's birthday today! They're turning 30.")
+  - time capsule letters on the morning they unlock ("💌 Ian left you a letter"). The letter's title and words are never put in the notification.
+  Tapping a notification opens the right page (the person's profile, or the time capsule).
+- **iPhone and iPad:** Apple only allows web notifications for sites added to the Home Screen (iOS/iPadOS 16.4+). The App & backup page knows this: in a Safari tab it explains how to install; inside the installed app it shows **Turn on notifications**, then sends a test straight away. There's also **Send a test** and **Turn off** per device. If she blocked them, it says where to switch them back on in Settings.
+- The dashboard's Birthdays card links to this ("Get reminders on your phone") until she's turned them on.
+- **How it works:** standard Web Push (VAPID) using the `web-push` package. Messages are end-to-end encrypted to her device. A new `push_subscriptions` table (owner-only) holds one row per device; devices that are removed get cleaned up automatically.
+- **Tested here:** real encrypted pushes to a local stand-in push service, decrypted with the device's keys exactly as her phone would. The VAPID signature verifies, and removed devices get cleaned up. Also tested: the reminder rules (right days, no spoilers, UK date at midnight and in winter time), and that the job refuses anyone without the secret.
+- **iPad fixes:** removed the portrait-only lock from the app manifest (so the installed app rotates on the iPad), and switched the status bar style so content never slides under it.
+- Removed the old "only while open" notifier (`BirthdayNotifier.tsx`); push replaces it. Delete that file on your PC.
+- **Migration** `20260930120000_push_subscriptions.sql` (new table only). **New package** `web-push`: run `npm install`.
+
+**Action:** follow DEPLOY.md section 4b once (key pair, cron secret, service role key in Vercel), then `npx supabase db push` on staging.
+
+## Session 25 (30 Sep 2026): What's new video + production guide
+- **A "What's new" video**, made with `/brag` (the `brag-slim` workflow): 58 seconds, with its own soundtrack written in code (100 BPM, C major, sound effects cued to every tap and reveal). It shows what's new (birthday countdowns, letters to future you, the year in colour, four new games, the extras) using the site's real screens and styling, then walks her through the two things she has to do herself: **Add to Home Screen** in Safari, and **Turn on notifications** in the installed app.
+  - Two cuts from one composition: **portrait** for her iPhone and **landscape** for her iPad. The player picks whichever fits the screen.
+  - Files in `public/whats-new/` (about 9 MB each, H.264 + AAC, fast start). Source and working files are in `brag-output/` (git-ignored): plan, stills, soundtrack script, composition page.
+- **It plays by itself once**, the first time she opens the updated site. It starts muted (phones only allow silent autoplay) with a big **Tap for sound** button that restarts it with music. It ends on **Watch again / Done**.
+- **Replay any time:** menu → **What's new** (new sidebar item), or the What's new button on App & backup.
+- "Seen" is saved to her account (`user_settings.whats_new_seen`), so it plays once in total, not once per device. If that column isn't there yet, it remembers per device instead.
+- **DEPLOY.md rewritten** as a full production guide, mostly the Supabase part: link, schema-only snapshot, baseline repair, **dry run**, push, structure-only checks, keys, Vercel settings, checks that never show her data, rollback.
+- **Migration** `20260930130000_whats_new.sql` (one nullable column). Video files are allowed through the sign-in guard (`.mp4`).
+- To make a video for a future update: bump `WHATS_NEW_VERSION` in `src/lib/whatsNew.ts` and replace the files in `public/whats-new/`.
+
+## Session 26 (30 Sep 2026): What's new video, now to "Delirious"
+- The video's soundtrack is now **"Delirious" from Jujutsu Kaisen** (the site is *ryoiki tenkai*, after all). Re-made with `/brag`:
+  - Edited the song to the scenes: its build under the hook, the drop landing as the phone rises, the breakdown under "two quick things to set up", a calmer section under the how-to, and the climax's final hit on "Made just for you".
+  - The whole video is stretched by 4.6% so every 2.4-second bar is exactly 6 beats (143.4 BPM). Every scene cut lands on a beat. It's now 59.8 seconds.
+  - Sound effects re-tuned into the song's key (F minor) and tucked 3–5 dB under it.
+- **Credit at the end:** a "now playing" card (♪ Delirious · from Jujutsu Kaisen) with 領域展開 (*ryōiki tenkai*, Domain Expansion) glowing faintly behind the logo.
+- **The video is now private:** because it uses a copyrighted song, `.mp4` files are only served to someone signed in (the poster images stay public). DEPLOY.md's checks updated to expect this.
+- The first version, with its own made-in-code music, is kept as `brag-output/brag-original-soundtrack.mp4` (and `-landscape`) in case you ever want a version with no copyrighted music.

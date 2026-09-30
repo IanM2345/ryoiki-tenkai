@@ -248,3 +248,27 @@
 
 /* Items never squash when the menu is taller than the screen; it scrolls instead. */
 .sidebar > * { flex-shrink: 0; }
+
+/* "What's new" (replays the update video) */
+.newsBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  width: calc(100% - 20px);
+  margin: 1px 10px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--or);
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+.newsBtn:hover { background: color-mix(in oklab, var(--or) 12%, transparent); }
+.sidebarClosed .newsBtn { justify-content: center; margin: 1px 8px; padding: 0; width: calc(100% - 16px); }

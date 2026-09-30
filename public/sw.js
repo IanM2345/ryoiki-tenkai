@@ -1,8 +1,8 @@
 // yourworld service worker.
 // Deliberately small: it makes the site installable, shows a friendly screen when
-// there's no connection, and handles taps on birthday notifications.
+// there's no connection, and shows push notifications (birthdays, letters).
 // It never caches her data; every page and query still comes fresh from the network.
-// Version: yw-sw-1 (bump this comment to force phones to pick up a new worker).
+// Version: yw-sw-2 (bump this comment to force phones to pick up a new worker).
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
@@ -24,12 +24,26 @@ self.addEventListener('fetch', event => {
   );
 });
 
+// A push from the daily reminder job (or the test button). Payload: { title, body, url, tag }.
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { title: 'yourworld', body: event.data?.text() }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'yourworld', {
+    body: data.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
+    tag: data.tag,
+    data: { url: data.url || '/dashboard' },
+  }));
+});
+
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  const url = new URL(event.notification.data?.url || '/dashboard', self.location.origin).href;
   event.waitUntil((async () => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const open = all.find(c => 'focus' in c);
-    if (open) { await open.focus(); return open.navigate?.('/dashboard'); }
-    return self.clients.openWindow('/dashboard');
+    if (open) { await open.focus(); return open.navigate ? open.navigate(url) : undefined; }
+    return self.clients.openWindow(url);
   })());
 });

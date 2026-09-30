@@ -51,6 +51,7 @@ export interface DbUserSettings {
   
   password_reset_done:  boolean;
   first_login_done:     boolean;
+  whats_new_seen?:      string | null;   // which What's new video she has watched
 }
 
 export async function getSettings(): Promise<DbUserSettings | null> {

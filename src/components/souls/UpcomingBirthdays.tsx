@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Cake, ArrowRight, BellRing, X, PartyPopper } from 'lucide-react';
+import { currentSubscription } from '@/lib/push-client';
 import StoredImage from '@/components/ui/StoredImage';
 import type { DbSoul } from '@/lib/db';
 import { upcomingBirthdays, countdownLabel, fmtBirthday, REMIND_DAYS } from '@/lib/birthdays';
@@ -21,16 +22,10 @@ function Face({ soul }: { soul: DbSoul }) {
 /** Dashboard card: the next few birthdays with a countdown. */
 export function UpcomingBirthdaysCard({ souls, loading }: { souls: DbSoul[]; loading: boolean }) {
   const list = upcomingBirthdays(souls).slice(0, 4);
-  const [perm, setPerm] = useState<NotificationPermission | 'unsupported'>('default');
+  const [subscribed, setSubscribed] = useState(true);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPerm(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission);
+    currentSubscription().then(sub => setSubscribed(!!sub)).catch(() => setSubscribed(false));
   }, []);
-
-  const askPermission = async () => {
-    if (typeof Notification === 'undefined') return;
-    setPerm(await Notification.requestPermission());
-  };
 
   return (
     <section className={s.card} aria-labelledby="bday-h">
@@ -65,10 +60,10 @@ export function UpcomingBirthdaysCard({ souls, loading }: { souls: DbSoul[]; loa
         </ul>
       )}
 
-      {list.length > 0 && perm === 'default' && (
-        <button type="button" className={s.notifyBtn} onClick={askPermission}>
-          <BellRing size={14} strokeWidth={2.25} /> Remind me on this device too
-        </button>
+      {list.length > 0 && !subscribed && (
+        <Link href="/settings#notifications" className={s.notifyBtn}>
+          <BellRing size={14} strokeWidth={2.25} /> Get reminders on your phone
+        </Link>
       )}
     </section>
   );

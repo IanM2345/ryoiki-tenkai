@@ -4,6 +4,8 @@ import type { NextRequest } from 'next/server';
 const PUBLIC_PATHS = ['/login', '/reset-password'];
 // The installable-app files must load before sign-in too.
 const APP_FILES = ['/sw.js', '/manifest.webmanifest', '/icons/'];
+// Note: .mp4 is deliberately NOT here. The What's new video uses a copyrighted song,
+// so it's only served to someone who is signed in.
 const STATIC_EXT = /\.(?:svg|png|jpg|jpeg|gif|webp|mp3|ico|txt|xml)$/;
 
 export function middleware(req: NextRequest) {

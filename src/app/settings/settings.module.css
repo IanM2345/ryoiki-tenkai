@@ -70,3 +70,19 @@
 .done svg { flex-shrink: 0; margin-top: 2px; }
 .footnote { display: flex; align-items: flex-start; gap: 7px; margin: 0; color: var(--tx-m); font-size: 0.8rem; line-height: 1.5; }
 .footnote svg { flex-shrink: 0; margin-top: 2px; color: var(--gr); }
+
+/* Notifications */
+.what { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; font-size: 0.9rem; color: var(--tx-s); }
+.what li { display: flex; align-items: center; gap: 9px; }
+.what svg { flex-shrink: 0; color: var(--or); }
+.notice {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%;
+  padding: 12px 14px; border-radius: var(--radius);
+  border: 1px solid color-mix(in oklab, var(--yellow) 35%, transparent);
+  background: color-mix(in oklab, var(--yellow) 8%, transparent);
+}
+.notice svg { flex-shrink: 0; margin-top: 2px; color: var(--yellow); }
+.notice p { margin: 0; font-size: 0.88rem; line-height: 1.55; color: var(--tx-s); }
+.notice b { color: var(--tx); }
+.btnRow { display: flex; flex-wrap: wrap; gap: 8px; }
+.skelBtn { width: 220px; height: 42px; border-radius: var(--radius-pill); }

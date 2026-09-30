@@ -2,13 +2,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   Smartphone, Download, CheckCircle2, Share, SquarePlus, EllipsisVertical, HardDriveDownload,
-  Images, ShieldCheck, Loader2, BellRing,
+  Images, ShieldCheck, Loader2, Sparkles,
 } from 'lucide-react';
 import s from './settings.module.css';
 import { Btn, Topbar, Toggle, Toast, useToast } from '@/components/ui';
 import { ensureSession } from '@/lib/supabase';
 import { makeBackup, downloadBlob, LAST_BACKUP_KEY, type Progress } from '@/lib/backup';
 import { fmtDate } from '@/lib/dates';
+import NotificationsCard from './NotificationsCard';
+import { openWhatsNew } from '@/lib/whatsNew';
 
 const MAX = 860;
 type Platform = 'ios' | 'android' | 'desktop';
@@ -24,7 +26,6 @@ export default function SettingsPage() {
   const [platform, setPlatform] = useState<Platform>('desktop');
   const [installed, setInstalled] = useState(false);
   const [canPrompt, setCanPrompt] = useState(false);
-  const [notif, setNotif] = useState<NotificationPermission | 'unsupported'>('default');
 
   useEffect(() => {
     const ua = navigator.userAgent;
@@ -33,7 +34,6 @@ export default function SettingsPage() {
     setPlatform(ios ? 'ios' : /Android/.test(ua) ? 'android' : 'desktop');
     setInstalled(window.matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true);
     setCanPrompt(!!window.__ywInstall);
-    setNotif(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission);
      
     const onReady = () => setCanPrompt(!!window.__ywInstall);
     window.addEventListener('yw-install-ready', onReady);
@@ -92,7 +92,12 @@ export default function SettingsPage() {
 
   return (
     <div className={s.page}>
-      <Topbar title="App & backup" sub="Put yourworld on your phone, and keep a copy of everything." maxWidth={MAX} />
+      <Topbar
+        title="App & backup"
+        sub="Put yourworld on your phone, and keep a copy of everything."
+        action={<Btn variant="ghost" onClick={openWhatsNew}><Sparkles size={16} strokeWidth={2} /> What&apos;s new</Btn>}
+        maxWidth={MAX}
+      />
       <div className={s.wrap}>
         {/* ── Install ─────────────────────────────────────── */}
         <section className={s.card} aria-labelledby="install-h">
@@ -110,9 +115,9 @@ export default function SettingsPage() {
             <Btn onClick={install}><Download size={16} strokeWidth={2} /> Install yourworld</Btn>
           ) : platform === 'ios' ? (
             <ol className={s.steps}>
-              <li><span className={s.stepIcon}><Share size={16} /></span> Open this site in <b>Safari</b> and tap the <b>Share</b> button.</li>
+              <li><span className={s.stepIcon}><Share size={16} /></span> Open this site in <b>Safari</b> and tap the <b>Share</b> button (at the bottom on iPhone, at the top next to the address bar on iPad).</li>
               <li><span className={s.stepIcon}><SquarePlus size={16} /></span> Scroll down and tap <b>Add to Home Screen</b>.</li>
-              <li><span className={s.stepIcon}><CheckCircle2 size={16} /></span> Tap <b>Add</b>. The star icon appears on your home screen.</li>
+              <li><span className={s.stepIcon}><CheckCircle2 size={16} /></span> Tap <b>Add</b>. The star icon appears on your Home Screen. From now on, open yourworld from there.</li>
             </ol>
           ) : platform === 'android' ? (
             <ol className={s.steps}>
@@ -124,15 +129,9 @@ export default function SettingsPage() {
             <p className={s.sub}>On your phone, open this site and come back to this page for the steps. On a computer, look for the install icon at the end of the address bar in Chrome or Edge.</p>
           )}
 
-          {notif !== 'unsupported' && (
-            <div className={s.row}>
-              <span className={s.rowText}><BellRing size={16} strokeWidth={2} /> Birthday reminders on this device</span>
-              {notif === 'granted' ? <span className={s.ok}>On</span>
-                : notif === 'denied' ? <span className={s.muted}>Blocked in your browser settings</span>
-                : <Btn sm variant="ghost" onClick={async () => setNotif(await Notification.requestPermission())}>Turn on</Btn>}
-            </div>
-          )}
         </section>
+
+        <NotificationsCard onMessage={show} />
 
         {/* ── Backup ──────────────────────────────────────── */}
         <section className={s.card} aria-labelledby="backup-h">
