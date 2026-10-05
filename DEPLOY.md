@@ -14,6 +14,58 @@ Every database change only *adds* things (new tables, new empty columns, permiss
 
 ---
 
+## Already live? Adding Routes
+
+If the earlier update is already on her site, this is all Routes needs (about 15 minutes):
+
+1. **Mapbox token.** Routes uses the Mapbox token the site already has (`NEXT_PUBLIC_MAPBOX_TOKEN`) for the 3D map,
+   road routes with times, search as she types, and best stop order. There's no other account to make.
+   - Check it's in Vercel → Settings → Environment Variables for **Production** and **Preview**. If it isn't,
+     copy your default public token (starts with `pk.`) from [account.mapbox.com](https://account.mapbox.com) and add it.
+   - Optional but sensible: in Mapbox → Tokens, add **URL restrictions** for her site address and
+     `http://localhost:3000`, so nobody can reuse the token elsewhere. If you do, Vercel Preview addresses won't show the map
+     unless you add them too.
+   - Without a token, Routes still works with a flat map, straight lines and estimates.
+2. **New package:** run `npm install` once (it adds `mapbox-gl`, the 3D map).
+3. **Her database** (only adds three new tables; nothing existing is touched):
+   ```powershell
+   npx supabase link --project-ref cuwqckhhlkvbhzqiktbj
+   npx supabase db push --dry-run     # should list ONLY 20261001100000_routes
+   npx supabase db push
+   npx supabase link --project-ref pdxozrjepmdjxmxmietz   # back to staging
+   ```
+   Do the same `db push` on staging first (while linked to staging) and try it there.
+4. **Deploy:** commit and push to `main` (or merge your branch). Vercel redeploys by itself.
+5. **Check:** `curl.exe -I https://YOUR-SITE/routes` gives 307 (sign-in only).
+
+---
+
+## Already live? Adding Learn and On the Go
+
+Learn needs one database update and nothing else (no new settings, no new packages):
+```powershell
+npx supabase link --project-ref pdxozrjepmdjxmxmietz      # staging first
+npx supabase db push
+npm run dev                                               # try http://localhost:3000/learn
+npx supabase link --project-ref cuwqckhhlkvbhzqiktbj      # her project
+npx supabase db push --dry-run     # should list ONLY 20261004100000_study_map, 20261004120000_review_scores, 20261004140000_study_sessions
+npx supabase db push
+npx supabase link --project-ref pdxozrjepmdjxmxmietz      # back to staging
+```
+Then commit and push to deploy. It only adds six new tables and one column; nothing existing is touched.
+Until the update is applied, the Learn page says it needs a database update instead of breaking.
+
+### The beta video for the map feature
+A new **What's new** video (`public/whats-new/map-beta-*.mp4` and `.jpg`) shows her Routes, Places, Learn
+and On the Go as a beta, says what works and what doesn't yet, and asks what would make it better.
+It plays by itself once (on whichever device she opens first), after the update above is live. At the end
+there's a **Watch the glow-up** button, so the older video stays watchable too. Nothing to set up: the
+files ship with the deploy. Soundtrack: "If I Am With You" (Jujutsu Kaisen, piano by Block_pf), so like
+the first video it's only served to someone signed in.
+Ship this together with Learn and On the Go (or after them), since the video shows both.
+
+---
+
 ## Checklist
 
 - [ ] 1. Staging tested, including notifications and the What's new video
@@ -45,6 +97,10 @@ Open http://localhost:3000, sign in with your **test** account and click through
 - [ ] Time capsule: write and seal a letter
 - [ ] Mood: log a feeling and check the year-in-colour grid
 - [ ] Theme: pick Bubblegum and a new font, Save, reload
+- [ ] Routes: New route, pick a destination, add two stops, drag one, press Best order, open in Google Maps
+- [ ] Routes: Start journey, tick a stop, End journey, check it appears under Past journeys
+- [ ] Learn: add a subject and two topics, drag one, link two topics, write notes, add a flashcard, review it
+- [ ] On the Go: pick a route and a subject, Start the journey, answer two cards, tap I'm here, Finish
 - [ ] Arcade: finish one game (2048, Wordle, Word Search or Bao), check the stats go up
 - [ ] The **What's new** video plays by itself once, and again from the menu → What's new
 - [ ] App & backup: Download everything, and open the zip
@@ -143,6 +199,12 @@ It should list only migrations from this table, and none that already have a Rem
 | `20260930110000_time_capsules` | new table for letters |
 | `20260930120000_push_subscriptions` | new table for devices with notifications on |
 | `20260930130000_whats_new` | remembers she's watched the What's new video |
+| `20261001100000_routes` | new tables for routes, route collections and journeys taken |
+| `20261004100000_study_map` | new tables for Learn: subjects and topics, cross-links, flashcards, answers, links |
+| `20261004120000_review_scores` | empty `score` column on Learn answers (how close a typed answer was) |
+| `20261004140000_study_sessions` | new table for On the Go sessions (what she studied, on which route, how it went) |
+
+(If you're only adding Routes to a site that already has everything else, you'll see just `20261001100000_routes`.)
 
 **Stop if** the list includes `20260729150314`: go back to 3.3.
 **Stop if** it lists anything else you don't recognise.
@@ -164,16 +226,16 @@ npx supabase migration list        # every row now has a Remote column filled in
 In Supabase → her project → **SQL Editor**, these return only table and column names, never her content:
 
 ```sql
--- the two new tables exist, with row level security on
+-- the new tables exist, with row level security on
 select tablename, rowsecurity from pg_tables
-where schemaname = 'public' and tablename in ('time_capsules', 'push_subscriptions');
+where schemaname = 'public' and tablename in ('time_capsules', 'push_subscriptions', 'routes', 'route_collections', 'route_trips');
 
 -- the new columns exist
 select table_name, column_name from information_schema.columns
 where table_schema = 'public'
   and (table_name, column_name) in (('souls','birthday'), ('places','wishlist'), ('user_settings','whats_new_seen'));
 
--- live sync is on for her tables (expect about 17 rows)
+-- live sync is on for her tables (expect about 20 rows)
 select count(*) from pg_publication_tables where pubname = 'supabase_realtime';
 ```
 
@@ -224,7 +286,7 @@ Preview should keep pointing at **staging**, so each variable has two values: ti
 | `VAPID_SUBJECT` | `mailto:your@email` | your email; push services use it to contact the site owner |
 | `CRON_SECRET` | the random string | step 2 (same in Preview) |
 | `APP_TIMEZONE` | `Europe/London` | optional; this is the default |
-| `NEXT_PUBLIC_MAPBOX_TOKEN` | optional | without it the map uses free CARTO tiles |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | your Mapbox public token (`pk.`) | the 3D Routes map, road routes, search and best order (same in Preview). Without it: flat maps on free CARTO tiles and straight-line routes |
 
 Delete `DEV_PASSWORD`; nothing uses it any more.
 
@@ -257,6 +319,7 @@ curl.exe -I https://YOUR-SITE/login                                   # 200
 curl.exe -I https://YOUR-SITE/manifest.webmanifest                    # 200: installable
 curl.exe -I https://YOUR-SITE/whats-new/glow-up-portrait.jpg          # 200: the video's poster is there
 curl.exe -I https://YOUR-SITE/whats-new/glow-up-portrait.mp4          # 307: the video itself is private (sign-in only)
+curl.exe -I https://YOUR-SITE/whats-new/map-beta-portrait.jpg         # 200: the map beta video's poster
 curl.exe https://YOUR-SITE/api/cron/daily                             # 401: locked
 curl.exe -H "Authorization: Bearer YOUR_CRON_SECRET" https://YOUR-SITE/api/cron/daily
 ```
@@ -309,3 +372,35 @@ Unused leftovers that couldn't be deleted remotely. Safe to delete:
 - `folder_structure.txt` (1 MB directory dump)
 - `staging_schema.sql` (the migration in `supabase/migrations` replaces it)
 - `src/components/souls/BirthdayNotifier.tsx` (replaced by push notifications)
+
+---
+
+## Sentry (error reports)
+
+Sentry tells you when something breaks on her phone, iPad or laptop, or on the server, with the page and the line of code.
+It's **off until you add the DSN**, and it's set up so it never sees her content:
+- no session replay (no screen recordings), no user or account details, no cookies, no request bodies, no query strings;
+- page and API addresses are sent as bare paths with ids blanked (`/journal/<id>`);
+- clicks, typing and console logs are dropped from the trail before an error (they can contain names and labels);
+- reports go through the site itself (`/monitoring`), so Sentry sees Vercel's server address, not hers.
+The rules live in `src/lib/sentry-privacy.ts`.
+
+1. Sign up at [sentry.io](https://sentry.io) (the free Developer plan is plenty) → **Create project** → platform **Next.js**.
+   Skip the wizard it shows; the code is already in place.
+2. Copy the project's **DSN** (Project Settings → Client Keys (DSN); it looks like `https://…@o….ingest….sentry.io/…`).
+3. Vercel → Settings → Environment Variables, for **Production** and **Preview**:
+
+   | Variable | Value |
+   |---|---|
+   | `NEXT_PUBLIC_SENTRY_DSN` | the DSN |
+   | `SENTRY_AUTH_TOKEN` | optional: Sentry → Settings → Auth Tokens → create one. Makes stack traces readable |
+   | `SENTRY_ORG` | optional, with the token: your organisation slug (in the Sentry address bar) |
+   | `SENTRY_PROJECT` | optional, with the token: the project slug |
+
+   For local testing, put `NEXT_PUBLIC_SENTRY_DSN=...` in `.env.local` too.
+4. In Sentry → Project Settings → **Security & Privacy**, turn on **Prevent storing of IP addresses** (belt and braces).
+5. Redeploy, then open `https://YOUR-SITE/dashboard?sentry-test` once while signed in. A test error,
+   "Sentry test from yourworld (this is fine)", appears in Sentry within a minute. Resolve it.
+6. Optional: Sentry → Alerts → create an alert to email you when a new issue appears.
+
+Errors are tagged `production`, `preview` or `development`, so you can tell her live site from your tests.

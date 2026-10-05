@@ -286,3 +286,146 @@
 .locBtn:disabled { opacity: 0.7; cursor: default; }
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Link across to Routes */
+.topActions { display: flex; align-items: center; gap: 8px; }
+.routesLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--bd-s);
+  border-radius: var(--radius-pill);
+  color: var(--tx-s);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: border-color var(--dur-fast) ease, color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+@media (hover: hover) and (pointer: fine) { .routesLink:hover { border-color: var(--or); color: var(--tx); background: var(--bds); } }
+
+/* ─── 3D map (Mapbox) ──────────────────────────────────────── */
+.mbWrap { position: relative; isolation: isolate; height: min(68dvh, 640px); }
+.mbPin {
+  --c: var(--or);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 0 9px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: transform var(--dur-base) var(--ease-out);
+  transform-origin: bottom center;
+}
+.mbPinWish { --c: var(--pu-l); }
+.mbPin::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  border: 6px solid transparent;
+  border-top: 10px solid var(--c);
+  border-bottom: 0;
+  transform: translateX(-50%);
+}
+.mbPinFace {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--c);
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--c) 30%, var(--bg)) center / cover no-repeat;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+.mbPinPhoto { color: transparent; }
+.mbPinLabel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  max-width: 160px;
+  padding: 3px 9px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  color: var(--tx);
+  font-family: var(--font);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translate(-50%, -4px);
+  pointer-events: none;
+  transition: opacity var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out);
+}
+.mbPinOn { z-index: 3; transform: scale(1.25); }
+.mbPinOn .mbPinFace { box-shadow: 0 0 0 5px color-mix(in oklab, var(--c) 35%, transparent), 0 6px 16px rgba(0, 0, 0, 0.55); }
+.mbPinOn .mbPinLabel { opacity: 1; transform: translate(-50%, 0); }
+@media (hover: hover) and (pointer: fine) {
+  .mbPin:hover { z-index: 2; transform: scale(1.12); }
+  .mbPin:hover .mbPinLabel { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.mbTools { position: absolute; top: 10px; left: 10px; z-index: 2; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.mbBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--bd-s);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--tx);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 800;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+.mbShow {
+  position: absolute;
+  bottom: 34px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--bd-s);
+  border-radius: var(--radius-pill);
+  background: color-mix(in oklab, var(--card) 90%, transparent);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+}
+.mbShowBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--tx-m);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.mbShowOn { background: var(--card-hov); color: var(--tx); }
+.mbDot { width: 9px; height: 9px; border-radius: 50%; background: var(--or); }
+.mbShowWish .mbDot { background: var(--pu-l); }
+.mbWrap :global(.mapboxgl-ctrl-group) { border-radius: 12px; overflow: hidden; }
+:global(html:not([data-scheme='light'])) .mbWrap :global(.mapboxgl-ctrl-group) { background: var(--raised); }
+:global(html:not([data-scheme='light'])) .mbWrap :global(.mapboxgl-ctrl-group button + button) { border-top-color: var(--bd); }
+:global(html:not([data-scheme='light'])) .mbWrap :global(.mapboxgl-ctrl-icon) { filter: invert(1) hue-rotate(180deg); }

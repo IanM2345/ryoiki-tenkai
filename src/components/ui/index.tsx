@@ -154,7 +154,8 @@ export function Modal({ children, onClose }: { children: ReactNode; onClose?: ()
     const prevOverflow = html.style.overflow;
     html.style.overflow = 'hidden';
     // Move focus into the dialog (first field if there is one).
-    const first = boxRef.current?.querySelector<HTMLElement>('input, textarea, select, button');
+    const first = boxRef.current?.querySelector<HTMLElement>('input, textarea, select')
+      ?? boxRef.current?.querySelector<HTMLElement>('button');
     first?.focus({ preventScroll: true });
     return () => {
       window.removeEventListener('keydown', onKey);

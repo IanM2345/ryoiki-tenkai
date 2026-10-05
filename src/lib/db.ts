@@ -1055,3 +1055,293 @@ export async function deleteCapsule(id: string): Promise<void> {
   const { error } = await supabase.from('time_capsules').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ================================================================
+//  ROUTES
+// ================================================================
+
+export type RouteMode = 'walk' | 'cycle' | 'drive' | 'transit';
+
+/** One point on a route. The first is where she starts, the last is where she's going. */
+export interface RouteStop {
+  id:        string;
+  name:      string;
+  address?:  string | null;
+  lat:       number | null;
+  lng:       number | null;
+  /** "My location": filled in from the device whenever the route is used. */
+  here?:     boolean;
+  place_id?: string | null;
+  note?:     string | null;
+  link?:     string | null;
+}
+
+export interface RouteLeg { distance_m: number; duration_s: number }
+
+/** A journey in progress, saved so it resumes on another device. */
+export interface RouteJourney {
+  started_at:     string;
+  /** Active time banked before the current stretch (pauses don't count). */
+  elapsed_ms:     number;
+  /** When the current stretch started; null while paused. */
+  running_since:  string | null;
+  /** stop id → when she got there */
+  visited:        Record<string, string>;
+  /** Fixed start for "my location" routes, captured when the journey began. */
+  start?:         { lat: number; lng: number } | null;
+  /** Quick notes jotted on the way. */
+  notes?:         string;
+  /** Which device follows her position (the one she's carrying). */
+  device?:        string;
+}
+
+export interface DbRoute {
+  id:            string;
+  user_id:       string;
+  name:          string;
+  notes:         string | null;
+  mode:          RouteMode;
+  stops:         RouteStop[];
+  geometry:      [number, number][] | null;   // [lat, lng] pairs
+  legs:          RouteLeg[] | null;
+  distance_m:    number | null;
+  duration_s:    number | null;
+  collection_id: string | null;
+  tags:          string[];
+  favourite:     boolean;
+  archived:      boolean;
+  journey:       RouteJourney | null;
+  last_done_at:  string | null;
+  created_at:    string;
+  updated_at:    string;
+}
+
+export type RouteInput = Partial<Omit<DbRoute, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
+
+export interface DbRouteCollection {
+  id:         string;
+  user_id:    string;
+  name:       string;
+  color:      string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface DbRouteTrip {
+  id:             string;
+  user_id:        string;
+  route_id:       string | null;
+  route_name:     string;
+  mode:           string | null;
+  started_at:     string;
+  ended_at:       string;
+  active_seconds: number;
+  distance_m:     number | null;
+  stops_total:    number;
+  stops_visited:  number;
+  notes:          string | null;
+  created_at:     string;
+}
+
+export async function getRoutes(): Promise<DbRoute[]> {
+  const { data, error } = await supabase.from('routes').select('*').order('updated_at', { ascending: false });
+  return unwrap(data, error) ?? [];
+}
+
+export async function getRoute(id: string): Promise<DbRoute | null> {
+  const { data, error } = await supabase.from('routes').select('*').eq('id', id).maybeSingle();
+  return unwrap(data, error);
+}
+
+export async function addRoute(route: RouteInput): Promise<DbRoute> {
+  const { data, error } = await supabase.from('routes').insert(route).select().single();
+  return unwrap(data, error);
+}
+
+export async function updateRoute(id: string, updates: RouteInput): Promise<DbRoute> {
+  const { data, error } = await supabase.from('routes').update(updates).eq('id', id).select().single();
+  return unwrap(data, error);
+}
+
+export async function deleteRoute(id: string): Promise<void> {
+  const { error } = await supabase.from('routes').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getRouteCollections(): Promise<DbRouteCollection[]> {
+  const { data, error } = await supabase.from('route_collections').select('*').order('sort_order').order('created_at');
+  return unwrap(data, error) ?? [];
+}
+
+export async function addRouteCollection(c: { name: string; color?: string | null; sort_order?: number }): Promise<DbRouteCollection> {
+  const { data, error } = await supabase.from('route_collections').insert(c).select().single();
+  return unwrap(data, error);
+}
+
+export async function updateRouteCollection(id: string, updates: Partial<Pick<DbRouteCollection, 'name' | 'color' | 'sort_order'>>): Promise<DbRouteCollection> {
+  const { data, error } = await supabase.from('route_collections').update(updates).eq('id', id).select().single();
+  return unwrap(data, error);
+}
+
+export async function deleteRouteCollection(id: string): Promise<void> {
+  const { error } = await supabase.from('route_collections').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getRouteTrips(routeId?: string): Promise<DbRouteTrip[]> {
+  let q = supabase.from('route_trips').select('*').order('ended_at', { ascending: false }).limit(50);
+  if (routeId) q = q.eq('route_id', routeId);
+  const { data, error } = await q;
+  return unwrap(data, error) ?? [];
+}
+
+export async function addRouteTrip(trip: Omit<DbRouteTrip, 'id' | 'user_id' | 'created_at'>): Promise<DbRouteTrip> {
+  const { data, error } = await supabase.from('route_trips').insert(trip).select().single();
+  return unwrap(data, error);
+}
+
+// ================================================================
+//  LEARN (study map)
+// ================================================================
+
+export interface DbStudyNode {
+  id:               string;
+  user_id:          string;
+  parent_id:        string | null;
+  title:            string;
+  summary:          string | null;
+  notes:            string | null;
+  color:            string | null;
+  sort_order:       number;
+  pos_x:            number | null;
+  pos_y:            number | null;
+  mastery_override: number | null;
+  created_at:       string;
+  updated_at:       string;
+}
+export type StudyNodeInput = Partial<Omit<DbStudyNode, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
+
+export interface DbStudyLink { id: string; user_id: string; from_id: string; to_id: string; label: string | null; created_at: string }
+
+export interface DbStudyCard {
+  id:               string;
+  user_id:          string;
+  node_id:          string;
+  front:            string;
+  back:             string;
+  ease:             number;
+  interval_days:    number;
+  reps:             number;
+  lapses:           number;
+  due_at:           string;
+  last_reviewed_at: string | null;
+  created_at:       string;
+}
+
+export interface DbStudyResource { id: string; user_id: string; node_id: string; url: string; title: string | null; sort_order: number; created_at: string }
+
+export interface DbStudyReview { id: string; user_id: string; card_id: string | null; node_id: string | null; grade: number; score: number | null; reviewed_at: string }
+
+async function selectAll<T>(table: string, order = 'created_at'): Promise<T[]> {
+  const { data, error } = await supabase.from(table).select('*').order(order);
+  return unwrap(data, error) ?? [];
+}
+
+export const getStudyNodes = () => selectAll<DbStudyNode>('study_nodes', 'sort_order');
+export const getStudyLinks = () => selectAll<DbStudyLink>('study_links');
+export const getStudyCards = () => selectAll<DbStudyCard>('study_cards');
+export const getStudyResources = () => selectAll<DbStudyResource>('study_resources', 'sort_order');
+
+export async function addStudyNode(n: StudyNodeInput & { title: string }): Promise<DbStudyNode> {
+  const { data, error } = await supabase.from('study_nodes').insert(n).select().single();
+  return unwrap(data, error);
+}
+export async function updateStudyNode(id: string, u: StudyNodeInput): Promise<DbStudyNode> {
+  const { data, error } = await supabase.from('study_nodes').update(u).eq('id', id).select().single();
+  return unwrap(data, error);
+}
+export async function deleteStudyNode(id: string): Promise<void> {
+  const { error } = await supabase.from('study_nodes').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function addStudyLink(from_id: string, to_id: string): Promise<DbStudyLink> {
+  const { data, error } = await supabase.from('study_links').insert({ from_id, to_id }).select().single();
+  return unwrap(data, error);
+}
+export async function deleteStudyLink(id: string): Promise<void> {
+  const { error } = await supabase.from('study_links').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function addStudyCard(c: { node_id: string; front: string; back: string }): Promise<DbStudyCard> {
+  const { data, error } = await supabase.from('study_cards').insert(c).select().single();
+  return unwrap(data, error);
+}
+export async function updateStudyCard(id: string, u: Partial<Omit<DbStudyCard, 'id' | 'user_id' | 'created_at'>>): Promise<DbStudyCard> {
+  const { data, error } = await supabase.from('study_cards').update(u).eq('id', id).select().single();
+  return unwrap(data, error);
+}
+export async function deleteStudyCard(id: string): Promise<void> {
+  const { error } = await supabase.from('study_cards').delete().eq('id', id);
+  if (error) throw error;
+}
+export async function addStudyReview(r: { card_id: string; node_id: string; grade: number; score?: number | null }): Promise<void> {
+  const { score, ...rest } = r;
+  // Only send the score when there is one, so this still works before the score column exists.
+  const { error } = await supabase.from('study_reviews').insert(score == null ? rest : { ...rest, score });
+  if (error) throw error;
+}
+export async function getStudyReviews(sinceIso: string): Promise<DbStudyReview[]> {
+  const { data, error } = await supabase.from('study_reviews').select('*').gte('reviewed_at', sinceIso).order('reviewed_at');
+  return unwrap(data, error) ?? [];
+}
+
+export async function addStudyResource(r: { node_id: string; url: string; title?: string | null; sort_order?: number }): Promise<DbStudyResource> {
+  const { data, error } = await supabase.from('study_resources').insert(r).select().single();
+  return unwrap(data, error);
+}
+export async function deleteStudyResource(id: string): Promise<void> {
+  const { error } = await supabase.from('study_resources').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ================================================================
+//  ON THE GO (study sessions)
+// ================================================================
+
+export type StudyMode = 'cards' | 'typing' | 'listen';
+
+export interface DbStudySession {
+  id:             string;
+  user_id:        string;
+  route_id:       string | null;
+  route_name:     string | null;
+  node_ids:       string[];
+  topic_names:    string[];
+  mode:           StudyMode;
+  started_at:     string;
+  ended_at:       string;
+  active_seconds: number;
+  cards_reviewed: number;
+  cards_right:    number;
+  cards_heard:    number;
+  stops_total:    number;
+  stops_visited:  number;
+  created_at:     string;
+}
+
+export async function getStudySessions(limit = 30): Promise<DbStudySession[]> {
+  const { data, error } = await supabase.from('study_sessions').select('*').order('ended_at', { ascending: false }).limit(limit);
+  return unwrap(data, error) ?? [];
+}
+
+export async function addStudySession(s: Omit<DbStudySession, 'id' | 'user_id' | 'created_at'>): Promise<DbStudySession> {
+  const { data, error } = await supabase.from('study_sessions').insert(s).select().single();
+  return unwrap(data, error);
+}
+
+export async function deleteStudySession(id: string): Promise<void> {
+  const { error } = await supabase.from('study_sessions').delete().eq('id', id);
+  if (error) throw error;
+}

@@ -3,19 +3,20 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Search, X, NotebookPen, Library, ListChecks, Lightbulb, ListVideo, MapPin, Star, Users, ChevronRight, SearchX,
+  Search, X, NotebookPen, Library, ListChecks, Lightbulb, ListVideo, MapPin, Star, Users, ChevronRight, SearchX, Route, GraduationCap,
 } from 'lucide-react';
 import s from './search.module.css';
 import { Stars, Pill, Topbar, Toast, useToast } from '@/components/ui';
 import SoulAvatar from '@/components/souls/SoulAvatar';
 import {
-  getJournalEntries, getLibrary, getTasks, getIdeas, getQueue, getPlaces, getRatings, getSouls,
+  getJournalEntries, getLibrary, getTasks, getIdeas, getQueue, getPlaces, getRatings, getSouls, getRoutes, getStudyNodes,
 } from '@/lib/db';
 import type { DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
 import { fmtDate } from '@/lib/dates';
+import { routeTitle } from '@/lib/routing';
 
-type SectionKey = 'journal' | 'library' | 'tasks' | 'ideas' | 'queue' | 'places' | 'ratings' | 'souls';
+type SectionKey = 'journal' | 'library' | 'tasks' | 'ideas' | 'queue' | 'places' | 'routes' | 'learn' | 'ratings' | 'souls';
 
 const SECTIONS: { key: SectionKey; label: string; Icon: typeof Search; color: string }[] = [
   { key: 'journal', label: 'Journal', Icon: NotebookPen, color: 'var(--or)' },
@@ -25,6 +26,8 @@ const SECTIONS: { key: SectionKey; label: string; Icon: typeof Search; color: st
   { key: 'tasks',   label: 'Tasks',   Icon: ListChecks,  color: 'var(--gr)' },
   { key: 'queue',   label: 'Queue',   Icon: ListVideo,   color: 'var(--blue)' },
   { key: 'places',  label: 'Places',  Icon: MapPin,      color: 'var(--red)' },
+  { key: 'routes',  label: 'Routes',  Icon: Route,       color: 'var(--or)' },
+  { key: 'learn',   label: 'Learn',   Icon: GraduationCap, color: 'var(--pu-l)' },
   { key: 'ratings', label: 'Ratings', Icon: Star,        color: 'var(--or)' },
 ];
 const SECTION_BY_KEY = Object.fromEntries(SECTIONS.map(x => [x.key, x])) as Record<SectionKey, typeof SECTIONS[number]>;
@@ -111,9 +114,11 @@ export default function SearchPage() {
         if (!(await ensureSession())) return;
         let failed = false;
         const safe = <T,>(p: Promise<T[]>) => p.catch(() => { failed = true; return [] as T[]; });
-        const [journal, library, tasks, ideas, queue, places, ratings, souls] = await Promise.all([
+        const [journal, library, tasks, ideas, queue, places, ratings, souls, routes, study] = await Promise.all([
           safe(getJournalEntries()), safe(getLibrary()), safe(getTasks()), safe(getIdeas()),
           safe(getQueue()), safe(getPlaces()), safe(getRatings()), safe(getSouls()),
+          getRoutes().catch(() => []), // quietly empty until the routes update is applied
+          getStudyNodes().catch(() => []),
         ]);
 
         const all: SearchItem[] = [
@@ -158,6 +163,18 @@ export default function SearchPage() {
             title: e.name,
             preview: join(e.address, oneLine(e.notes)),
             extra: (e.tags ?? []).join(' '), rating: e.rating ?? 0, href: '/places',
+          })),
+          ...routes.map(e => ({
+            id: `RT-${e.id}`, section: 'routes' as const,
+            title: routeTitle(e),
+            preview: join((e.stops ?? []).map(x => (x.here ? 'Your location' : x.name)).filter(Boolean).join(', '), oneLine(e.notes)),
+            extra: `${(e.tags ?? []).join(' ')} ${(e.stops ?? []).map(x => `${x.address ?? ''} ${x.note ?? ''}`).join(' ')}`, rating: 0, href: `/routes/${e.id}`,
+          })),
+          ...study.map(e => ({
+            id: `ST-${e.id}`, section: 'learn' as const,
+            title: e.title,
+            preview: join(e.summary, oneLine(e.notes)),
+            extra: e.notes ?? '', rating: 0, href: `/learn/${e.id}`,
           })),
           ...ratings.map(e => ({
             id: `R-${e.id}`, section: 'ratings' as const,

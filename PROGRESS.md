@@ -406,3 +406,94 @@ Tic Tac Toe, Sudoku, Chess, Battleship, Kadi, Matatu, Connect Four, Memory, 2048
 - **Credit at the end:** a "now playing" card (♪ Delirious · from Jujutsu Kaisen) with 領域展開 (*ryōiki tenkai*, Domain Expansion) glowing faintly behind the logo.
 - **The video is now private:** because it uses a copyrighted song, `.mp4` files are only served to someone signed in (the poster images stay public). DEPLOY.md's checks updated to expect this.
 - The first version, with its own made-in-code music, is kept as `brag-output/brag-original-soundtrack.mp4` (and `-landscape`) in case you ever want a version with no copyrighted music.
+
+## Session 27 (1 Oct 2026): Routes (first part of Lorraine's Explorer idea)
+- **Routes** (menu → Routes, or the Routes button on Places): plan a journey like in Google Maps. **From** (her location by default), **To**, and **+ Add stop** in between.
+  - Fill any box by typing (live address and landmark search near her), picking one of her saved Places or bucket-list spots, **Your location**, or **Choose on map**. Her saved places also show as small dots on the map; tap one to add it.
+  - **Walk, Cycle, Drive or Transit.** The line follows real roads with distance and time per leg (needs the free `ORS_API_KEY`; without it, straight dotted lines with estimates). Transit shows distances only and leaves bus/train times to Google Maps.
+  - **Drag to reorder** (grip handle, works on iPhone; arrow keys too), **Reverse**, and **Best order** (shortest/quickest order for the stops between start and end).
+  - **Open in Google Maps** (the whole route, up to 10 stops) or **Apple Maps** (one stop at a time). Every leg in the Stops list has its own Google/Apple buttons. Notes and a link per stop.
+  - Saves by itself as she goes. Name, collection, tags, notes, favourite, archive, delete.
+- **Collections and tags:** filter chips (All, Favourites, each collection, Archived), rename/remove collections, copy a route. Each card has a little drawing of the route's shape.
+- **Journey mode:** Start journey → next stop, how far away, distance and time to the end, stops left, a running clock. Stops tick themselves off when she arrives (within about 35 m), or tap **I'm here**. Undo a tick, jot notes on the way, pause/resume, keep the screen on, and Google/Apple buttons for directions to the next stop. Finishing saves the journey (time, stops, distance, notes) under **Past journeys**.
+  - Only the phone she started on follows her GPS; her laptop or iPad shows progress live ("Following along") and can take over.
+  - Works while the screen is on. iPhones don't let websites track location in the background.
+- **Plan a route** button on every pinned place; routes are in global Search and in the backup zip.
+- **Migration** `20261001100000_routes.sql` (three new tables, owner-only, live sync). DEPLOY.md has an "Already live? Adding Routes" section.
+
+## Session 28 (1 Oct 2026): Routes in 3D with Mapbox
+- **The Routes map is now Mapbox's 3D map** (Mapbox Standard): 3D buildings, landmarks and trees, lit for **night** on the dark theme (day on the light theme). Tilt and rotate with two fingers; compass and zoom buttons on the right.
+- **2D / 3D button** on the map (remembered per device). 2D is lighter on battery for long walks.
+- **Journey camera:** during a journey the map tilts, follows her and turns to face the next stop, like a sat-nav. Dragging the map pauses that; **Re-centre** brings it back. On phones the map sits at the top during a journey.
+- The next stop pulses; her position is a pulsing blue dot.
+- **Everything else now uses Mapbox too**, with the token the site already had: road routes and times (Directions), search as she types (Search Box, finds cafes and landmarks as well as addresses), and Best order (Optimization, up to 10 stops between start and end; more than that uses the built-in shortest-path order). **openrouteservice is gone**: no `ORS_API_KEY`, and the `/api/maps/*` server routes were removed.
+- Falls back to the flat map if the device has no WebGL or there's no Mapbox token.
+- **New package** `mapbox-gl`: run `npm install`.
+
+## Session 29 (1 Oct 2026): Places map in 3D
+- **Places → Map is now the Mapbox 3D map too**, matching Routes: a **globe** when zoomed out (her trips abroad sit where they really are), 3D buildings and landmarks up close, night lighting on the dark theme.
+- **Photo pins:** each place shows her photo in a round pin (orange ring = been, purple = want to go), with its name on hover or when chosen.
+- Tapping a place **flies** the camera there, tilted in 3D, and opens its card below the map (Directions, Plan a route, edit).
+- **Show all** zooms out to every place; **All / Been / Want to go** switch on the map; **2D / 3D** button (shared with Routes, remembered per device).
+- Falls back to the old flat map with no Mapbox token or no WebGL.
+
+## Session 30 (1 Oct 2026): Sentry error reports
+- **Sentry** (`@sentry/nextjs` 11) for the browser, server, API routes, middleware and the daily reminder job. Off until `NEXT_PUBLIC_SENTRY_DSN` is set (DEPLOY.md, "Sentry").
+- **Privacy first:** no session replay, no user/cookies/bodies/query strings/local variables; URLs reduced to paths with ids blanked; click, input and console breadcrumbs dropped (`src/lib/sentry-privacy.ts`). Checked: a test error from a page full of names sent none of them.
+- Reports go through `/monitoring` on the site (ad blockers can't drop them; Sentry sees Vercel's address, not hers). The sign-in guard lets that path through.
+- **New error screen** (`global-error.tsx`): "Something went wrong" with Try again / Go home, and the crash is reported.
+- Test it any time by opening a page with `?sentry-test` in the address.
+- Readable stack traces when `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` are set in Vercel (optional).
+- **New package** `@sentry/nextjs`: run `npm install`.
+
+## Session 31 (4 Oct 2026): Learn, the study map (Lorraine's Scholar idea, part 1)
+- **Learn** (menu → Learn): subjects and the topics inside them, as many levels deep as she likes.
+- **Visual map** on laptop and iPad: subjects as big coloured bubbles, topics around them, branches between them. Drag the background to move around, scroll or pinch to zoom, drag any topic to put it where she wants (remembered). **Tidy up** puts a subject's topics back in a neat ring.
+  - Tap a topic to see it in the side panel (how well she knows it, cards due, linked topics); tap again to open it.
+  - **Cross-links:** "Link to…" joins topics in different subjects (Statistics ↔ Research methods), shown as dotted lines.
+  - Each topic shows a progress bar and a purple badge with cards due.
+- **Outline view**: the same tree as a tidy fold-out list. Always used on phones; a switch on laptop/iPad.
+- **Topic page**: name and one-line summary (edit in place), mastery ring, and four tabs:
+  - **Notes** with headings, bold, italics, bullets, tickable checklists, quotes and links (toolbar buttons, Ctrl+S saves).
+  - **Flashcards**: add question/answer cards quickly, edit or delete, see when each is next due, "Study these".
+  - **Links**: lecture videos, articles, Spotify playlists; each opens in its own app, with a matching icon.
+  - **Related**: topics inside this one (add more), and topics it's linked to (search any subject to add one).
+- **Flashcard review** (Review button, or per subject/topic): question first, Space or "Show answer", then Again / Hard / Good / Easy, each showing when the card will come back. A small spaced-repetition scheduler (SM-2 style): "Again" returns in 10 minutes, right answers wait 1 day, 3 days, then longer each time. Every answer is logged for future progress charts.
+- **Mastery is automatic**: a card counts as learnt once she remembers it three weeks out; a topic's % averages its cards and the topics inside it. She can override it with a slider ("Set it myself") and switch back to automatic.
+- Learn is in global Search and the backup zip; everything live-syncs between devices.
+- Small fix everywhere: pop-up forms now put the cursor in the first box instead of on the close button.
+- **Migration** `20261004100000_study_map.sql` (five new tables). DEPLOY.md has "Already live? Adding Learn".
+
+## Session 32 (4 Oct 2026): type your answer on flashcards
+- **Staging seed** (`supabase/seed_staging.sql`): re-runnable, and now fills Dublin places, routes, past journeys and a full study map with cards and past answers. See the comments at the top.
+- **Typing answers in Review** (on by default, a "Typing answers" switch remembers the choice per device): type the answer, press Enter, and see:
+  - a **match score** (e.g. 85%), the real answer and hers side by side, with the matching words highlighted and missed ones underlined;
+  - a **suggested** grade button (glowing, Enter accepts it). She can always tap a different one: the site never grades for her.
+  - Short answers (a word, a name, a formula) are checked strictly but forgive capitals, accents, punctuation and spacing; one wrong letter in a short word ("tango" for "tengo") isn't counted right. Part of a name ("Ebbinghaus" for "Hermann Ebbinghaus") gets Hard.
+  - Long answers are scored on key words, with a note that her own wording can score low and she decides.
+  - "Just show me" flips without typing, as before.
+- **Accuracy:** the end of a session shows the % right (and the average match of typed answers). Each topic's Flashcards tab shows the % right over the last 30 days and a bar per week for the last 8 weeks (including the topics inside it).
+- **Not AI:** all checking is plain word and letter comparison in the browser; nothing leaves the site.
+- **Migration** `20261004120000_review_scores.sql` (one empty column).
+
+## Session 33 (4 Oct 2026): On the Go (revise while you travel)
+- **On the Go** (menu, or "On the Go" on Learn, or "Revise on the way" on any route): three steps, then Start.
+  1. **Where:** one of her routes, or no route. A route already in progress is picked automatically.
+  2. **What:** tick subjects, or open one and tick single topics; "Everything with cards due" in one tap.
+  3. **How:** **Flashcards** (tap to flip, then two big buttons, Missed it / Got it: easy one-handed), **Type answers** (with the match score and suggested grade), or **Listen** (the phone reads the question, waits a few seconds, then reads the answer; thinking time and speed adjustable; Spanish/French/German answers in a matching voice).
+  - Due cards first; if there aren't enough for the length of the walk (about 3 per minute), it tops up with her weakest other cards, marked "extra practice". Missed cards come back later in the session.
+  - Spotify/Apple Music links on the chosen topics show as "Your study playlists" to open before setting off.
+- **During the session:** a strip along the top shows the next stop, how far, and time to the end, with "I'm here" and Google/Apple directions; stops tick off by themselves when she arrives (GPS). Clock, right/answered count, Pause (stops time, GPS and reading aloud), Finish. The screen is kept on.
+  - The journey is the same as in Routes: it shows live on the route page and her other devices.
+- **Finish** saves the session (time, cards answered and right, cards heard, stops reached) and the walk as one of the route's past journeys, with what she studied in its notes. Answers update the flashcards' schedules and accuracy as normal; listening is exposure only and doesn't change schedules.
+- **My journeys:** the On the Go page lists recent sessions (when, route, subjects, time, score), each deletable.
+- Listening only works with the screen on (iPhones stop websites talking when locked); the page says so.
+- **Migration** `20261004140000_study_sessions.sql` (one new table). The staging seed adds three past sessions.
+
+## Session 34 (5 Oct 2026): the map feature's beta video
+- **New What's new video** (1:52, portrait and landscape) presenting her map proposal as a beta: Explore (plan a walk with stops, best order, Google/Apple Maps, the 3D map, Journey mode, Places in 3D), Learn (the study map on iPad, notes, typed answers with a match score) and On the Go.
+  - **Works now** list, **Not yet (and why)** list (spoken directions, bus/train times, offline maps, phone locked, sharing routes, no AI on purpose), then **"It's a beta. What would make it better?"** with three questions, and a clean ending: "Questions or ideas? You know how to reach me." with just the song title and 領域展開 (the site is ryoiki tenkai, so its videos use JJK songs only).
+  - Real app pages on made-up sample data; the 3D map shows a drawn stand-in city (map tiles can't be downloaded where it was made).
+  - Soundtrack: an edit of "If I Am With You" (Jujutsu Kaisen, piano by Block_pf). Cuts at 47.7s to 67.6s and 95.3s to 104.0s, picked where the music before and after matches; the climax lands on "Works now" and the quiet reprise on "Your turn".
+- **What's new now holds several videos** (`WHATS_NEW_VIDEOS` in `src/lib/whatsNew.ts`, newest first). The newest plays by itself once; its end card has a button for each older video. `openWhatsNew(id?)` can open a specific one.
+- Fixes: the Learn map fits the iPad screen on open (and centres on the first subject if everything would be too small); subjects sit closer together; stop search no longer lists a saved place twice.

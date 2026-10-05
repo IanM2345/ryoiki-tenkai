@@ -14,6 +14,7 @@ export function middleware(req: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/') ||
+    pathname.startsWith('/monitoring') || // Sentry error reports (tunnel)
     STATIC_EXT.test(pathname) ||
     PUBLIC_PATHS.some(p => pathname.startsWith(p)) ||
     APP_FILES.some(p => pathname.startsWith(p))

@@ -1,11 +1,11 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
-import { X, Volume2, RotateCcw, Check, Pause, Play } from 'lucide-react';
+import { X, Volume2, RotateCcw, Check, Pause, Play, Film } from 'lucide-react';
 import s from './whatsNew.module.css';
 import { ensureSession } from '@/lib/supabase';
 import {
-  WHATS_NEW_EVENT, WHATS_NEW_VIDEO, shouldAutoplayWhatsNew, markWhatsNewSeen,
+  WHATS_NEW_EVENT, WHATS_NEW_VIDEOS, shouldAutoplayWhatsNew, markWhatsNewSeen,
 } from '@/lib/whatsNew';
 
 const AUTH_PAGES = ['/login', '/reset-password'];
@@ -24,10 +24,12 @@ export default function WhatsNew() {
   const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
   const [portrait, setPortrait] = useState(true);
+  const [videoId, setVideoId] = useState(WHATS_NEW_VIDEOS[0].id);
   const video = useRef<HTMLVideoElement>(null);
   const closeBtn = useRef<HTMLButtonElement>(null);
 
-  const start = useCallback((withSound: boolean, isAuto: boolean) => {
+  const start = useCallback((withSound: boolean, isAuto: boolean, id?: string) => {
+    setVideoId(WHATS_NEW_VIDEOS.some(x => x.id === id) ? id! : WHATS_NEW_VIDEOS[0].id);
     setPortrait(window.innerHeight >= window.innerWidth);
     setAuto(isAuto); setEnded(false); setPaused(false); setProgress(0); setMuted(!withSound); setOpen(true);
   }, []);
@@ -47,7 +49,7 @@ export default function WhatsNew() {
 
   // Replays from the menu / settings.
   useEffect(() => {
-    const onOpen = (e: Event) => start(!!(e as CustomEvent).detail?.withSound, false);
+    const onOpen = (e: Event) => { const d = (e as CustomEvent).detail; start(!!d?.withSound, false, d?.id); };
     window.addEventListener(WHATS_NEW_EVENT, onOpen);
     return () => window.removeEventListener(WHATS_NEW_EVENT, onOpen);
   }, [start]);
@@ -64,7 +66,7 @@ export default function WhatsNew() {
     });
     closeBtn.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, portrait]);
+  }, [open, portrait, videoId]);
 
   const close = useCallback(() => {
     video.current?.pause();
@@ -82,7 +84,14 @@ export default function WhatsNew() {
   }, [open, close]);
 
   if (!open) return null;
-  const v = portrait ? WHATS_NEW_VIDEO.portrait : WHATS_NEW_VIDEO.landscape;
+  const current = WHATS_NEW_VIDEOS.find(x => x.id === videoId) ?? WHATS_NEW_VIDEOS[0];
+  const others = WHATS_NEW_VIDEOS.filter(x => x.id !== current.id);
+  const v = portrait ? current.portrait : current.landscape;
+  const watchOther = (id: string) => {
+    // Finishing the new video counts as seen before switching to an older one.
+    if (auto) { markWhatsNewSeen(); setAuto(false); }
+    setVideoId(id); setEnded(false); setPaused(false); setProgress(0);
+  };
 
   const soundOn = () => {
     const el = video.current; if (!el) return;
@@ -99,9 +108,10 @@ export default function WhatsNew() {
   };
 
   return (
-    <div className={s.overlay} role="dialog" aria-modal="true" aria-label="What's new in yourworld">
+    <div className={s.overlay} role="dialog" aria-modal="true" aria-label={`What's new in yourworld: ${current.title}`}>
       <div className={`${s.frame} ${portrait ? s.portrait : s.landscape}`}>
         <video
+          key={current.id}
           ref={video}
           className={s.video}
           src={v.src}
@@ -135,6 +145,9 @@ export default function WhatsNew() {
         {ended && (
           <div className={s.endCard}>
             <button type="button" className={s.primary} onClick={replay}><RotateCcw size={17} strokeWidth={2.25} /> Watch again</button>
+            {others.map(o => (
+              <button key={o.id} type="button" className={s.ghost} onClick={() => watchOther(o.id)}><Film size={17} strokeWidth={2.25} /> Watch {o.title.charAt(0).toLowerCase() + o.title.slice(1)}</button>
+            ))}
             <button type="button" className={s.ghost} onClick={close}><Check size={17} strokeWidth={2.25} /> Done</button>
           </div>
         )}

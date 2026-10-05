@@ -11,7 +11,7 @@ const BUCKET = 'yourworld';
 export const BACKUP_TABLES = [
   'journal_entries', 'journal_entry_souls', 'tasks', 'library', 'ideas', 'queue', 'places',
   'souls', 'soul_media', 'soul_links', 'ratings', 'mood_defs', 'mood_logs', 'gallery_images',
-  'time_capsules', 'game_sessions', 'user_settings',
+  'time_capsules', 'route_collections', 'routes', 'route_trips', 'study_nodes', 'study_links', 'study_cards', 'study_reviews', 'study_resources', 'study_sessions', 'game_sessions', 'user_settings',
 ] as const;
 
 export const LAST_BACKUP_KEY = 'yw-last-backup';

@@ -1,0 +1,25 @@
+.body {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  margin: 0;
+  background: #0d0a0f;
+  color: #f5e6d0;
+  font-family: 'Comic Neue', 'Comic Sans MS', cursive;
+}
+.box { max-width: 380px; padding: 24px; text-align: center; }
+.box h1 { margin: 0 0 8px; font-size: 1.5rem; }
+.box p { margin: 0 0 20px; color: #b9a99a; }
+.row { display: flex; justify-content: center; gap: 10px; }
+.row button {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 1px solid #ff8c00;
+  border-radius: 999px;
+  background: transparent;
+  color: #f5e6d0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.row button:first-child { background: #ff8c00; color: #120a02; }

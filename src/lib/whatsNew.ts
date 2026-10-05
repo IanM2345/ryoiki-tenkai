@@ -3,19 +3,40 @@
 // and a way for any button to open it again.
 import { getSettings, saveSettings } from './db';
 
-/** Bump this (and the files in /public/whats-new) for the next update video. */
-export const WHATS_NEW_VERSION = '2026-10-glow-up';
+export type WhatsNewVideo = {
+  id: string;
+  title: string;
+  portrait:  { src: string; poster: string };
+  landscape: { src: string; poster: string };
+};
+
+/**
+ * Every update video, newest first. The newest one plays by itself once; the
+ * older ones stay replayable from the end of it. Add the next one at the top
+ * (and its files in /public/whats-new).
+ */
+export const WHATS_NEW_VIDEOS: WhatsNewVideo[] = [
+  {
+    id: '2026-10-map-beta',
+    title: 'Your map idea (beta)',
+    portrait:  { src: '/whats-new/map-beta-portrait.mp4',  poster: '/whats-new/map-beta-portrait.jpg' },
+    landscape: { src: '/whats-new/map-beta-landscape.mp4', poster: '/whats-new/map-beta-landscape.jpg' },
+  },
+  {
+    id: '2026-10-glow-up',
+    title: 'The glow-up',
+    portrait:  { src: '/whats-new/glow-up-portrait.mp4',  poster: '/whats-new/glow-up-portrait.jpg' },
+    landscape: { src: '/whats-new/glow-up-landscape.mp4', poster: '/whats-new/glow-up-landscape.jpg' },
+  },
+];
+
+export const WHATS_NEW_VERSION = WHATS_NEW_VIDEOS[0].id;
 export const WHATS_NEW_EVENT = 'yw-whats-new';
 const LOCAL_KEY = 'yw-whats-new-seen';
 
-export const WHATS_NEW_VIDEO = {
-  portrait:  { src: '/whats-new/glow-up-portrait.mp4',  poster: '/whats-new/glow-up-portrait.jpg' },
-  landscape: { src: '/whats-new/glow-up-landscape.mp4', poster: '/whats-new/glow-up-landscape.jpg' },
-};
-
 /** Open the What's new video from anywhere (sidebar, settings page). */
-export function openWhatsNew() {
-  window.dispatchEvent(new CustomEvent(WHATS_NEW_EVENT, { detail: { withSound: true } }));
+export function openWhatsNew(id?: string) {
+  window.dispatchEvent(new CustomEvent(WHATS_NEW_EVENT, { detail: { withSound: true, id: typeof id === 'string' ? id : undefined } }));
 }
 
 function localSeen(): boolean {

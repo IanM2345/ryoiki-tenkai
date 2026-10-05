@@ -1,7 +1,8 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Plus, MapPin, List, Map as MapIcon, Navigation, Pencil, Trash2, Footprints, CalendarDays, MapPinOff, Bookmark, Check, LocateFixed, Loader2 } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, MapPin, List, Map as MapIcon, Navigation, Pencil, Trash2, Footprints, CalendarDays, MapPinOff, Bookmark, Check, LocateFixed, Loader2, Route as RouteIcon } from 'lucide-react';
 import s from './places.module.css';
 import {
   Btn, Lbl, Tag, Stars, TagInput, SearchBar, Topbar, Modal, ModalTitle, ModalFooter, Confirm,
@@ -19,8 +20,10 @@ import { useLiveTables } from '@/lib/realtime';
 import { prepareImage, deleteImage, preloadSignedUrls } from '@/lib/upload';
 import { geocodeAddress, directionsUrl, detectLocation } from '@/lib/geocode';
 import { fmtDate, localDateStr } from '@/lib/dates';
+import { mapboxToken } from '@/lib/routing';
 
-const MapView = dynamic(() => import('./MapView'), {
+// 3D Mapbox globe when the site has a Mapbox token; the flat map otherwise.
+const MapView = dynamic(() => (mapboxToken() ? import('./PlacesMap3D') : import('./MapView')), {
   ssr: false,
   loading: () => <div className={`${s.mapWrap} skeleton`} />,
 });
@@ -38,6 +41,9 @@ function PlaceActions({ p, onVisit, onMarkVisited, onEdit, onDelete }: {
         : <button type="button" className={s.actBtn} onClick={() => onVisit(p)}><Footprints size={14} strokeWidth={2} /> Visited again</button>}
       {p.lat != null && p.lng != null && (
         <a className={s.actBtn} href={directionsUrl({ lat: p.lat, lng: p.lng })} target="_blank" rel="noopener noreferrer"><Navigation size={14} strokeWidth={2} /> Directions</a>
+      )}
+      {p.lat != null && p.lng != null && (
+        <Link className={s.actBtn} href={`/routes/new?to=${p.id}`}><RouteIcon size={14} strokeWidth={2} /> Plan a route</Link>
       )}
       <button type="button" className={s.iconBtn} onClick={() => onEdit(p)} aria-label={`Edit ${p.name}`}><Pencil size={15} strokeWidth={2} /></button>
       <button type="button" className={`${s.iconBtn} ${s.danger}`} onClick={() => onDelete(p)} aria-label={`Delete ${p.name}`}><Trash2 size={15} strokeWidth={2} /></button>
@@ -196,7 +202,7 @@ export default function PlacesPage() {
       <Topbar
         title="Places"
         sub={loading ? 'Loading your places' : places.length ? `${beenCount} visited, ${wishCount} on the list` : 'Everywhere you have been, and want to go'}
-        action={<Btn onClick={openAdd}><Plus size={16} strokeWidth={2.25} /> Add place</Btn>}
+        action={<div className={s.topActions}><Link href="/routes" className={s.routesLink}><RouteIcon size={16} strokeWidth={2} /> Routes</Link><Btn onClick={openAdd}><Plus size={16} strokeWidth={2.25} /> Add place</Btn></div>}
       />
 
       <div className={s.wrap}>
