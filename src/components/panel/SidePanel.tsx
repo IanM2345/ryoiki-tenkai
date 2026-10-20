@@ -128,7 +128,7 @@ export default function SidePanel() {
       {!open && (
         <button type="button" className={s.tab} onClick={() => setOpen(true)} aria-label="Open tasks and sticky notes">
           <ListChecks size={18} />
-          <StickyNote size={17} />
+          <StickyNote size={17} className={s.tabNote} />
           {urgent > 0 && <span className={s.badge}>{urgent}</span>}
         </button>
       )}

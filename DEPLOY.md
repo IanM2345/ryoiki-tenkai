@@ -76,7 +76,12 @@ just show nothing; the rest of the site is unaffected.
    `npx supabase db push --dry-run` → `npx supabase db push`. It adds one table, `widget_keys`.
    Only a fingerprint (SHA-256 hash) of each key is stored, never the key itself.
 2. Deploy. Nothing new to set in Vercel: the widget uses `SUPABASE_SERVICE_ROLE_KEY`, which is already there.
-3. Check: open `https://<her site>/w/tasks?k=ywk_test` → it should say the key isn't valid (that's right).
+3. Check: open `https://<main address>/w/tasks?k=ywk_test` → it should say the key isn't valid (that's right).
+   **Use the main address** (Vercel → project → Settings → Domains, e.g. `ryoiki-tenkai.vercel.app`), never a
+   per-deploy link like `ryoiki-tenkai-4feww462y-….vercel.app`: those change every deploy and sit behind a
+   Vercel login, so a phone gets Vercel's login page instead of tasks. Widgets now always use the main address
+   (Vercel provides it to the build), even if set up from a per-deploy link. Same goes for her bookmark and the
+   Home Screen app: add them from the main address.
 4. Her side: **Settings → Tasks on your Home Screen → Set up a widget**, then follow the steps it shows.
    - **Scriptable** (free, App Store) is the recommended way: native widget, live countdowns, Home Screen
      and Lock Screen, all sizes. Copy the script, paste into Scriptable, add a Scriptable widget, pick the script.

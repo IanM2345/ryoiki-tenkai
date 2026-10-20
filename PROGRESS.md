@@ -547,3 +547,10 @@ Tic Tac Toe, Sudoku, Chess, Battleship, Kadi, Matatu, Connect Four, Memory, 2048
   - Keys: only a SHA-256 fingerprint is stored; a key reads open tasks only; switch off any device's key (tap twice). Shown once.
 - Server: `/api/widget/tasks` (JSON feed) and `/w/tasks` use the service role to look up the key, then read only that person's open tasks. Bad key → 401.
 - **Migration** `20261020100000_widget_keys.sql` (one new table, owner-only RLS).
+
+## Session 40 (20 Oct 2026): "Tasks, on time" video, and two layout fixes
+- **What's new video** `public/whats-new/tasks-{portrait,landscape}.{mp4,jpg}` (about 67 s): the four things she asked for, each shown working with made-up tasks (times and countdowns, reminders, the side panel with sticky notes, Home Screen and Lock Screen widgets), then how to try them. Plays once by itself; the older two stay on its end card. Source in `brag-output-tasks/`.
+- **Dashboard beside the pinned panel** (iPad landscape, laptop): the dashboard now sizes itself by the space it has (a container query), so it drops to one column instead of squeezing the Birthdays card.
+- **Phone panel tab** is a single slim icon, so it no longer covers the edit and delete buttons on task rows.
+- **Widget says why it can't load** instead of always "Offline": made on a test copy (localhost), the site not updated yet (404), a switched-off key, or truly no connection (then it shows the last copy). Settings won't make widget keys on a test copy on the computer, since a phone can't reach it.
+- **Widgets always use the site's main address** (`VERCEL_PROJECT_PRODUCTION_URL`, or `NEXT_PUBLIC_SITE_HOST` to override). The "Offline" widget was made on a per-deploy Vercel link, which sends phones to Vercel's login page; the widget now says so if it ever happens.

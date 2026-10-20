@@ -67,7 +67,13 @@ export default function WidgetCard({ onMessage }: { onMessage: (msg: string, col
     else onMessage('Copying didn’t work here. Long-press the text to copy it.', 'var(--yellow)');
   };
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  // Widgets always use the site's main address: per-deploy Vercel links are behind a Vercel login.
+  const mainHost = process.env.NEXT_PUBLIC_SITE_HOST || '';
+  const here = typeof window !== 'undefined' ? window.location.host : '';
+  const origin = mainHost ? `https://${mainHost}` : typeof window !== 'undefined' ? window.location.origin : '';
+  const deployLink = !!mainHost && here !== mainHost && here.endsWith('.vercel.app');
+  // A phone can't reach a copy running on this computer, so don't make keys there.
+  const testCopy = !mainHost && typeof window !== 'undefined' && /^(localhost|127\.|10\.|192\.168\.|0\.0\.0\.0)|\.local$/.test(window.location.hostname);
   const pageUrl = made ? `${origin}/w/tasks?k=${made.key}` : '';
 
   return (
@@ -126,7 +132,9 @@ export default function WidgetCard({ onMessage }: { onMessage: (msg: string, col
             <span>Which device is it for?</span>
             <input value={label} onChange={e => setLabel(e.target.value)} placeholder="iPhone" maxLength={40} />
           </label>
-          <Btn onClick={create} disabled={busy}><Plus size={16} /> {busy ? 'Making it…' : 'Set up a widget'}</Btn>
+          {testCopy && <div className={s.notice}><TriangleAlert size={18} /><p>This is a test copy on your computer ({typeof window !== 'undefined' ? window.location.host : ''}), and a phone can&apos;t reach it. Set up the widget from the live site.</p></div>}
+          {deployLink && !testCopy && <div className={s.notice}><TriangleAlert size={18} /><p>You&apos;re on a link to one deploy ({here}). The widget will use the main address, <b>{mainHost}</b>, which stays the same. Use that one for bookmarks and the Home Screen app too.</p></div>}
+          <Btn onClick={create} disabled={busy || testCopy}><Plus size={16} /> {busy ? 'Making it…' : 'Set up a widget'}</Btn>
         </div>
       )}
 

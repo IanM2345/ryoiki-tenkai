@@ -94,6 +94,8 @@
 @media (max-width: 767px) {
   .panel { z-index: 210; }
   .backdrop { z-index: 209; }
-  .tab { top: auto; bottom: calc(env(safe-area-inset-bottom) + 96px); transform: none; flex-direction: row; padding: 10px 10px 10px 12px; gap: 6px; }
+  /* slim: one icon, so it doesn't cover the edit buttons on rows */
+  .tab { top: auto; bottom: calc(env(safe-area-inset-bottom) + 96px); transform: none; padding: 10px 7px 10px 9px; }
+  .tab .tabNote { display: none; }
   .tab:hover { padding-right: 10px; }
 }

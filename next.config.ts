@@ -26,7 +26,9 @@ function checkSupabaseEnv() {
 }
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The site's main address (set by Vercel; stays the same across deploys). Per-deploy links
+  // like ryoiki-tenkai-abc123xyz-….vercel.app sit behind a Vercel login, so widgets use this.
+  env: { NEXT_PUBLIC_SITE_HOST: process.env.NEXT_PUBLIC_SITE_HOST || process.env.VERCEL_PROJECT_PRODUCTION_URL || '' },
 };
 
 const config = withSentryConfig(nextConfig, {

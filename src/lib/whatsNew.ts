@@ -17,6 +17,12 @@ export type WhatsNewVideo = {
  */
 export const WHATS_NEW_VIDEOS: WhatsNewVideo[] = [
   {
+    id: '2026-10-tasks-on-time',
+    title: 'Tasks, on time',
+    portrait:  { src: '/whats-new/tasks-portrait.mp4',  poster: '/whats-new/tasks-portrait.jpg' },
+    landscape: { src: '/whats-new/tasks-landscape.mp4', poster: '/whats-new/tasks-landscape.jpg' },
+  },
+  {
     id: '2026-10-map-beta',
     title: 'Your map idea (beta)',
     portrait:  { src: '/whats-new/map-beta-portrait.mp4',  poster: '/whats-new/map-beta-portrait.jpg' },

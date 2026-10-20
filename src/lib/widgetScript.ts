@@ -18,16 +18,27 @@ const fm = FileManager.local();
 const cache = fm.joinPath(fm.cacheDirectory(), "yourworld-tasks.json");
 
 async function load() {
+  const host = FEED.split("/")[2] || "";
+  if (/^(localhost|127\\.|10\\.|192\\.168\\.|0\\.0\\.0\\.0)|\\.local(:|$)/.test(host))
+    return { error: "This was made on a test copy (" + host + "), which a phone can't reach. Make a new widget from the live site." };
+  let r, text;
   try {
-    const r = new Request(FEED); r.timeoutInterval = 15;
-    const d = await r.loadJSON();
-    if (r.response.statusCode !== 200) return { error: d.error || "Couldn't load your tasks." };
-    fm.writeString(cache, JSON.stringify(d));
-    return d;
+    r = new Request(FEED); r.timeoutInterval = 15;
+    text = await r.loadString();
   } catch (e) {
+    // no connection at all: show the last copy if there is one
     if (fm.fileExists(cache)) { const d = JSON.parse(fm.readString(cache)); d.offline = true; return d; }
-    return { error: "Offline. It will update when you're back online." };
+    return { error: "Can't reach " + host + " right now. It will update when you're back online." };
   }
+  const code = r.response ? r.response.statusCode : 0;
+  let d = null; try { d = JSON.parse(text); } catch (e) { /* not JSON */ }
+  const seen = (text + " " + (r.response && r.response.url || "")).toLowerCase();
+  if (!d && (seen.indexOf("vercel.com/login") >= 0 || seen.indexOf("vercel.com/sso") >= 0 || seen.indexOf("vercel authentication") >= 0))
+    return { error: "This link is locked by Vercel (it's a one-deploy link). Make a new widget from the site's main address." };
+  if (!d) return { error: code === 404 ? "The site doesn't have widgets yet. Deploy the latest update, then try again." : "The site sent something unexpected (" + code + "). Try again in a minute." };
+  if (code !== 200) return { error: d.error || "Couldn't load your tasks (" + code + ")." };
+  fm.writeString(cache, JSON.stringify(d));
+  return d;
 }
 
 function dayLabel(t) {
