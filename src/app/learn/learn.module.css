@@ -530,3 +530,6 @@
 .accBar { display: block; width: 100%; border-radius: 5px 5px 2px 2px; background: var(--or); }
 .accBar[data-empty] { height: 3px !important; background: var(--bd); }
 .accCol small { height: 12px; color: var(--tx-d); font-size: 0.62rem; white-space: nowrap; }
+
+/* handwriting under the typed notes */
+.inkBlock { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: 1px solid var(--bds); }

@@ -18,6 +18,7 @@ import {
 import { wasCorrect } from '@/lib/answerCheck';
 import { useStudy } from '../useStudy';
 import s from '../learn.module.css';
+import InkNotes from '@/components/ink/InkNotes';
 
 type Tab = 'notes' | 'cards' | 'links' | 'related';
 
@@ -339,6 +340,7 @@ export default function TopicPage() {
                     <Btn sm onClick={startNotes}><Pencil size={15} /> Write notes</Btn>
                   </div>
                 )}
+                <div className={s.inkBlock}><InkNotes type="study_node" id={id} context={node.title} label="Handwritten notes" /></div>
               </section>
             )}
 
@@ -485,6 +487,8 @@ export default function TopicPage() {
           <ModalTitle>Edit card</ModalTitle>
           <FArea label="Question" value={editCard.front} onChange={v => setEditCard({ ...editCard, front: v })} rows={3} />
           <FArea label="Answer" value={editCard.back} onChange={v => setEditCard({ ...editCard, back: v })} rows={3} />
+          <InkNotes type="card_front" id={editCard.id} context={editCard.front || 'Question'} variant="compact" label="Draw on the question" />
+          <InkNotes type="card_back" id={editCard.id} context={editCard.back || 'Answer'} variant="compact" label="Draw on the answer" />
           <div className={s.modalRow}>
             <button type="button" className={`${s.ghostBtn} ${s.danger}`} onClick={() => removeCard(editCard)}><Trash2 size={15} /> Delete card</button>
           </div>

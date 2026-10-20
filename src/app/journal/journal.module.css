@@ -393,3 +393,6 @@
   .prompt { flex-wrap: wrap; }
   .promptText { flex-basis: 100%; }
 }
+
+/* handwriting attached to the entry */
+.inkBlock { margin-top: var(--sp-4); }

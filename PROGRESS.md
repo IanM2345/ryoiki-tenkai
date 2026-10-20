@@ -497,3 +497,34 @@ Tic Tac Toe, Sudoku, Chess, Battleship, Kadi, Matatu, Connect Four, Memory, 2048
   - Soundtrack: an edit of "If I Am With You" (Jujutsu Kaisen, piano by Block_pf). Cuts at 47.7s to 67.6s and 95.3s to 104.0s, picked where the music before and after matches; the climax lands on "Works now" and the quiet reprise on "Your turn".
 - **What's new now holds several videos** (`WHATS_NEW_VIDEOS` in `src/lib/whatsNew.ts`, newest first). The newest plays by itself once; its end card has a button for each older video. `openWhatsNew(id?)` can open a specific one.
 - Fixes: the Learn map fits the iPad screen on open (and centres on the first subject if everything would be too small); subjects sit closer together; stop search no longer lists a saved place twice.
+
+## Session 35 (8 Oct 2026): production key fix and guard rails
+- **Incident:** after the deploy, her laptop could load the site but nothing saved, then she couldn't sign in. Cause: `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel Production had one extra character pasted at the end, so Supabase rejected every request (401 on realtime, auth and data). Fixed by correcting the key and redeploying (Vercel only applies changed variables to new deployments). Her data was never affected.
+- **Build check** (`next.config.ts`): the build now stops with a plain message if the Supabase URL or anon key is missing, the key belongs to a different project than the URL, it's the service_role/secret key, or it's cut short / has extra characters.
+- **Keys are trimmed** in `src/lib/supabase.ts`, so a stray space or line break can't break requests.
+- **Login message:** if Supabase itself fails (bad key, outage, rate limit), the login page now says "Can't reach your account right now. Your password is fine" (or "Too many tries") instead of "Wrong email or password".
+- **Build check only at build time:** the Supabase key check now runs only while building (not on `next dev` or a running server), so a mismatched local `.env.local` can't stop the dev server.
+
+## Session 36 (17 Oct 2026): Apple Pencil everywhere, and a Sketchbook
+- **One pen engine** (`src/components/ink/`, `src/lib/ink.ts`): pressure-sensitive Pen, Pencil, Marker and Highlighter, plus a Precise or Whole-stroke eraser. Undo/redo (also Cmd/Ctrl+Z), 8 colours plus any colour, 3 sizes, and blank, lined, grid or dotted paper (dark or light).
+  - **Apple Pencil** draws; her **palm is ignored** while the Pencil is down; **fingers scroll, pan and pinch-zoom**. Without a Pencil (phone, laptop), a finger or mouse draws (with simulated pressure). Once a Pencil has been used on a device, fingers stop drawing there; "Draw with finger too" in the ⋯ menu turns that back on.
+  - Hovering Pencils (newer iPads) show where the tip will land. Safari can't pass the Pencil's double-tap or squeeze to websites.
+  - Strokes are stored as smoothed vectors (sharp at any zoom, small to save), autosaved about a second after each stroke, with a preview image for lists. ⋯ → **Save as image** shares a PNG (to Photos on iPad).
+  - Highlighter sits under the writing and glows on dark paper.
+- **Sketchbook** (`/draw`, in the menu): drawings in landscape, portrait or square; name, favourite, delete. Tabs for Drawings, Favourites, and **Handwriting** (every handwritten page from around the site, with where it belongs). Drawings with a name show up in Search.
+- **Handwrite / Sketch everywhere:** journal entries, study topics ("Handwritten notes" under the typed notes), people (Souls → Notes), routes (Details), and the edit windows for places, ideas, tasks, library finds, queue items and ratings. Items need saving once before handwriting can be added.
+  - **Flashcards:** draw on the question and/or answer (edit a card). Review shows the drawings with the card, and a **Scratchpad** button gives an unsaved space to work the answer out.
+  - **Time capsule:** handwritten pages can go in a letter. They stay hidden until the letter opens (and never appear in the Sketchbook).
+  - Deleting an item deletes its handwriting. Scribble (iPadOS handwriting into text boxes) already works in every text box on the site.
+- **Migration** `20261017100000_drawings.sql` (one new table). Backup includes drawings.
+
+## Session 37 (18 Oct 2026): animation in the Sketchbook
+- **New → Animation** (landscape, portrait or square): a flipbook animator built on the same pens.
+  - **Frame strip** under the canvas: tap a frame to draw on it, **+** adds a blank frame after the current one, **Copy** duplicates it (to change a little at a time), **Hold** shows a frame 2, 3 or 4 times longer, arrows move it earlier or later, bin deletes it. Up to 120 frames.
+  - **Onion skin**: the previous two frames show faintly in red and the next in green, so each drawing lines up with the last.
+  - **Background**: a layer drawn once that shows under every frame (scenery, a ground line).
+  - **Play** (or Space) at 2 to 24 frames per second, as a **Loop** or a **Bounce** (forwards then backwards). ← and → step through frames on a keyboard.
+  - ⋯ → **Save as GIF** makes a looping GIF (640 px wide) to share or keep in Photos; **Save first frame as image** for a still.
+  - Undo/redo works per frame. Autosaves like drawings (a little less often, since animations are bigger).
+- Sketchbook has an **Animations** tab and an Animation badge on cards; Drawings shows drawings only.
+- **Migration** `20261018100000_animations.sql`: lets a drawing be an animation (widens one check; nothing else changes). New package `gifenc` (MIT) for GIFs.

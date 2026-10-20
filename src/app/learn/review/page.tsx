@@ -1,13 +1,16 @@
 'use client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ChevronLeft, Layers, PartyPopper, RotateCcw, Eye, Keyboard, CornerDownLeft, Sparkles } from 'lucide-react';
+import { ChevronLeft, Layers, PartyPopper, RotateCcw, Eye, Keyboard, CornerDownLeft, Sparkles, PenLine } from 'lucide-react';
 import { Btn, Topbar, EmptyState, Toast, useToast } from '@/components/ui';
 import { updateStudyCard, addStudyReview, type DbStudyCard } from '@/lib/db';
 import { GRADES, fmtInterval, isDue, pathTo, schedule, subtreeIds, SUBJECT_COLORS, subjectOf, type Grade } from '@/lib/study';
 import { checkAnswer, isShortAnswer, wasCorrect, type AnswerCheck, type Piece } from '@/lib/answerCheck';
 import { useStudy } from '../useStudy';
 import s from '../learn.module.css';
+import InkNotes from '@/components/ink/InkNotes';
+const Scratchpad = dynamic(() => import('@/components/ink/Scratchpad'), { ssr: false });
 
 interface Session { ids: string[]; scope: string | null; all: boolean }
 
@@ -48,6 +51,9 @@ export default function ReviewPage() {
   const [check, setCheck] = useState<AnswerCheck | null>(null);
   const [results, setResults] = useState<{ grade: number; score: number | null }[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // A place to work answers out with the Pencil (remembered per device)
+  const [scratch, setScratch] = useState(() => { try { return typeof window !== 'undefined' && localStorage.getItem('yw-learn-scratch') === '1'; } catch { return false; } });
+  const toggleScratch = () => setScratch(v => { try { localStorage.setItem('yw-learn-scratch', v ? '0' : '1'); } catch { /* ignore */ } return !v; });
 
   // Build the pile once, when the cards first arrive (later syncs don't reshuffle it).
   if (!loading && !session) {
@@ -166,6 +172,7 @@ export default function ReviewPage() {
             <section className={`${s.flash} ${flipped ? s.flashOn : ''}`} style={{ ['--c' as string]: color }} aria-live="polite">
               <p className={s.flashWhere}>{where.map(n => n.title).join(' › ')}</p>
               <p className={s.flashFront}>{card.front}</p>
+              <InkNotes key={`f${card.id}`} type="card_front" id={card.id} variant="inline" readOnly context={card.front} />
               {flipped ? (
                 <>
                   <hr className={s.flashRule} />
@@ -183,6 +190,7 @@ export default function ReviewPage() {
                   ) : (
                     <p className={s.flashBack}>{card.back}</p>
                   )}
+                  <InkNotes key={`b${card.id}`} type="card_back" id={card.id} variant="inline" readOnly context={card.back} />
                 </>
               ) : typeMode ? (
                 <form className={s.typeForm} onSubmit={e => { e.preventDefault(); submitTyped(); }}>
@@ -207,6 +215,7 @@ export default function ReviewPage() {
                 <button type="button" className={s.flipBtn} onClick={() => setFlipped(true)}><Eye size={17} /> Show answer</button>
               )}
             </section>
+            {scratch && <Scratchpad key={`s${card.id}`} />}
             {flipped && (
               <div className={s.grades} role="group" aria-label="How did that go?">
                 {GRADES.map(g => (
@@ -221,6 +230,9 @@ export default function ReviewPage() {
             <div className={s.reviewFoot}>
               <button type="button" className={`${s.typeToggle} ${typeMode ? s.typeToggleOn : ''}`} onClick={toggleType} aria-pressed={typeMode}>
                 <Keyboard size={15} /> {typeMode ? 'Typing answers' : 'Type answers'}
+              </button>
+              <button type="button" className={`${s.typeToggle} ${scratch ? s.typeToggleOn : ''}`} onClick={toggleScratch} aria-pressed={scratch}>
+                <PenLine size={15} /> Scratchpad
               </button>
               <p className={s.keysHint}>{typeMode && !flipped ? 'Enter to check.' : flipped ? `Keys: 1 to 4, or Enter for ${check ? GRADES[check.suggested - 1].label : 'Good'}.` : 'Keys: Space to flip.'}</p>
             </div>

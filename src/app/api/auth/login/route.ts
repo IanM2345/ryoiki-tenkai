@@ -29,6 +29,15 @@ export async function POST(request: NextRequest) {
       password,
     });
 
+    if (error && error.status !== 400) {
+      // Not her password: the site can't reach her account (bad key, Supabase down, rate limit).
+      console.error('login: Supabase auth error', error.status, error.message);
+      return NextResponse.json({
+        message: error.status === 429
+          ? 'Too many tries. Wait a few minutes and try again.'
+          : "Can't reach your account right now. Your password is fine; try again in a minute.",
+      }, { status: 503 });
+    }
     if (error || !data.session) {
       return NextResponse.json({ message: 'Wrong email or password.' }, { status: 401 });
     }

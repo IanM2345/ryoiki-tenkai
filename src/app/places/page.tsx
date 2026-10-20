@@ -21,6 +21,7 @@ import { prepareImage, deleteImage, preloadSignedUrls } from '@/lib/upload';
 import { geocodeAddress, directionsUrl, detectLocation } from '@/lib/geocode';
 import { fmtDate, localDateStr } from '@/lib/dates';
 import { mapboxToken } from '@/lib/routing';
+import InkNotes from '@/components/ink/InkNotes';
 
 // 3D Mapbox globe when the site has a Mapbox token; the flat map otherwise.
 const MapView = dynamic(() => (mapboxToken() ? import('./PlacesMap3D') : import('./MapView')), {
@@ -320,6 +321,7 @@ export default function PlacesPage() {
           </div>
           <ImagePicker label="Photo" value={imagePreview} onChange={(f, p) => { setImageFile(f); setImagePreview(p); }} onClear={() => { setImageFile(null); setImagePreview(null); }} />
           <SoulLinkField souls={souls} value={soulIds} onChange={setSoulIds} label={form.wishlist ? 'Who do you want to go with?' : 'Who were you with?'} />
+          {editItem && <InkNotes type="place" id={editItem.id} context={editItem.name} variant="compact" />}
           <ModalFooter onCancel={() => setFormOpen(false)} onSave={save} saveLabel={saving ? 'Saving' : editItem ? 'Save changes' : 'Save place'} />
         </Modal>
       )}

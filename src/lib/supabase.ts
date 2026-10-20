@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const url = process.env.NEXT_PUBLIC_SUPABASE_URL!.trim();
+const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!.trim();   // a stray space or line break pasted into Vercel would break every request
 
 export const supabase = createClient(url, key, {
   auth: {

@@ -15,6 +15,7 @@ import { ensureSession } from '@/lib/supabase';
 import { useLiveTables } from '@/lib/realtime';
 import { PRIORITIES, PRIO_COLOR, PRIO_LABEL, type Priority } from '@/lib/tasks';
 import { fmtDate } from '@/lib/dates';
+import InkNotes from '@/components/ink/InkNotes';
 
 type IStatus = DbIdea['status'];
 const ORDER: IStatus[] = ['thinking', 'planning', 'doing', 'done'];
@@ -229,6 +230,7 @@ export default function IdeasPage() {
             <TagInput tags={form.tags} color="var(--pu-g)" onAdd={t => set('tags', [...form.tags, t])} onRemove={t => set('tags', form.tags.filter(x => x !== t))} />
           </div>
           <SoulLinkField souls={souls} value={soulIds} onChange={setSoulIds} />
+          {editItem && <InkNotes type="idea" id={editItem.id} context={editItem.title} variant="compact" />}
           <ModalFooter onCancel={() => setFormOpen(false)} onSave={save} saveLabel={saving ? 'Saving' : editItem ? 'Save changes' : 'Save idea'} />
         </Modal>
       )}

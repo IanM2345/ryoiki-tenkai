@@ -55,6 +55,22 @@ npx supabase link --project-ref pdxozrjepmdjxmxmietz      # back to staging
 Then commit and push to deploy. It only adds six new tables and one column; nothing existing is touched.
 Until the update is applied, the Learn page says it needs a database update instead of breaking.
 
+## Already live? Adding Apple Pencil (Sketchbook and handwriting)
+
+Two small database updates (a new `drawings` table, then one more allowed kind for animations; nothing existing is touched) and two new packages:
+```powershell
+npm install                                               # adds perfect-freehand (smooth strokes) and gifenc (GIF export)
+npx supabase link --project-ref pdxozrjepmdjxmxmietz      # staging first
+npx supabase db push
+npm run dev                                               # try http://localhost:3000/draw
+npx supabase link --project-ref cuwqckhhlkvbhzqiktbj      # her project
+npx supabase db push --dry-run     # should list ONLY 20261017100000_drawings and 20261018100000_animations
+npx supabase db push
+npx supabase link --project-ref pdxozrjepmdjxmxmietz      # back to staging
+```
+Then commit and push to deploy. Until the update is applied, the Sketchbook and the Handwrite buttons
+just show nothing; the rest of the site is unaffected.
+
 ### The beta video for the map feature
 A new **What's new** video (`public/whats-new/map-beta-*.mp4` and `.jpg`) shows her Routes, Places, Learn
 and On the Go as a beta, says what works and what doesn't yet, and asks what would make it better.

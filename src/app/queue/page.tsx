@@ -15,6 +15,7 @@ import type { DbQueueItem, DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
 import { useLiveTables } from '@/lib/realtime';
 import { localDateStr, fmtDate } from '@/lib/dates';
+import InkNotes from '@/components/ink/InkNotes';
 
 type QStatus = DbQueueItem['status'];
 type QTab = DbQueueItem['tab'];
@@ -250,6 +251,7 @@ export default function QueuePage() {
           </div>
           <div style={{ height: 14 }} />
           <SoulLinkField souls={souls} value={soulIds} onChange={setSoulIds} label="Recommended by or shared with" />
+          {editItem && <InkNotes type="queue" id={editItem.id} context={editItem.title} variant="compact" />}
           <ModalFooter onCancel={() => setFormOpen(false)} onSave={save} saveLabel={saving ? 'Saving' : editItem ? 'Save changes' : 'Add'} />
         </Modal>
       )}

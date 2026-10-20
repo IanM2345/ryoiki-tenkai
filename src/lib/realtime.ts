@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { supabase } from './supabase';
 
 /**
@@ -15,6 +15,7 @@ export function useLiveTables(tables: string[], reload: () => void) {
   const reloadRef = useRef(reload);
   reloadRef.current = reload;
   const key = tables.join(',');
+  const uid = useId();   // several components can watch the same table at once
 
   useEffect(() => {
     if (typeof window === 'undefined' || !tables.length) return;
@@ -22,7 +23,7 @@ export function useLiveTables(tables: string[], reload: () => void) {
     // Collapse a burst of changes into a single reload.
     const ping = () => { clearTimeout(timer); timer = setTimeout(() => reloadRef.current(), 350); };
 
-    const channel = supabase.channel(`live:${key}`);
+    const channel = supabase.channel(`live:${key}:${uid}`);
     for (const table of tables) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, ping);
     }
@@ -38,5 +39,5 @@ export function useLiveTables(tables: string[], reload: () => void) {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, uid]);
 }

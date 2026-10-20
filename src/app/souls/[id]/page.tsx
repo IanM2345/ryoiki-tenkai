@@ -19,6 +19,7 @@ import {
 import { ensureSession } from '@/lib/supabase';
 import { deleteImage } from '@/lib/upload';
 import { fmtDate, relDay } from '@/lib/dates';
+import InkNotes from '@/components/ink/InkNotes';
 
 type Tab = 'timeline' | 'favourites' | 'connected' | 'notes';
 
@@ -241,12 +242,15 @@ export default function SoulProfilePage() {
         )}
 
         {tab === 'notes' && (
-          soul.notes ? (
-            <div className={s.notes}>{soul.notes}</div>
-          ) : (
-            <EmptyState icon={<Heart size={26} />} msg="Keep birthdays, favourite things and little details here."
-              action={<Btn sm variant="ghost" onClick={() => setEditing(true)}><Pencil size={14} /> Add notes</Btn>} />
-          )
+          <>
+            {soul.notes ? (
+              <div className={s.notes}>{soul.notes}</div>
+            ) : (
+              <EmptyState icon={<Heart size={26} />} msg="Keep birthdays, favourite things and little details here."
+                action={<Btn sm variant="ghost" onClick={() => setEditing(true)}><Pencil size={14} /> Add notes</Btn>} />
+            )}
+            <div style={{ marginTop: 'var(--sp-5)' }}><InkNotes type="soul" id={soul.id} context={soul.name} label="Handwriting and sketches" /></div>
+          </>
         )}
       </div>
 

@@ -126,6 +126,7 @@ export async function updateTask(id: string, updates: Partial<Pick<DbTask, 'text
 export async function deleteTask(id: string): Promise<void> {
   const { error } = await supabase.from('tasks').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('task', id);
 }
 
 export async function clearDoneTasks(): Promise<void> {
@@ -199,6 +200,7 @@ export async function updateJournalEntry(id: string, updates: Partial<Omit<DbJou
 export async function deleteJournalEntry(id: string): Promise<void> {
   const { error } = await supabase.from('journal_entries').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('journal', id);
 }
 
 // Link/unlink souls to a journal entry
@@ -285,6 +287,7 @@ export async function updateLibraryEntry(id: string, updates: Partial<Omit<DbLib
 export async function deleteLibraryEntry(id: string): Promise<void> {
   const { error } = await supabase.from('library').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('library', id);
 }
 
 // ================================================================
@@ -339,6 +342,7 @@ export async function updateIdea(id: string, updates: Partial<Omit<DbIdea, 'id' 
 export async function deleteIdea(id: string): Promise<void> {
   const { error } = await supabase.from('ideas').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('idea', id);
 }
 
 // ================================================================
@@ -400,6 +404,7 @@ export async function updateQueueItem(id: string, updates: Partial<Omit<DbQueueI
 export async function deleteQueueItem(id: string): Promise<void> {
   const { error } = await supabase.from('queue').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('queue', id);
 }
 
 // ================================================================
@@ -466,6 +471,7 @@ export async function updatePlace(id: string, updates: Partial<Omit<DbPlace, 'id
 export async function deletePlace(id: string): Promise<void> {
   const { error } = await supabase.from('places').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('place', id);
 }
 
 // ================================================================
@@ -519,6 +525,7 @@ export async function updateRating(id: string, updates: Partial<Omit<DbRating, '
 export async function deleteRating(id: string): Promise<void> {
   const { error } = await supabase.from('ratings').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('rating', id);
 }
 
 // ================================================================
@@ -611,6 +618,7 @@ export async function updateSoul(id: string, updates: Partial<Omit<DbSoul, 'id' 
 export async function deleteSoul(id: string): Promise<void> {
   const { error } = await supabase.from('souls').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('soul', id);
 }
 
 export async function addSoulMedia(media: {
@@ -1036,7 +1044,7 @@ export async function getCapsules(): Promise<DbCapsule[]> {
   return unwrap(data, error) ?? [];
 }
 
-export async function addCapsule(c: { title: string; body: string; open_on: string; from_name?: string | null }): Promise<DbCapsule> {
+export async function addCapsule(c: { id?: string; title: string; body: string; open_on: string; from_name?: string | null }): Promise<DbCapsule> {
   const { data, error } = await supabase.from('time_capsules').insert(c).select().single();
   return unwrap(data, error);
 }
@@ -1054,6 +1062,7 @@ export async function markCapsuleOpened(id: string): Promise<DbCapsule> {
 export async function deleteCapsule(id: string): Promise<void> {
   const { error } = await supabase.from('time_capsules').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('capsule', id);
 }
 
 // ================================================================
@@ -1166,6 +1175,7 @@ export async function updateRoute(id: string, updates: RouteInput): Promise<DbRo
 export async function deleteRoute(id: string): Promise<void> {
   const { error } = await supabase.from('routes').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('route', id);
 }
 
 export async function getRouteCollections(): Promise<DbRouteCollection[]> {
@@ -1263,6 +1273,7 @@ export async function updateStudyNode(id: string, u: StudyNodeInput): Promise<Db
 export async function deleteStudyNode(id: string): Promise<void> {
   const { error } = await supabase.from('study_nodes').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('study_node', id);
 }
 
 export async function addStudyLink(from_id: string, to_id: string): Promise<DbStudyLink> {
@@ -1285,6 +1296,7 @@ export async function updateStudyCard(id: string, u: Partial<Omit<DbStudyCard, '
 export async function deleteStudyCard(id: string): Promise<void> {
   const { error } = await supabase.from('study_cards').delete().eq('id', id);
   if (error) throw error;
+  cleanupInk('card_front', id); cleanupInk('card_back', id);
 }
 export async function addStudyReview(r: { card_id: string; node_id: string; grade: number; score?: number | null }): Promise<void> {
   const { score, ...rest } = r;
@@ -1344,4 +1356,83 @@ export async function addStudySession(s: Omit<DbStudySession, 'id' | 'user_id' |
 export async function deleteStudySession(id: string): Promise<void> {
   const { error } = await supabase.from('study_sessions').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ================================================================
+//  DRAWINGS (Apple Pencil: sketchbook + handwriting on anything)
+// ================================================================
+
+export type DrawingKind = 'sketch' | 'note' | 'animation';
+/** What a handwritten page can be attached to. */
+export type DrawingAttach =
+  | 'journal' | 'study_node' | 'card_front' | 'card_back' | 'soul' | 'place' | 'route'
+  | 'idea' | 'task' | 'library' | 'capsule' | 'queue' | 'rating' | 'mood';
+
+export interface DbDrawing {
+  id:            string;
+  user_id:       string;
+  kind:          DrawingKind;
+  title:         string;
+  doc:           unknown;          // InkDoc (see src/lib/ink.ts)
+  thumb:         string | null;
+  attached_type: DrawingAttach | null;
+  attached_id:   string | null;
+  favourite:     boolean;
+  created_at:    string;
+  updated_at:    string;
+}
+/** List rows without the strokes (they can be large). */
+export type DbDrawingSummary = Omit<DbDrawing, 'doc'>;
+const DRAWING_LIST = 'id,user_id,kind,title,thumb,attached_type,attached_id,favourite,created_at,updated_at';
+
+export async function getSketches(): Promise<DbDrawingSummary[]> {
+  const { data, error } = await supabase.from('drawings').select(DRAWING_LIST).is('attached_type', null).order('updated_at', { ascending: false });
+  return unwrap(data, error) ?? [];
+}
+
+export async function getAllDrawingSummaries(): Promise<DbDrawingSummary[]> {
+  const { data, error } = await supabase.from('drawings').select(DRAWING_LIST).order('updated_at', { ascending: false });
+  return unwrap(data, error) ?? [];
+}
+
+export async function getDrawingsFor(type: DrawingAttach, ids: string | string[]): Promise<DbDrawingSummary[]> {
+  const list = Array.isArray(ids) ? ids : [ids];
+  if (!list.length) return [];
+  const { data, error } = await supabase.from('drawings').select(DRAWING_LIST)
+    .eq('attached_type', type).in('attached_id', list).order('created_at', { ascending: true });
+  return unwrap(data, error) ?? [];
+}
+
+export async function getDrawing(id: string): Promise<DbDrawing | null> {
+  const { data, error } = await supabase.from('drawings').select('*').eq('id', id).maybeSingle();
+  return unwrap(data, error);
+}
+
+export async function addDrawing(d: { kind: DrawingKind; title?: string; doc: unknown; thumb?: string | null; attached_type?: DrawingAttach | null; attached_id?: string | null }): Promise<DbDrawing> {
+  const { data, error } = await supabase.from('drawings').insert({
+    kind: d.kind, title: d.title ?? '', doc: d.doc, thumb: d.thumb ?? null,
+    attached_type: d.attached_type ?? null, attached_id: d.attached_id ?? null,
+  }).select().single();
+  return unwrap(data, error);
+}
+
+export async function updateDrawing(id: string, patch: Partial<Pick<DbDrawing, 'title' | 'doc' | 'thumb' | 'favourite' | 'attached_type' | 'attached_id'>>): Promise<DbDrawing> {
+  const { data, error } = await supabase.from('drawings').update(patch).eq('id', id).select().single();
+  return unwrap(data, error);
+}
+
+export async function deleteDrawing(id: string): Promise<void> {
+  const { error } = await supabase.from('drawings').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** When an item is deleted, its handwritten pages go with it. */
+export async function deleteDrawingsFor(type: DrawingAttach, id: string): Promise<void> {
+  const { error } = await supabase.from('drawings').delete().eq('attached_type', type).eq('attached_id', id);
+  if (error) throw error;
+}
+
+/** Remove an item's handwriting after the item is deleted (best effort, never blocks the delete). */
+function cleanupInk(type: DrawingAttach, id: string) {
+  deleteDrawingsFor(type, id).catch(() => {});
 }

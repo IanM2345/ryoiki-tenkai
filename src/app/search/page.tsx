@@ -3,20 +3,20 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Search, X, NotebookPen, Library, ListChecks, Lightbulb, ListVideo, MapPin, Star, Users, ChevronRight, SearchX, Route, GraduationCap,
+  Search, X, NotebookPen, Library, ListChecks, Lightbulb, ListVideo, MapPin, Star, Users, ChevronRight, SearchX, Route, GraduationCap, Brush,
 } from 'lucide-react';
 import s from './search.module.css';
 import { Stars, Pill, Topbar, Toast, useToast } from '@/components/ui';
 import SoulAvatar from '@/components/souls/SoulAvatar';
 import {
-  getJournalEntries, getLibrary, getTasks, getIdeas, getQueue, getPlaces, getRatings, getSouls, getRoutes, getStudyNodes,
+  getJournalEntries, getLibrary, getTasks, getIdeas, getQueue, getPlaces, getRatings, getSouls, getRoutes, getStudyNodes, getSketches,
 } from '@/lib/db';
 import type { DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
 import { fmtDate } from '@/lib/dates';
 import { routeTitle } from '@/lib/routing';
 
-type SectionKey = 'journal' | 'library' | 'tasks' | 'ideas' | 'queue' | 'places' | 'routes' | 'learn' | 'ratings' | 'souls';
+type SectionKey = 'journal' | 'library' | 'tasks' | 'ideas' | 'queue' | 'places' | 'routes' | 'learn' | 'sketches' | 'ratings' | 'souls';
 
 const SECTIONS: { key: SectionKey; label: string; Icon: typeof Search; color: string }[] = [
   { key: 'journal', label: 'Journal', Icon: NotebookPen, color: 'var(--or)' },
@@ -28,6 +28,7 @@ const SECTIONS: { key: SectionKey; label: string; Icon: typeof Search; color: st
   { key: 'places',  label: 'Places',  Icon: MapPin,      color: 'var(--red)' },
   { key: 'routes',  label: 'Routes',  Icon: Route,       color: 'var(--or)' },
   { key: 'learn',   label: 'Learn',   Icon: GraduationCap, color: 'var(--pu-l)' },
+  { key: 'sketches', label: 'Sketchbook', Icon: Brush,   color: 'var(--or)' },
   { key: 'ratings', label: 'Ratings', Icon: Star,        color: 'var(--or)' },
 ];
 const SECTION_BY_KEY = Object.fromEntries(SECTIONS.map(x => [x.key, x])) as Record<SectionKey, typeof SECTIONS[number]>;
@@ -114,11 +115,12 @@ export default function SearchPage() {
         if (!(await ensureSession())) return;
         let failed = false;
         const safe = <T,>(p: Promise<T[]>) => p.catch(() => { failed = true; return [] as T[]; });
-        const [journal, library, tasks, ideas, queue, places, ratings, souls, routes, study] = await Promise.all([
+        const [journal, library, tasks, ideas, queue, places, ratings, souls, routes, study, sketches] = await Promise.all([
           safe(getJournalEntries()), safe(getLibrary()), safe(getTasks()), safe(getIdeas()),
           safe(getQueue()), safe(getPlaces()), safe(getRatings()), safe(getSouls()),
           getRoutes().catch(() => []), // quietly empty until the routes update is applied
           getStudyNodes().catch(() => []),
+          getSketches().catch(() => []),   // quietly empty until the drawings update is applied
         ]);
 
         const all: SearchItem[] = [
@@ -175,6 +177,11 @@ export default function SearchPage() {
             title: e.title,
             preview: join(e.summary, oneLine(e.notes)),
             extra: e.notes ?? '', rating: 0, href: `/learn/${e.id}`,
+          })),
+          ...sketches.filter(e => e.title).map(e => ({
+            id: `D-${e.id}`, section: 'sketches' as const,
+            title: e.title, preview: `Drawing · ${fmtDate(e.updated_at.slice(0, 10))}`,
+            extra: '', rating: 0, href: '/draw',
           })),
           ...ratings.map(e => ({
             id: `R-${e.id}`, section: 'ratings' as const,

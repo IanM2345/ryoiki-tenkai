@@ -17,6 +17,7 @@ import type { DbLibraryEntry, DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
 import { useLiveTables } from '@/lib/realtime';
 import { prepareImage, deleteImage, preloadSignedUrls } from '@/lib/upload';
+import InkNotes from '@/components/ink/InkNotes';
 
 type LibType = DbLibraryEntry['type'];
 
@@ -263,6 +264,7 @@ export default function LibraryPage() {
             onClear={() => { setImageFile(null); setImagePreview(null); }}
           />
           <SoulLinkField souls={souls} value={soulIds} onChange={setSoulIds} />
+          {editItem && <InkNotes type="library" id={editItem.id} context={editItem.title} variant="compact" />}
           <ModalFooter
             onCancel={() => setFormOpen(false)}
             onSave={save}

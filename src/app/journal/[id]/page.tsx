@@ -13,6 +13,7 @@ import { ensureSession } from '@/lib/supabase';
 import { localDateStr, localTimeStr, parseLocalDate } from '@/lib/dates';
 import { MOODS, wordCount, JOURNAL_PROMPTS } from '@/lib/journal';
 import SoulAvatar from '@/components/souls/SoulAvatar';
+import InkNotes from '@/components/ink/InkNotes';
 
 interface Draft { title: string; body: string; mood: string; tags: string[]; pinned: boolean; souls: string[]; }
 const EMPTY: Draft = { title: '', body: '', mood: '', tags: [], pinned: false, souls: [] };
@@ -294,6 +295,8 @@ export default function JournalEditorPage() {
             </div>
           )}
         </div>
+
+        {!isNew && <div className={s.inkBlock}><InkNotes type="journal" id={id} context={draft.title || 'Journal entry'} label="Handwriting and sketches" /></div>}
 
         <div className={s.editorFoot}>
           <div className={s.footBlock}>

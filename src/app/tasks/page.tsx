@@ -15,6 +15,7 @@ import {
   isOverdue, isDueToday, isUpcoming, sortOpen, sortDone,
 } from '@/lib/tasks';
 import { localDateStr } from '@/lib/dates';
+import InkNotes from '@/components/ink/InkNotes';
 
 type TabKey = 'today' | 'upcoming' | 'overdue' | 'done' | 'all';
 
@@ -240,6 +241,7 @@ export default function TasksPage() {
           <FInput label="Due date" type="date" value={editDue} onChange={setEditDue} />
           <Lbl>Priority</Lbl>
           <PriorityPicker value={editPrio} onChange={setEditPrio} />
+          <InkNotes type="task" id={editTask.id} context={editTask.text} variant="compact" />
           <ModalFooter onCancel={() => setEditTask(null)} onSave={saveEdit} />
         </Modal>
       )}

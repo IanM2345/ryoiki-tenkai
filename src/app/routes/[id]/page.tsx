@@ -26,6 +26,7 @@ import StopField from '../StopField';
 import Journey, { journeyElapsed } from '../Journey';
 import type { MapPoint } from '../mapTypes';
 import s from '../routes.module.css';
+import InkNotes from '@/components/ink/InkNotes';
 
 // 3D Mapbox map when the site has a Mapbox token; the flat map otherwise.
 const RouteMap = dynamic(() => (mapboxToken() ? import('../RouteMap3D') : import('../RouteMapFlat')), {
@@ -118,6 +119,7 @@ export default function RoutePlannerPage() {
   const [toast, show] = useToast();
 
   const idRef = useRef<string | null>(initialId);
+  const [savedId, setSavedId] = useState<string | null>(initialId);
   const draftRef = useRef(draft);
   const dirtyRef = useRef(false);
   const savingRef = useRef(false);
@@ -182,7 +184,7 @@ export default function RoutePlannerPage() {
       const saved = idRef.current ? await updateRoute(idRef.current, d) : await addRoute(d);
       lastSavedAt.current = saved.updated_at;
       if (!idRef.current) {
-        idRef.current = saved.id;
+        idRef.current = saved.id; setSavedId(saved.id);
         window.history.replaceState(window.history.state, '', `/routes/${saved.id}`);
       }
     } catch {
@@ -709,6 +711,7 @@ export default function RoutePlannerPage() {
                   <TagInput tags={draft.tags} onAdd={t => edit(d => ({ ...d, tags: [...d.tags, t] }))} onRemove={t => edit(d => ({ ...d, tags: d.tags.filter(x => x !== t) }))} />
                 </div>
                 <FArea label="Notes" value={draft.notes ?? ''} onChange={v => edit(d => ({ ...d, notes: v || null }))} rows={3} placeholder="What to bring, when to go, why it's a good walk" />
+                {savedId && <InkNotes type="route" id={savedId} context={title} variant="compact" label="Handwriting and sketches" />}
                 <label className={s.toggleRow}>
                   <span><Star size={16} /> Favourite</span>
                   <Toggle checked={draft.favourite} onChange={v => edit(d => ({ ...d, favourite: v }))} label="Favourite" />

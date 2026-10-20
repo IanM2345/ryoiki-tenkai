@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  House, LibraryBig, NotebookPen, ListChecks, Lightbulb, ListVideo, MapPin, Route, GraduationCap, Footprints,
+  House, LibraryBig, NotebookPen, ListChecks, Lightbulb, ListVideo, MapPin, Route, GraduationCap, Footprints, Brush,
   Search, Star, Cloudy, Gamepad2, Palette, Users, Images, Hourglass, HardDriveDownload, ChartColumn, KeyRound,
   LogOut, Sparkles, type LucideIcon,
 } from 'lucide-react';
@@ -24,6 +24,7 @@ const SPACES: NavItem[] = [
   { icon: Route,       label: 'Routes',    href: '/routes'    },
   { icon: GraduationCap, label: 'Learn',   href: '/learn'     },
   { icon: Footprints,  label: 'On the Go', href: '/go'      },
+  { icon: Brush,       label: 'Sketchbook', href: '/draw'    },
 ];
 const TOOLS: NavItem[] = [
   { icon: Search,   label: 'Search',      href: '/search'  },

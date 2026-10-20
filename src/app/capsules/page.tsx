@@ -5,7 +5,8 @@ import s from './capsules.module.css';
 import {
   Btn, Topbar, Modal, ModalTitle, ModalFooter, Confirm, FInput, FArea, EmptyState, Toast, useToast, Lbl, DatePicker,
 } from '@/components/ui';
-import { getCapsules, addCapsule, markCapsuleOpened, deleteCapsule, type DbCapsule } from '@/lib/db';
+import { getCapsules, addCapsule, markCapsuleOpened, deleteCapsule, deleteDrawingsFor, type DbCapsule } from '@/lib/db';
+import InkNotes from '@/components/ink/InkNotes';
 import { ensureSession } from '@/lib/supabase';
 import { useLiveTables } from '@/lib/realtime';
 import { localDateStr, addDays, fmtDate, parseLocalDate } from '@/lib/dates';
@@ -46,6 +47,9 @@ export default function CapsulesPage() {
   const [loading, setLoading] = useState(true);
   const [writing, setWriting] = useState(false);
   const [form, setForm] = useState(EMPTY);
+  // A letter's id is chosen when writing starts, so handwritten pages can be added before it's sealed.
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [inkCount, setInkCount] = useState(0);
   const [saving, setSaving] = useState(false);
   const [reading, setReading] = useState<DbCapsule | null>(null);
   const [unsealing, setUnsealing] = useState<string | null>(null);
@@ -73,14 +77,18 @@ export default function CapsulesPage() {
     opened: letters.filter(l => !!l.opened_at).sort((a, b) => (b.opened_at ?? '').localeCompare(a.opened_at ?? '')),
   }), [letters, today]);
 
-  const openWriter = () => { setForm({ ...EMPTY, open_on: presets(today)[2].value }); setWriting(true); };
+  const openWriter = () => { setForm({ ...EMPTY, open_on: presets(today)[2].value }); setDraftId(crypto.randomUUID()); setInkCount(0); setWriting(true); };
+  const cancelWriter = () => {
+    if (draftId && inkCount) deleteDrawingsFor('capsule', draftId).catch(() => {});   // nothing sealed, so drop its pages
+    setWriting(false);
+  };
 
   const seal = async () => {
-    if (!form.body.trim() || !form.open_on || saving) return;
+    if ((!form.body.trim() && !inkCount) || !form.open_on || saving) return;
     if (form.open_on <= today) { show('Pick a date in the future to open it.', 'var(--yellow)'); return; }
     setSaving(true);
     try {
-      const saved = await addCapsule({ title: form.title.trim() || 'A letter', body: form.body.trim(), open_on: form.open_on });
+      const saved = await addCapsule({ ...(draftId ? { id: draftId } : {}), title: form.title.trim() || 'A letter', body: form.body.trim(), open_on: form.open_on });
       setLetters(l => [...l, saved].sort((a, b) => a.open_on.localeCompare(b.open_on)));
       setWriting(false);
       show(`Sealed until ${fmtDate(saved.open_on)}`);
@@ -211,11 +219,12 @@ export default function CapsulesPage() {
       </div>
 
       {writing && (
-        <Modal onClose={() => !saving && setWriting(false)}>
+        <Modal onClose={() => !saving && cancelWriter()}>
           <ModalTitle>Write a letter to the future</ModalTitle>
           <FInput label="Title" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="Dear future me" />
           <FArea label="Your letter" value={form.body} onChange={v => setForm(f => ({ ...f, body: v }))} rows={9}
             placeholder="What's happening in your life right now? What are you hoping for? What do you want to remember?" />
+          {draftId && <InkNotes type="capsule" id={draftId} context={form.title || 'Your letter'} variant="compact" label="Handwritten pages" onCount={setInkCount} />}
           <Lbl>Open on</Lbl>
           <div className={s.presets}>
             {presets(today).map(p => (
@@ -226,7 +235,7 @@ export default function CapsulesPage() {
           </div>
           <DatePicker value={form.open_on} min={addDays(today, 1)} onChange={v => setForm(f => ({ ...f, open_on: v }))} placeholder="Or pick any date" />
           <p className={s.hint}><Lock size={12} /> Once sealed, the letter stays hidden until that day.</p>
-          <ModalFooter onCancel={() => setWriting(false)} onSave={seal} saveLabel={saving ? 'Sealing' : 'Seal the letter'} />
+          <ModalFooter onCancel={cancelWriter} onSave={seal} saveLabel={saving ? 'Sealing' : 'Seal the letter'} />
         </Modal>
       )}
 
@@ -237,6 +246,7 @@ export default function CapsulesPage() {
             <h2 className={s.paperTitle}>{reading.title}</h2>
             <div className={s.paperBody}>{reading.body}</div>
           </div>
+          <InkNotes type="capsule" id={reading.id} variant="inline" readOnly context={reading.title} />
           <div className={s.readFoot}>
             {!reading.from_name && (
               <Btn variant="ghost" sm onClick={() => { setDelItem(reading); setReading(null); }}><Trash2 size={14} /> Remove</Btn>

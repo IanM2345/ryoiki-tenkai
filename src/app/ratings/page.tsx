@@ -17,6 +17,7 @@ import type { DbRating, DbSoul } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
 import { useLiveTables } from '@/lib/realtime';
 import { fmtDate } from '@/lib/dates';
+import InkNotes from '@/components/ink/InkNotes';
 
 const CATS = ['Film', 'Book', 'Music', 'Place', 'Series', 'Article', 'Experience'] as const;
 type RCat = typeof CATS[number];
@@ -306,6 +307,7 @@ export default function RatingsPage() {
               <Trash2 size={14} strokeWidth={2} /> Delete this rating
             </button>
           )}
+          {editItem && <InkNotes type="rating" id={editItem.id} context={editItem.title} variant="compact" />}
           <ModalFooter onCancel={() => setFormOpen(false)} onSave={save} saveLabel={saving ? 'Saving' : editItem ? 'Save changes' : 'Save rating'} />
         </Modal>
       )}
