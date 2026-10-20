@@ -528,3 +528,22 @@ Tic Tac Toe, Sudoku, Chess, Battleship, Kadi, Matatu, Connect Four, Memory, 2048
   - Undo/redo works per frame. Autosaves like drawings (a little less often, since animations are bigger).
 - Sketchbook has an **Animations** tab and an Animation badge on cards; Drawings shows drawings only.
 - **Migration** `20261018100000_animations.sql`: lets a drawing be an animation (widens one check; nothing else changes). New package `gifenc` (MIT) for GIFs.
+
+## Session 38 (19 Oct 2026): task countdowns, reminders, and a side panel (her requests)
+- **Countdown on every task** (a clock chip): "in 25 min", "in 3h 10m", "in 2 days", "due now" (pulses), "40 min late". Orange within the hour, yellow today, red when late. Refreshes every 30 seconds. Date-only tasks show "5h left today", "tomorrow", "in 3 days", "2 days late".
+- **Tasks can have a time** (add form, edit window, side panel). Timed tasks sort first in the day.
+- **Push reminders per task:** pick any of at the time, 5, 15 or 30 minutes, 1 hour or 1 day before. Defaults to whatever she picked last time (15 min before + at the time to start). A bell on the chip shows a reminder is set. Changing the time re-arms them.
+  - Sent by `/api/cron/tasks`, called every minute by Supabase Cron (see DEPLOY.md, "Task reminders"). Each reminder goes out once; nothing is sent for a task more than an hour late; urgent, and dropped if a phone is offline for over an hour. Times are her local time (APP_TIMEZONE), summer time handled.
+- **Side panel on every page** (the tab on the right edge, with a badge for tasks late or due within the hour):
+  - **Tasks:** quick add for today (with an optional time), and Late / Today / Next 7 days lists with tick-off and countdowns.
+  - **Sticky notes:** coloured notes (six colours), pin to the top, delete (tap twice). Autosave, synced across devices. With an Apple Pencil she can write straight into a note (Scribble).
+  - On a laptop or iPad in landscape it can be **pinned** open beside the page; it remembers. On a phone it covers the screen. Esc closes it.
+- **Migration** `20261019100000_task_times_and_notes.sql`. Backup includes sticky notes.
+
+## Session 39 (20 Oct 2026): tasks on the Home Screen (her request)
+- **Settings → Tasks on your Home Screen:** makes a private widget key per device, then shows the steps.
+  - **Scriptable widget** (recommended): copy a ready-made script into the free Scriptable app. Small, medium, large and Lock Screen sizes. Shows late, timed, today and next-7-days tasks with live countdowns (iOS keeps them ticking), a "1 late" badge and "+N more". Refreshes about every 15 minutes, works offline from the last copy, tap opens Tasks.
+  - **Web widget page** `/w/tasks?k=…` for apps that show a web page as a widget: dark or `&theme=light`, fits small/medium/large, stacks the time under each task on the small size, hides rows that don't fit.
+  - Keys: only a SHA-256 fingerprint is stored; a key reads open tasks only; switch off any device's key (tap twice). Shown once.
+- Server: `/api/widget/tasks` (JSON feed) and `/w/tasks` use the service role to look up the key, then read only that person's open tasks. Bad key → 401.
+- **Migration** `20261020100000_widget_keys.sql` (one new table, owner-only RLS).

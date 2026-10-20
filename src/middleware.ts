@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/reset-password'];
+const PUBLIC_PATHS = ['/login', '/reset-password', '/w/'];   // /w/: Home Screen widgets (they bring their own private key)
 // The installable-app files must load before sign-in too.
 const APP_FILES = ['/sw.js', '/manifest.webmanifest', '/icons/'];
 // Note: .mp4 is deliberately NOT here. The What's new video uses a copyrighted song,

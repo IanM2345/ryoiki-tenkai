@@ -10,6 +10,7 @@ import { ensureSession } from '@/lib/supabase';
 import { makeBackup, downloadBlob, LAST_BACKUP_KEY, type Progress } from '@/lib/backup';
 import { fmtDate } from '@/lib/dates';
 import NotificationsCard from './NotificationsCard';
+import WidgetCard from './WidgetCard';
 import { openWhatsNew } from '@/lib/whatsNew';
 
 const MAX = 860;
@@ -132,6 +133,8 @@ export default function SettingsPage() {
         </section>
 
         <NotificationsCard onMessage={show} />
+
+        <WidgetCard onMessage={show} />
 
         {/* ── Backup ──────────────────────────────────────── */}
         <section className={s.card} aria-labelledby="backup-h">

@@ -86,6 +86,9 @@ export interface DbTask {
   done_at:      string | null;  // date string YYYY-MM-DD
   priority:     'high' | 'medium' | 'low';
   due_date:     string | null;  // date string YYYY-MM-DD
+  due_time?:    string | null;  // 'HH:MM' or 'HH:MM:SS', her local time (null = any time that day)
+  remind_before?: number[];     // minutes before due to send a push; 0 = at the time
+  reminders_sent?: number[];    // which reminders have gone out
   created_date: string;
   created_at:   string;
   updated_at:   string;
@@ -103,8 +106,13 @@ export async function addTask(task: {
   text: string;
   priority: 'high' | 'medium' | 'low';
   due_date?: string | null;
+  due_time?: string | null;
+  remind_before?: number[];
   created_date: string;
 }): Promise<DbTask> {
+  // Only send the time fields when used, so adding plain tasks works before the update is applied.
+  if (!task.due_time) delete task.due_time;
+  if (!task.remind_before?.length) delete task.remind_before;
   const { data, error } = await supabase
     .from('tasks')
     .insert(task)
@@ -113,7 +121,7 @@ export async function addTask(task: {
   return unwrap(data, error);
 }
 
-export async function updateTask(id: string, updates: Partial<Pick<DbTask, 'text' | 'done' | 'done_at' | 'priority' | 'due_date'>>): Promise<DbTask> {
+export async function updateTask(id: string, updates: Partial<Pick<DbTask, 'text' | 'done' | 'done_at' | 'priority' | 'due_date' | 'due_time' | 'remind_before' | 'reminders_sent'>>): Promise<DbTask> {
   const { data, error } = await supabase
     .from('tasks')
     .update(updates)
@@ -1435,4 +1443,56 @@ export async function deleteDrawingsFor(type: DrawingAttach, id: string): Promis
 /** Remove an item's handwriting after the item is deleted (best effort, never blocks the delete). */
 function cleanupInk(type: DrawingAttach, id: string) {
   deleteDrawingsFor(type, id).catch(() => {});
+}
+
+// ================================================================
+//  STICKY NOTES (side panel)
+// ================================================================
+
+export type StickyColor = 'yellow' | 'pink' | 'mint' | 'sky' | 'lilac' | 'peach';
+export interface DbStickyNote {
+  id:         string;
+  user_id:    string;
+  body:       string;
+  color:      StickyColor;
+  pinned:     boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getStickyNotes(): Promise<DbStickyNote[]> {
+  const { data, error } = await supabase.from('sticky_notes').select('*')
+    .order('pinned', { ascending: false }).order('sort_order').order('created_at', { ascending: false });
+  return unwrap(data, error) ?? [];
+}
+export async function addStickyNote(n: { body?: string; color?: StickyColor }): Promise<DbStickyNote> {
+  const { data, error } = await supabase.from('sticky_notes').insert({ body: n.body ?? '', color: n.color ?? 'yellow' }).select().single();
+  return unwrap(data, error);
+}
+export async function updateStickyNote(id: string, patch: Partial<Pick<DbStickyNote, 'body' | 'color' | 'pinned' | 'sort_order'>>): Promise<DbStickyNote> {
+  const { data, error } = await supabase.from('sticky_notes').update(patch).eq('id', id).select().single();
+  return unwrap(data, error);
+}
+export async function deleteStickyNote(id: string): Promise<void> {
+  const { error } = await supabase.from('sticky_notes').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ================================================================
+//  HOME SCREEN WIDGET KEYS (only a hash of each key is stored)
+// ================================================================
+
+export interface DbWidgetKey { id: string; label: string; created_at: string; last_used_at: string | null }
+export async function getWidgetKeys(): Promise<DbWidgetKey[]> {
+  const { data, error } = await supabase.from('widget_keys').select('id, label, created_at, last_used_at').order('created_at', { ascending: false });
+  return unwrap(data, error) ?? [];
+}
+export async function addWidgetKey(label: string, key_hash: string): Promise<DbWidgetKey> {
+  const { data, error } = await supabase.from('widget_keys').insert({ label, key_hash }).select('id, label, created_at, last_used_at').single();
+  return unwrap(data, error);
+}
+export async function deleteWidgetKey(id: string): Promise<void> {
+  const { error } = await supabase.from('widget_keys').delete().eq('id', id);
+  if (error) throw error;
 }

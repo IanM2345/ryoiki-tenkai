@@ -156,6 +156,8 @@ mark { background: color-mix(in oklab, var(--or) 25%, transparent); color: var(-
 /* Body class toggled by Sidebar.tsx */
 body.sidebar-closed .appMain { margin-left: var(--sidebar-w-closed); }
 body.sidebar-open   .appMain { margin-left: var(--sidebar-w); }
+/* Side panel pinned open beside the page (wide screens) */
+body.panel-docked .appMain { margin-right: 380px; transition: margin var(--dur-slow) var(--ease-drawer); }
 
 .leaflet-pane         { z-index: 4 !important; }
 .leaflet-tile-pane    { z-index: 2 !important; }

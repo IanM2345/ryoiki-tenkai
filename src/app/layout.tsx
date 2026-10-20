@@ -9,6 +9,7 @@ import SessionMonitor from '@/components/SessionMonitor';
 import SessionRestore from '@/components/SessionRestore';
 import ServiceWorker from '@/components/ServiceWorker';
 import WhatsNew from '@/components/WhatsNew';
+import SidePanel from '@/components/panel/SidePanel';
 import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="appMain">
           {children}
         </main>
+        <SidePanel />
         <Analytics/>
       </body>
     </html>

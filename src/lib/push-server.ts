@@ -30,7 +30,7 @@ export interface SubRow { id: string; user_id: string; endpoint: string; p256dh:
  * Send messages to a user's devices. Devices that no longer exist (the app was
  * removed from the Home Screen, notifications turned off) are cleaned up.
  */
-export async function sendTo(db: SupabaseClient, subs: SubRow[], messages: PushMessage[]) {
+export async function sendTo(db: SupabaseClient, subs: SubRow[], messages: PushMessage[], opts: { ttl?: number; urgency?: 'normal' | 'high' } = {}) {
   setup();
   let sent = 0, failed = 0, removed = 0;
   for (const sub of subs) {
@@ -40,7 +40,7 @@ export async function sendTo(db: SupabaseClient, subs: SubRow[], messages: PushM
         await webpush.sendNotification(
           { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
           JSON.stringify(m),
-          { TTL: 60 * 60 * 20, urgency: 'normal' },
+          { TTL: opts.ttl ?? 60 * 60 * 20, urgency: opts.urgency ?? 'normal' },
         );
         sent++; ok = true;
       } catch (err) {

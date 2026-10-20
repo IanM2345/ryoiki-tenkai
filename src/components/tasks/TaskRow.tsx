@@ -2,8 +2,10 @@
 import React from 'react';
 import { Pencil, Trash2, CalendarClock, CalendarCheck2, TriangleAlert } from 'lucide-react';
 import s from './TaskRow.module.css';
-import { type Task, PRIO_COLOR, PRIO_LABEL, isOverdue } from '@/lib/tasks';
+import { type Task, PRIO_COLOR, PRIO_LABEL, isOverdue, hhmm } from '@/lib/tasks';
 import { relDay } from '@/lib/dates';
+import { useNow } from '@/lib/useNow';
+import Countdown from './Countdown';
 
 export default function TaskRow({
   task, onToggle, onEdit, onDelete, compact,
@@ -14,7 +16,9 @@ export default function TaskRow({
   onDelete?: (id: string) => void;
   compact?: boolean;
 }) {
+  const now = useNow(30000);
   const overdue = isOverdue(task);
+  const at = task.due_time ? ` at ${hhmm(task.due_time)}` : '';
   const color = PRIO_COLOR[task.priority];
 
   return (
@@ -41,18 +45,19 @@ export default function TaskRow({
               {PRIO_LABEL[task.priority]}
             </span>
             {overdue && task.due_date && (
-              <span className={s.overdue}><TriangleAlert size={13} strokeWidth={2} />Was due {relDay(task.due_date)}</span>
+              <span className={s.overdue}><TriangleAlert size={13} strokeWidth={2} />Was due {relDay(task.due_date)}{at}</span>
             )}
             {!overdue && !task.done && task.due_date && (
-              <span><CalendarClock size={13} strokeWidth={2} />Due {relDay(task.due_date)}</span>
+              <span><CalendarClock size={13} strokeWidth={2} />Due {relDay(task.due_date)}{at}</span>
             )}
+            {!task.done && <Countdown task={task} now={now} />}
             {task.done && task.done_at && (
               <span><CalendarCheck2 size={13} strokeWidth={2} />Done {relDay(task.done_at)}</span>
             )}
           </div>
         )}
-        {compact && overdue && task.due_date && (
-          <div className={s.meta}><span className={s.overdue}>Was due {relDay(task.due_date)}</span></div>
+        {compact && !task.done && task.due_date && (task.due_time || overdue) && (
+          <div className={s.meta}><Countdown task={task} now={now} bell={false} /></div>
         )}
       </div>
 

@@ -1,0 +1,99 @@
+/* Side panel: tasks + sticky notes */
+.tab {
+  position: fixed; right: 0; top: 50%; z-index: 96; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 12px 8px 12px 10px; border-radius: 16px 0 0 16px;
+  border: 1px solid var(--bd-s); border-right: 0; background: var(--raised); color: var(--tx-s);
+  box-shadow: -6px 8px 24px rgba(0,0,0,.35); cursor: pointer;
+  transition: padding var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.tab:hover { color: var(--or); padding-right: 12px; }
+.badge {
+  position: absolute; top: -7px; left: -7px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+  background: var(--or); color: var(--on-accent); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.backdrop { position: fixed; inset: 0; z-index: 96; background: var(--scrim); animation: fade var(--dur-base) ease both; }
+@keyframes fade { from { opacity: 0; } }
+.panel {
+  position: fixed; top: 0; right: 0; z-index: 97; height: 100dvh; width: min(380px, 100vw);
+  display: flex; flex-direction: column; background: var(--surf); border-left: 1px solid var(--bd);
+  box-shadow: -18px 0 48px rgba(0,0,0,.4);
+  transform: translateX(105%); visibility: hidden;
+  transition: transform var(--dur-slow) var(--ease-drawer), visibility 0s linear var(--dur-slow);
+  padding-top: env(safe-area-inset-top);
+}
+.open { transform: none; visibility: visible; transition: transform var(--dur-slow) var(--ease-drawer), visibility 0s; }
+.docked { box-shadow: none; }
+.head { display: flex; align-items: center; gap: 6px; padding: 12px 12px 10px; border-bottom: 1px solid var(--bds); }
+.tabs { display: flex; gap: 4px; flex: 1; }
+.tabs button {
+  display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px; border-radius: 999px; border: 1px solid transparent;
+  background: transparent; color: var(--tx-s); font: inherit; font-weight: 700; font-size: .9rem; cursor: pointer;
+}
+.tabs i { font-style: normal; min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--card); font-size: .75rem; text-align: center; }
+.tabs .tabOn { background: color-mix(in oklab, var(--or) 16%, transparent); color: var(--or); border-color: var(--bd-s); }
+.iconBtn { width: 36px; height: 36px; border-radius: 10px; border: 0; background: transparent; color: var(--tx-s); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.iconBtn:hover { background: var(--card); color: var(--tx); }
+.iconBtn[aria-pressed="true"] { color: var(--or); }
+.body { flex: 1; overflow-y: auto; padding: 12px 12px calc(env(safe-area-inset-bottom) + 20px); display: flex; flex-direction: column; gap: 12px; }
+.quick { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--bds); }
+.quick > input {
+  width: 100%; border: 0; background: transparent; color: var(--tx); font: inherit; font-size: .95rem; padding: 4px 2px;
+}
+.quick > input:focus { outline: none; }
+.quickRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.addBtn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 7px 14px; border-radius: 999px; border: 0;
+  background: var(--or); color: var(--on-accent); font: inherit; font-weight: 700; font-size: .85rem; cursor: pointer;
+}
+.addBtn:disabled { opacity: .45; cursor: default; }
+.group h3 { margin: 4px 4px 4px; font-size: .75rem; text-transform: uppercase; letter-spacing: .07em; color: var(--tx-m); }
+.group .late { color: var(--red); }
+.empty { margin: 8px 4px; color: var(--tx-m); font-size: .9rem; line-height: 1.5; }
+.more { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; margin: 4px; color: var(--or); font-weight: 700; font-size: .85rem; text-decoration: none; }
+
+.newNote {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: var(--radius);
+  border: 1px dashed var(--bd-s); background: transparent; color: var(--or); font: inherit; font-weight: 700; cursor: pointer;
+}
+.notes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.note {
+  position: relative; display: flex; flex-direction: column; border-radius: 4px 4px 14px 4px; padding: 12px 10px 6px;
+  background: var(--bg); color: #2a1d0e; transform: rotate(var(--tilt));
+  box-shadow: 0 10px 18px rgba(0,0,0,.35), inset 0 -18px 24px -20px rgba(0,0,0,.25);
+}
+.note:focus-within { transform: none; z-index: 1; }
+.note textarea {
+  width: 100%; border: 0; resize: none; background: transparent; color: #2a1d0e;
+  font-family: var(--font); font-size: .95rem; line-height: 1.4;
+}
+.note textarea::placeholder { color: rgba(42,29,14,.45); }
+.note textarea:focus { outline: none; }
+.pinMark { position: absolute; top: -6px; right: 10px; color: #b45309; }
+.noteBar { display: flex; align-items: center; gap: 2px; margin-top: 4px; opacity: .6; transition: opacity var(--dur-fast) ease; }
+.note:hover .noteBar, .note:focus-within .noteBar { opacity: 1; }
+@media (hover: none) { .noteBar { opacity: 1; } }
+.noteBar > button {
+  border: 0; background: transparent; color: #4a3520; padding: 5px; border-radius: 8px; cursor: pointer; display: flex; font: inherit; font-size: .75rem; font-weight: 700;
+}
+.noteBar > button:hover { background: rgba(0,0,0,.08); }
+.delConfirm { color: #b91c1c !important; }
+.colors { display: flex; gap: 3px; flex: 1; flex-wrap: wrap; }
+.colors button { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.25); padding: 0; cursor: pointer; }
+.colors .colorOn { box-shadow: 0 0 0 2px #2a1d0e; }
+@media (max-width: 420px) { .notes { grid-template-columns: 1fr; } }
+
+/* Touch screens: the site makes every button at least 40px tall; keep these compact but tappable. */
+.colors button, .noteBar > button { min-height: 0; }
+@media (pointer: coarse) {
+  .colors { gap: 6px; }
+  .colors button { width: 22px; height: 22px; }
+  .noteBar > button { padding: 8px; }
+}
+/* Phone: the panel covers the screen, above the menu button; the tab sits low on the edge. */
+@media (max-width: 767px) {
+  .panel { z-index: 210; }
+  .backdrop { z-index: 209; }
+  .tab { top: auto; bottom: calc(env(safe-area-inset-bottom) + 96px); transform: none; flex-direction: row; padding: 10px 10px 10px 12px; gap: 6px; }
+  .tab:hover { padding-right: 10px; }
+}

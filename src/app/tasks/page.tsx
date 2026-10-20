@@ -7,12 +7,13 @@ import {
   Toast, useToast, FInput, EmptyState, Lbl, DatePicker,
 } from '@/components/ui';
 import TaskRow from '@/components/tasks/TaskRow';
+import { TimeInput, ReminderPicker } from '@/components/tasks/TimeAndReminders';
 import { getTasks, addTask, updateTask, deleteTask, clearDoneTasks } from '@/lib/db';
 import { ensureSession } from '@/lib/supabase';
 import { useLiveTables } from '@/lib/realtime';
 import {
   type Task, type Priority, PRIORITIES, PRIO_COLOR, PRIO_LABEL,
-  isOverdue, isDueToday, isUpcoming, sortOpen, sortDone,
+  isOverdue, isDueToday, isUpcoming, sortOpen, sortDone, defaultReminders, rememberReminders, hhmm,
 } from '@/lib/tasks';
 import { localDateStr } from '@/lib/dates';
 import InkNotes from '@/components/ink/InkNotes';
@@ -50,12 +51,16 @@ export default function TasksPage() {
   const [newText, setNewText] = useState('');
   const [newDue, setNewDue]   = useState('');
   const [newPrio, setNewPrio] = useState<Priority>('medium');
+  const [newTime, setNewTime] = useState('');
+  const [newRemind, setNewRemind] = useState<number[]>([]);
   const [adding, setAdding]   = useState(false);
 
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [editText, setEditText] = useState('');
   const [editDue, setEditDue]   = useState('');
   const [editPrio, setEditPrio] = useState<Priority>('medium');
+  const [editTime, setEditTime] = useState('');
+  const [editRemind, setEditRemind] = useState<number[]>([]);
 
   const [delId, setDelId]           = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -110,9 +115,10 @@ export default function TasksPage() {
     if (!text || adding) return;
     setAdding(true);
     try {
-      const created = await addTask({ text, priority: newPrio, due_date: newDue || today, created_date: today });
+      const created = await addTask({ text, priority: newPrio, due_date: newDue || today, due_time: newTime || null, remind_before: newTime ? newRemind : [], created_date: today });
+      if (newTime) rememberReminders(newRemind);
       setTasks(prev => [created, ...prev]);
-      setNewText(''); setNewDue('');
+      setNewText(''); setNewDue(''); setNewTime(''); setNewRemind([]);
       if (tab === 'done') setTab('today');
     } catch {
       show('Could not add that task.', 'var(--red)');
@@ -130,12 +136,22 @@ export default function TasksPage() {
     catch { setTasks(prev => prev.map(t => t.id === id ? before : t)); show('Could not update that task.', 'var(--red)'); }
   };
 
-  const openEdit = (t: Task) => { setEditTask(t); setEditText(t.text); setEditDue(t.due_date ?? ''); setEditPrio(t.priority); };
+  const openEdit = (t: Task) => {
+    setEditTask(t); setEditText(t.text); setEditDue(t.due_date ?? ''); setEditPrio(t.priority);
+    setEditTime(hhmm(t.due_time)); setEditRemind(t.remind_before ?? []);
+  };
 
   const saveEdit = async () => {
     if (!editTask || !editText.trim()) return;
     const before = editTask;
-    const updates = { text: editText.trim(), due_date: editDue || null, priority: editPrio };
+    const updates: Parameters<typeof updateTask>[1] = { text: editText.trim(), due_date: editDue || null, priority: editPrio };
+    // Time fields only when they're in use or changed (works before the database update too).
+    const timeChanged = hhmm(before.due_time) !== editTime || before.due_date !== (editDue || null)
+      || JSON.stringify(before.remind_before ?? []) !== JSON.stringify(editTime ? editRemind : []);
+    if (timeChanged && (editTime || before.due_time)) {
+      Object.assign(updates, { due_time: editTime || null, remind_before: editTime ? editRemind : [], reminders_sent: [] });
+      if (editTime) rememberReminders(editRemind);
+    }
     setTasks(prev => prev.map(t => t.id === before.id ? { ...t, ...updates } : t));
     setEditTask(null);
     try { await updateTask(before.id, updates); show('Task updated'); }
@@ -190,9 +206,11 @@ export default function TasksPage() {
               <span className={s.dateLabel}>Due</span>
               <DatePicker compact clearable value={newDue} min={today} onChange={setNewDue} placeholder="Add a date" />
             </div>
+            <TimeInput value={newTime} onChange={v => { if (v && !newTime) setNewRemind(defaultReminders()); setNewTime(v); }} />
             <Btn type="submit" sm disabled={!newText.trim() || adding} className={s.addBtn}>
               {adding ? 'Adding' : 'Add task'}
             </Btn>
+            {newTime && <ReminderPicker value={newRemind} onChange={setNewRemind} />}
           </div>
         </form>
 
@@ -239,6 +257,11 @@ export default function TasksPage() {
           <ModalTitle>Edit task</ModalTitle>
           <FInput label="Task" value={editText} onChange={setEditText} />
           <FInput label="Due date" type="date" value={editDue} onChange={setEditDue} />
+          <Lbl>Time</Lbl>
+          <div style={{ marginBottom: 'var(--sp-3)' }}>
+            <TimeInput value={editTime} onChange={v => { if (v && !editTime && !editRemind.length) setEditRemind(defaultReminders()); setEditTime(v); }} />
+          </div>
+          {editTime && <div style={{ marginBottom: 'var(--sp-3)' }}><ReminderPicker value={editRemind} onChange={setEditRemind} /></div>}
           <Lbl>Priority</Lbl>
           <PriorityPicker value={editPrio} onChange={setEditPrio} />
           <InkNotes type="task" id={editTask.id} context={editTask.text} variant="compact" />

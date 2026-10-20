@@ -71,6 +71,51 @@ npx supabase link --project-ref pdxozrjepmdjxmxmietz      # back to staging
 Then commit and push to deploy. Until the update is applied, the Sketchbook and the Handwrite buttons
 just show nothing; the rest of the site is unaffected.
 
+## Already live? Adding tasks on her Home Screen (widgets)
+1. Push the migration `20261020100000_widget_keys.sql` (staging first, then hers; dry run first):
+   `npx supabase db push --dry-run` → `npx supabase db push`. It adds one table, `widget_keys`.
+   Only a fingerprint (SHA-256 hash) of each key is stored, never the key itself.
+2. Deploy. Nothing new to set in Vercel: the widget uses `SUPABASE_SERVICE_ROLE_KEY`, which is already there.
+3. Check: open `https://<her site>/w/tasks?k=ywk_test` → it should say the key isn't valid (that's right).
+4. Her side: **Settings → Tasks on your Home Screen → Set up a widget**, then follow the steps it shows.
+   - **Scriptable** (free, App Store) is the recommended way: native widget, live countdowns, Home Screen
+     and Lock Screen, all sizes. Copy the script, paste into Scriptable, add a Scriptable widget, pick the script.
+   - Or any "web widget" app: copy the widget address (`/w/tasks?k=...`); add `&theme=light` for light.
+   - One key per device; each can be switched off in the same card (the widget then stops showing tasks).
+   - The key can read open tasks (text, date, time, priority) and nothing else. Tapping the widget opens Tasks.
+
+## Already live? Adding task times, reminders and the side panel
+
+1. **Database** (adds three empty columns to tasks and a `sticky_notes` table; nothing existing changes):
+   ```powershell
+   npx supabase link --project-ref pdxozrjepmdjxmxmietz      # staging first
+   npx supabase db push
+   npx supabase link --project-ref cuwqckhhlkvbhzqiktbj      # her project
+   npx supabase db push --dry-run     # should list ONLY 20261019100000_task_times_and_notes (plus any earlier ones not pushed yet)
+   npx supabase db push
+   npx supabase link --project-ref pdxozrjepmdjxmxmietz      # back to staging
+   ```
+2. **Deploy** (commit and push). Times, countdowns and the side panel work straight away.
+3. **Reminders need a clock that ticks every minute.** Vercel's free plan only runs jobs once a day, so
+   Supabase does the ticking. Once, in **her** project (`cuwqckhhlkvbhzqiktbj`):
+   - Supabase → **Integrations → Cron** → enable it. Then **Database → Extensions** → enable **pg_net**.
+   - **SQL Editor** → new query → paste this, with her site address and the same `CRON_SECRET` as in Vercel:
+     ```sql
+     select cron.schedule('yourworld-task-reminders', '* * * * *', $$
+       select net.http_get(
+         url := 'https://YOUR-SITE/api/cron/tasks',
+         headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET'),
+         timeout_milliseconds := 20000
+       );
+     $$);
+     ```
+   - Check it after two minutes: `select status_code, content from net._http_response order by created desc limit 3;`
+     should show `200` and `{"ok":true,...}` (counts only, never task names).
+   - To stop it: `select cron.unschedule('yourworld-task-reminders');`
+   The secret is stored in her database's cron settings, which only the project's admins can read.
+   It never touches her rows: it just calls the site once a minute, and the site does the rest.
+4. Reminders arrive on devices where notifications are turned on (App & backup → Turn on notifications).
+
 ### The beta video for the map feature
 A new **What's new** video (`public/whats-new/map-beta-*.mp4` and `.jpg`) shows her Routes, Places, Learn
 and On the Go as a beta, says what works and what doesn't yet, and asks what would make it better.

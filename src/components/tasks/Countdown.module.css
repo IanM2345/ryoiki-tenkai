@@ -1,0 +1,13 @@
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 999px;
+  font-size: 0.78rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums;
+  background: color-mix(in oklab, var(--tx) 8%, transparent); color: var(--tx-s);
+}
+.later { }
+.today { background: color-mix(in oklab, var(--yellow) 16%, transparent); color: var(--yellow); }
+.soon  { background: color-mix(in oklab, var(--or) 20%, transparent); color: var(--or); }
+.now   { background: var(--or); color: var(--on-accent); animation: pulse 1.6s ease-in-out infinite; }
+.over  { background: color-mix(in oklab, var(--red) 16%, transparent); color: var(--red); }
+@keyframes pulse { 50% { box-shadow: 0 0 0 4px color-mix(in oklab, var(--or) 25%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .now { animation: none; } }

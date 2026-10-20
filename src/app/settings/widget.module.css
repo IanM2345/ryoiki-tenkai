@@ -1,0 +1,21 @@
+.create { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.label { display: flex; flex-direction: column; gap: 6px; font-size: .85rem; font-weight: 700; color: var(--tx-m); }
+.label input {
+  min-height: 40px; padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--bd); background: var(--card);
+  color: var(--tx); font: inherit; font-size: .95rem; width: 220px;
+}
+.made { display: flex; flex-direction: column; gap: 14px; }
+.tabs { display: flex; gap: 4px; padding: 3px; border-radius: 14px; background: var(--card); border: 1px solid var(--bds); width: fit-content; flex-wrap: wrap; }
+.tabs button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 11px; border: 0; background: transparent;
+  color: var(--tx-s); font: inherit; font-weight: 700; font-size: .88rem; cursor: pointer;
+}
+.tabs .tabOn { background: color-mix(in oklab, var(--or) 18%, transparent); color: var(--or); }
+.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 10px; font-size: .92rem; line-height: 1.5; color: var(--tx-s); }
+.steps li::marker { color: var(--or); font-weight: 700; }
+.steps li { padding-left: 4px; }
+.steps li > button, .steps li > a { margin-left: 8px; vertical-align: middle; }
+.steps b { color: var(--tx); }
+.steps code { font-size: .85em; padding: 1px 5px; border-radius: 6px; background: var(--card); }
+.tip { list-style: none; margin-left: -22px; color: var(--tx-m); font-size: .85rem; }
+.keys { display: flex; flex-direction: column; gap: 6px; }
