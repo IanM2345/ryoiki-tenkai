@@ -181,6 +181,7 @@ export default function ConnectFourPage() {
 
   return (
     <GameShell
+      tutorial="connect-four"
       title="Connect Four"
       subtitle="Line up four before the computer does."
       icon={<CircleDot size={22} strokeWidth={2} />}

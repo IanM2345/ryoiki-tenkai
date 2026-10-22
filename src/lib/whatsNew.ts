@@ -6,31 +6,48 @@ import { getSettings, saveSettings } from './db';
 export type WhatsNewVideo = {
   id: string;
   title: string;
+  /** When the update came out (YYYY-MM-DD) and a line about what it brought. */
+  date: string;
+  blurb: string;
   portrait:  { src: string; poster: string };
   landscape: { src: string; poster: string };
 };
 
 /**
- * Every update video, newest first. The newest one plays by itself once; the
- * older ones stay replayable from the end of it. Add the next one at the top
- * (and its files in /public/whats-new).
+ * Every update video, newest first. Videos are never replaced: each one stays here
+ * (and on the Updates page, /updates) so any of them can be watched again. The newest
+ * plays by itself once. Add the next one at the top, with its files in /public/whats-new.
  */
 export const WHATS_NEW_VIDEOS: WhatsNewVideo[] = [
   {
+    id: '2026-10-mahjong',
+    title: 'Mahjong is here',
+    date: '2026-10-22',
+    blurb: 'Mahjong Solitaire and the full four-player game, plus How to play videos.',
+    portrait:  { src: '/whats-new/mahjong-portrait.mp4',  poster: '/whats-new/mahjong-portrait.jpg' },
+    landscape: { src: '/whats-new/mahjong-landscape.mp4', poster: '/whats-new/mahjong-landscape.jpg' },
+  },
+  {
     id: '2026-10-tasks-on-time',
     title: 'Tasks, on time',
+    date: '2026-10-20',
+    blurb: 'Times and countdowns on tasks, reminders on your phone, a side panel with sticky notes, and Home Screen widgets.',
     portrait:  { src: '/whats-new/tasks-portrait.mp4',  poster: '/whats-new/tasks-portrait.jpg' },
     landscape: { src: '/whats-new/tasks-landscape.mp4', poster: '/whats-new/tasks-landscape.jpg' },
   },
   {
     id: '2026-10-map-beta',
     title: 'Your map idea (beta)',
+    date: '2026-10-05',
+    blurb: 'Routes on real streets, your places in 3D, a study map in Learn, and revising On the Go.',
     portrait:  { src: '/whats-new/map-beta-portrait.mp4',  poster: '/whats-new/map-beta-portrait.jpg' },
     landscape: { src: '/whats-new/map-beta-landscape.mp4', poster: '/whats-new/map-beta-landscape.jpg' },
   },
   {
     id: '2026-10-glow-up',
     title: 'The glow-up',
+    date: '2026-09-30',
+    blurb: 'Birthday countdowns, letters to future you, the year in colour, four new games, and how to put yourworld on your phone.',
     portrait:  { src: '/whats-new/glow-up-portrait.mp4',  poster: '/whats-new/glow-up-portrait.jpg' },
     landscape: { src: '/whats-new/glow-up-landscape.mp4', poster: '/whats-new/glow-up-landscape.jpg' },
   },

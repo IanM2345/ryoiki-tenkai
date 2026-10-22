@@ -151,6 +151,7 @@ export default function WordSearchGame() {
 
   return (
     <GameShell
+      tutorial="word-search"
       title="Word Search"
       subtitle={puzzle ? `Theme: ${puzzle.theme}` : 'Find the hidden words.'}
       icon={<SearchIcon size={22} strokeWidth={2} />}

@@ -135,6 +135,7 @@ export default function BaoPage() {
 
   return (
     <GameShell
+      tutorial="bao"
       title="Bao"
       subtitle="The Swahili board game of sowing and capturing."
       icon={<Sprout size={22} strokeWidth={2} />}

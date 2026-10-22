@@ -11,7 +11,7 @@ import { makeBackup, downloadBlob, LAST_BACKUP_KEY, type Progress } from '@/lib/
 import { fmtDate } from '@/lib/dates';
 import NotificationsCard from './NotificationsCard';
 import WidgetCard from './WidgetCard';
-import { openWhatsNew } from '@/lib/whatsNew';
+import { useRouter } from 'next/navigation';
 
 const MAX = 860;
 type Platform = 'ios' | 'android' | 'desktop';
@@ -23,6 +23,7 @@ const TABLE_LABEL: Record<string, string> = {
 };
 
 export default function SettingsPage() {
+  const router = useRouter();
   // ── Install ────────────────────────────────────────────────
   const [platform, setPlatform] = useState<Platform>('desktop');
   const [installed, setInstalled] = useState(false);
@@ -96,7 +97,7 @@ export default function SettingsPage() {
       <Topbar
         title="App & backup"
         sub="Put yourworld on your phone, and keep a copy of everything."
-        action={<Btn variant="ghost" onClick={openWhatsNew}><Sparkles size={16} strokeWidth={2} /> What&apos;s new</Btn>}
+        action={<Btn variant="ghost" onClick={() => router.push('/updates')}><Sparkles size={16} strokeWidth={2} /> What&apos;s new</Btn>}
         maxWidth={MAX}
       />
       <div className={s.wrap}>

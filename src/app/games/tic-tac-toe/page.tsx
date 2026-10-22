@@ -253,6 +253,7 @@ export default function TicTacToePage() {
 
   return (
     <GameShell
+      tutorial="tic-tac-toe"
       title="Tic Tac Toe"
       subtitle="Three in a row wins. You are X."
       icon={<Grid3x3 size={24} strokeWidth={2} />}

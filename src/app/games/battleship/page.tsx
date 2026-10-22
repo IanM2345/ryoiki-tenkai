@@ -432,6 +432,7 @@ export default function BattleshipPage() {
 
   return (
     <GameShell
+      tutorial="battleship"
       title="Battleship"
       subtitle="Hide your fleet and hunt down theirs."
       icon={<ShipIcon size={24} strokeWidth={2} />}

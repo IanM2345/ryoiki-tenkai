@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { X, Volume2, RotateCcw, Check, Pause, Play, Film } from 'lucide-react';
 import s from './whatsNew.module.css';
 import { ensureSession } from '@/lib/supabase';
@@ -17,6 +17,7 @@ const AUTH_PAGES = ['/login', '/reset-password'];
  */
 export default function WhatsNew() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [auto, setAuto] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -87,11 +88,8 @@ export default function WhatsNew() {
   const current = WHATS_NEW_VIDEOS.find(x => x.id === videoId) ?? WHATS_NEW_VIDEOS[0];
   const others = WHATS_NEW_VIDEOS.filter(x => x.id !== current.id);
   const v = portrait ? current.portrait : current.landscape;
-  const watchOther = (id: string) => {
-    // Finishing the new video counts as seen before switching to an older one.
-    if (auto) { markWhatsNewSeen(); setAuto(false); }
-    setVideoId(id); setEnded(false); setPaused(false); setProgress(0);
-  };
+  // Every older video lives on the Updates page.
+  const allUpdates = () => { close(); router.push('/updates'); };
 
   const soundOn = () => {
     const el = video.current; if (!el) return;
@@ -145,9 +143,9 @@ export default function WhatsNew() {
         {ended && (
           <div className={s.endCard}>
             <button type="button" className={s.primary} onClick={replay}><RotateCcw size={17} strokeWidth={2.25} /> Watch again</button>
-            {others.map(o => (
-              <button key={o.id} type="button" className={s.ghost} onClick={() => watchOther(o.id)}><Film size={17} strokeWidth={2.25} /> Watch {o.title.charAt(0).toLowerCase() + o.title.slice(1)}</button>
-            ))}
+            {others.length > 0 && (
+              <button type="button" className={s.ghost} onClick={allUpdates}><Film size={17} strokeWidth={2.25} /> All updates</button>
+            )}
             <button type="button" className={s.ghost} onClick={close}><Check size={17} strokeWidth={2.25} /> Done</button>
           </div>
         )}

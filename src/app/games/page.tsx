@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  ChevronRight, CircleDot, Club, Crown, Flame, Gamepad2, Grid2x2, Grid3x3, Hash, Images, SearchCode, Ship, Sprout, Spade, Trophy, Type,
+  ChevronRight, CircleDot, Club, Crown, Dices, Flame, Gamepad2, Grid2x2, Grid3x3, Hash, Images, Layers, SearchCode, Ship, Sprout, Spade, Trophy, Type,
 } from 'lucide-react';
 import { Topbar, Toast, useToast } from '@/components/ui';
 import { ensureSession } from '@/lib/supabase';
@@ -23,6 +23,8 @@ interface GameCard {
 }
 
 const GAMES: GameCard[] = [
+  { type: 'mahjong', href: '/games/mahjong', title: 'Mahjong', desc: 'The classic four-player tile game. Draw, discard, claim Pungs and Chows, and be first to a full hand.', levels: 'Easy, Medium, Hard', icon: <Dices size={22} strokeWidth={2} />, accent: 'pu' },
+  { type: 'mahjongsol', href: '/games/mahjong-solitaire', title: 'Mahjong Solitaire', desc: 'Clear the stack of tiles two by two. Take a pair when both tiles are free.', levels: 'Pyramid or Turtle', icon: <Layers size={22} strokeWidth={2} />, accent: 'gr' },
   { type: 'tic', href: '/games/tic-tac-toe', title: 'Tic Tac Toe', desc: 'Three in a row. Quick rounds, and the top level never loses.', levels: 'Easy to Impossible', icon: <Grid3x3 size={22} strokeWidth={2} />, accent: 'or' },
   { type: 'sudoku', href: '/games/sudoku', title: 'Sudoku', desc: 'Fill every row, column and box with one to nine.', levels: 'Easy, Medium, Hard', icon: <Hash size={22} strokeWidth={2} />, accent: 'pu' },
   { type: 'chess', href: '/games/chess', title: 'Chess', desc: 'A full game against a computer that thinks a few moves ahead.', levels: 'Easy, Medium, Hard', icon: <Crown size={22} strokeWidth={2} />, accent: 'or' },

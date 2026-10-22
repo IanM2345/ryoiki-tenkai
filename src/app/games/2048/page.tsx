@@ -178,6 +178,7 @@ export default function Game2048() {
 
   return (
     <GameShell
+      tutorial="2048"
       title="2048"
       subtitle="Slide the tiles, add them up, reach 2048."
       icon={<Grid2x2 size={22} strokeWidth={2} />}

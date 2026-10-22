@@ -295,6 +295,7 @@ export default function SudokuPage() {
 
   return (
     <GameShell
+      tutorial="sudoku"
       title="Sudoku"
       subtitle="Fill every row, column and box with 1 to 9."
       icon={<Grid3x3 size={24} strokeWidth={2} />}

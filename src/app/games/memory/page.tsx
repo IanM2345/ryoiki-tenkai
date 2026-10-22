@@ -143,6 +143,7 @@ export default function MemoryPage() {
 
   return (
     <GameShell
+      tutorial="memory"
       title="Memory"
       subtitle="Match the pairs, made from your own photos."
       icon={<Images size={22} strokeWidth={2} />}

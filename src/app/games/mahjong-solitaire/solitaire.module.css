@@ -1,0 +1,50 @@
+.tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.tools button {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: 38px; padding: 0 14px;
+  border: 1px solid var(--bd-s); border-radius: var(--radius-pill);
+  background: var(--card); color: var(--tx);
+  font: 700 0.86rem var(--font); cursor: pointer;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+.tools button:hover:not(:disabled) { border-color: var(--or); }
+.tools button:active:not(:disabled) { transform: scale(0.96); }
+.tools button:disabled { opacity: 0.45; cursor: default; }
+.tools .on { border-color: var(--or); color: var(--or-l); }
+
+.boardWrap {
+  width: 100%;
+  padding: 14px 4px 18px;
+  border-radius: var(--radius-lg, 18px);
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in oklab, #1e7a62 30%, transparent), transparent 70%),
+    color-mix(in oklab, var(--card) 70%, #0b3d30);
+  border: 1px solid var(--bd);
+  overflow: hidden;
+}
+.zoomed { overflow-x: auto; overscroll-behavior-x: contain; }
+.tip { margin: -4px 0 10px; color: var(--tx-m); font-size: 0.82rem; }
+.board { position: relative; margin: 0 auto; }
+.placed { position: absolute; }
+.free:not(:disabled):hover { transform: translate(-1px, -3px); }
+.gone { opacity: 0; transform: scale(0.85) translateY(-6px); pointer-events: none; }
+.shake { animation: shake 360ms ease; }
+@keyframes shake {
+  20% { transform: translateX(-3px); } 40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); } 80% { transform: translateX(2px); }
+}
+
+.banner {
+  display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
+  margin-top: 14px; padding: 14px 18px;
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--gr, #4ade80) 16%, var(--card));
+  border: 1px solid color-mix(in oklab, var(--gr, #4ade80) 45%, transparent);
+  font-weight: 700; font-size: 1.05rem;
+}
+.bannerBad { background: color-mix(in oklab, var(--red) 12%, var(--card)); border-color: color-mix(in oklab, var(--red) 40%, transparent); }
+.banner button {
+  min-height: 38px; padding: 0 16px; border: none; border-radius: var(--radius-pill);
+  background: var(--or); color: var(--on-accent); font: 700 0.9rem var(--font); cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) { .shake { animation: none; } }

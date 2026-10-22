@@ -308,6 +308,7 @@ export default function KadiPage() {
 
   return (
     <GameShell
+      tutorial="kadi"
       title="Kadi"
       subtitle="The Kenyan card game of stacking penalties and shouting Kadi."
       icon={<Layers size={24} strokeWidth={2} />}

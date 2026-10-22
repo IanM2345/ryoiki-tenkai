@@ -9,7 +9,6 @@ import {
   LogOut, Sparkles, type LucideIcon,
 } from 'lucide-react';
 import s from './sidebar.module.css';
-import { openWhatsNew } from '@/lib/whatsNew';
 
 interface NavItem { icon: LucideIcon; label: string; href: string; count?: number; }
 
@@ -40,6 +39,7 @@ const YOU: NavItem[] = [
   { icon: ChartColumn, label: 'Stats',    href: '/stats'          },
   { icon: HardDriveDownload, label: 'App & backup', href: '/settings' },
   { icon: KeyRound,    label: 'Password', href: '/reset-password' },
+  { icon: Sparkles,    label: "What's new", href: '/updates'     },
 ];
 
 function isDesktop() {
@@ -196,10 +196,6 @@ export default function Sidebar() {
 
         <div className={s.sectionLabel}>You</div>
         {YOU.map(i => <NavLink key={i.href} {...i} />)}
-        <button type="button" className={s.newsBtn} title="What's new" onClick={() => { if (window.innerWidth < 768) close(); openWhatsNew(); }}>
-          <span className={s.navIcon}><Sparkles size={18} strokeWidth={1.75} aria-hidden /></span>
-          <span className={s.navLabel}>What&apos;s new</span>
-        </button>
 
         <button className={s.logoutBtn} onClick={handleLogout}>
           <span className={s.navIcon}><LogOut size={18} strokeWidth={1.75} aria-hidden /></span>

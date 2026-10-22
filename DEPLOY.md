@@ -71,6 +71,13 @@ npx supabase link --project-ref pdxozrjepmdjxmxmietz      # back to staging
 Then commit and push to deploy. Until the update is applied, the Sketchbook and the Handwrite buttons
 just show nothing; the rest of the site is unaffected.
 
+## Already live? Adding Mahjong (dev branch first)
+1. On the `dev` branch: `npx supabase db push --dry-run` then `npx supabase db push` against **staging**
+   (migration `20261021100000_mahjong.sql`: lets the two Mahjong games save results; it only widens a rule).
+2. Push `dev`; Vercel builds a preview. Try both games and the How to play buttons there.
+3. When happy, merge `dev` into `main`, push the same migration to her project, and deploy.
+   The videos in `public/tutorials` and `public/whats-new/mahjong-*` ship with the deploy (signed-in only).
+
 ## Already live? Adding tasks on her Home Screen (widgets)
 1. Push the migration `20261020100000_widget_keys.sql` (staging first, then hers; dry run first):
    `npx supabase db push --dry-run` → `npx supabase db push`. It adds one table, `widget_keys`.

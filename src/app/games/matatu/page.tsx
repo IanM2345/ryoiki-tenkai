@@ -310,6 +310,7 @@ export default function MatatuPage() {
 
   return (
     <GameShell
+      tutorial="matatu"
       title="Matatu"
       subtitle="Shed your cards, or cut the game with the right 7."
       icon={<Spade size={24} strokeWidth={2} />}

@@ -2,6 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
+import HowToVideo from './HowToVideo';
 import s from './GameShell.module.css';
 
 export interface Difficulty { key: string; label: string; hint?: string }
@@ -12,7 +13,7 @@ export interface Difficulty { key: string; label: string; hint?: string }
  */
 export default function GameShell({
   title, subtitle, icon, difficulties, difficulty, onDifficulty, score, status, statusTone = 'neutral',
-  onNewGame, rules, children, aside,
+  onNewGame, rules, children, aside, tutorial,
 }: {
   title: string;
   subtitle?: string;
@@ -27,6 +28,8 @@ export default function GameShell({
   rules?: React.ReactNode;
   children: React.ReactNode;
   aside?: React.ReactNode;
+  /** Slug of a "How to play" video in lib/tutorials (shown only once that video exists). */
+  tutorial?: string;
 }) {
   return (
     <div className={s.page}>
@@ -41,11 +44,14 @@ export default function GameShell({
               {subtitle && <p className={s.subtitle}>{subtitle}</p>}
             </div>
           </div>
-          {onNewGame && (
-            <button type="button" className={s.newGame} onClick={onNewGame}>
-              <RotateCcw size={15} strokeWidth={2.25} /> New game
-            </button>
-          )}
+          <div className={s.headBtns}>
+            {tutorial && <HowToVideo slug={tutorial} />}
+            {onNewGame && (
+              <button type="button" className={s.newGame} onClick={onNewGame}>
+                <RotateCcw size={15} strokeWidth={2.25} /> New game
+              </button>
+            )}
+          </div>
         </header>
 
         {(difficulties?.length || score?.length) ? (

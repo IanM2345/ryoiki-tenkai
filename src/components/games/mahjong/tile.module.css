@@ -1,0 +1,53 @@
+/* Ivory tile with a jade back showing as a thick edge (bottom-right). --d is the edge depth. */
+.tile {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid #c9bb98;
+  border-radius: 12% / 9%;
+  background: linear-gradient(160deg, #fffdf6 0%, #f6efdc 70%, #ece2c8 100%);
+  box-shadow:
+    1px 1px 0 #d8caa6,
+    var(--d) var(--d) 0 #1e7a62,
+    calc(var(--d) + 1px) calc(var(--d) + 1px) 0 #155947,
+    calc(var(--d) + 2px + var(--zs, 0px) * 0.6) calc(var(--d) + 3px + var(--zs, 0px)) calc(6px + var(--zs, 0px)) rgba(0, 0, 0, 0.35);
+  font: inherit;
+  color: inherit;
+  transition: transform 140ms cubic-bezier(.2, .8, .2, 1), filter 140ms ease, opacity 200ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.face { position: absolute; inset: 6% 7% 7% 7%; width: 86%; height: 87%; pointer-events: none; }
+.back { background: linear-gradient(150deg, #36a585, #1e7a62 60%, #155947); border-color: #12513f; }
+.back::after {
+  content: '';
+  position: absolute; inset: 14%;
+  border-radius: 10%;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+}
+.sideways { transform: rotate(90deg); }
+
+button.tile { cursor: default; }
+.clickable { cursor: pointer; }
+.clickable:not(:disabled):hover { transform: translate(-1px, -2px); }
+.clickable:disabled { cursor: default; }
+
+.selected {
+  background: linear-gradient(160deg, #fff4c9 0%, #ffe08a 100%);
+  border-color: var(--or, #ff8c00);
+  outline: 3px solid var(--or, #ff8c00);
+  outline-offset: 1px;
+  transform: translate(-1px, -3px);
+}
+.hint { outline: 3px dashed #4ade80; outline-offset: 2px; animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 50% { outline-color: rgba(74, 222, 128, 0.25); } }
+.blocked { filter: brightness(0.72) saturate(0.8); }
+.claim { outline: 3px solid #a855f7; outline-offset: 1px; }
+.win { outline: 3px solid #4ade80; outline-offset: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition: none; }
+  .hint { animation: none; }
+}

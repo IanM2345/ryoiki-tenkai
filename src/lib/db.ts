@@ -826,7 +826,7 @@ export async function deleteSoulLinksForItem(tableName: DbSoulLink['table_name']
 //  Append this block to the bottom of src/lib/db.ts
 // ================================================================
 
-export type GameType = 'tic' | 'sudoku' | 'chess' | 'battleship' | 'kadi' | 'matatu' | 'connect4' | 'memory' | 'wordle' | 'g2048' | 'wordsearch' | 'bao';
+export type GameType = 'tic' | 'sudoku' | 'chess' | 'battleship' | 'kadi' | 'matatu' | 'connect4' | 'memory' | 'wordle' | 'g2048' | 'wordsearch' | 'bao' | 'mahjongsol' | 'mahjong';
 export type GameDifficulty = 'easy' | 'medium' | 'hard';
 export type GameStatus = 'in_progress' | 'finished';
 export type GameResult = 'win' | 'loss' | 'draw';

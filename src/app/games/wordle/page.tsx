@@ -151,6 +151,7 @@ export default function WordleGame() {
 
   return (
     <GameShell
+      tutorial="wordle"
       title="Daily Wordle"
       subtitle="One new word every day."
       icon={<TypeIcon size={22} strokeWidth={2} />}

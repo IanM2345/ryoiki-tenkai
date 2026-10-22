@@ -454,6 +454,7 @@ export default function ChessPage() {
 
   return (
     <GameShell
+      tutorial="chess"
       title="Chess"
       subtitle="You play White against the computer."
       icon={<Crown size={24} strokeWidth={2} />}
