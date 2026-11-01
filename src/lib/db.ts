@@ -1496,3 +1496,62 @@ export async function deleteWidgetKey(id: string): Promise<void> {
   const { error } = await supabase.from('widget_keys').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ================================================================
+//  WARDROBE (avatar, closet photos, saved outfits)
+// ================================================================
+
+export type ClosetCategory = 'top' | 'bottom' | 'dress' | 'outerwear' | 'shoes' | 'bag' | 'accessory';
+export interface DbClosetItem {
+  id: string; user_id: string; name: string; category: ClosetCategory; image_path: string;
+  color: string | null; tags: string[]; notes: string | null; created_at: string; updated_at: string;
+}
+export interface DbOutfit {
+  id: string; user_id: string; name: string; layers: unknown[]; tags: string[]; favourite: boolean;
+  created_at: string; updated_at: string;
+}
+
+export async function getAvatarLook(): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabase.from('avatars').select('look').maybeSingle();
+  return (unwrap(data, error) as { look: Record<string, unknown> } | null)?.look ?? null;
+}
+export async function saveAvatarLook(look: Record<string, unknown>): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const { error } = await supabase.from('avatars').upsert({ user_id: user.id, look }, { onConflict: 'user_id' });
+  if (error) throw error;
+}
+
+export async function getClosetItems(): Promise<DbClosetItem[]> {
+  const { data, error } = await supabase.from('closet_items').select('*').order('created_at', { ascending: false });
+  return unwrap(data, error) ?? [];
+}
+export async function addClosetItem(item: Pick<DbClosetItem, 'name' | 'category' | 'image_path'> & Partial<Pick<DbClosetItem, 'color' | 'tags' | 'notes'>>): Promise<DbClosetItem> {
+  const { data, error } = await supabase.from('closet_items').insert(item).select('*').single();
+  return unwrap(data, error);
+}
+export async function updateClosetItem(id: string, patch: Partial<Pick<DbClosetItem, 'name' | 'category' | 'color' | 'tags' | 'notes'>>): Promise<DbClosetItem> {
+  const { data, error } = await supabase.from('closet_items').update(patch).eq('id', id).select('*').single();
+  return unwrap(data, error);
+}
+export async function deleteClosetItem(id: string): Promise<void> {
+  const { error } = await supabase.from('closet_items').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function getOutfits(): Promise<DbOutfit[]> {
+  const { data, error } = await supabase.from('outfits').select('*').order('updated_at', { ascending: false });
+  return unwrap(data, error) ?? [];
+}
+export async function addOutfit(o: Pick<DbOutfit, 'name' | 'layers'> & Partial<Pick<DbOutfit, 'tags' | 'favourite'>>): Promise<DbOutfit> {
+  const { data, error } = await supabase.from('outfits').insert(o).select('*').single();
+  return unwrap(data, error);
+}
+export async function updateOutfit(id: string, patch: Partial<Pick<DbOutfit, 'name' | 'layers' | 'tags' | 'favourite'>>): Promise<DbOutfit> {
+  const { data, error } = await supabase.from('outfits').update(patch).eq('id', id).select('*').single();
+  return unwrap(data, error);
+}
+export async function deleteOutfit(id: string): Promise<void> {
+  const { error } = await supabase.from('outfits').delete().eq('id', id);
+  if (error) throw error;
+}

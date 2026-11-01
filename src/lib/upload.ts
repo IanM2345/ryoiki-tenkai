@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export type ImageFolder = 'library' | 'souls' | 'places' | 'gallery';
+export type ImageFolder = 'library' | 'souls' | 'places' | 'gallery' | 'closet';
 
 const BUCKET = 'yourworld';
 const SIGN_SECONDS = 60 * 60 * 24; // links are short-lived; they are re-created when needed

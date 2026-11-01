@@ -7,6 +7,8 @@
 import type { Breadcrumb, ErrorEvent } from '@sentry/nextjs';
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+// Map services put places (and her live position) in the address itself, so only the host is kept.
+const MAP_HOSTS = /(^|\.)(mapbox\.com|openstreetmap\.org|tile\.openstreetmap\.org)$/i;
 
 /** Keep only the path (no ?query, no #hash), with ids blanked: /journal/<id>. */
 export function cleanUrl(url: string | undefined): string | undefined {
@@ -14,6 +16,7 @@ export function cleanUrl(url: string | undefined): string | undefined {
   try {
     const u = new URL(url, 'https://x.invalid');
     const host = u.host === 'x.invalid' ? '' : `${u.protocol}//${u.host}`;
+    if (MAP_HOSTS.test(u.hostname)) return `${host}/…`;
     return `${host}${u.pathname.replace(UUID, '<id>')}`;
   } catch {
     return url.split(/[?#]/)[0].replace(UUID, '<id>');

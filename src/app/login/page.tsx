@@ -46,8 +46,8 @@ function LoginForm() {
       const session = await restoreSession(data.access_token, data.refresh_token);
       if (!session) throw new Error('Something went wrong signing you in. Please try again.');
       // Full page load so no page cached from before sign in gets reused
-      const next = searchParams.get('next');
-      window.location.replace(next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
+      // Only ever go back to a page on this site (a crafted ?next= could point elsewhere).
+      window.location.replace(safeNext(searchParams.get('next')));
     } catch (err) {
       setError(err instanceof Error && err.message !== 'Wrong email or password.' ? err.message : "That email and password don't match.");
       setShake(n => n + 1);
@@ -111,6 +111,16 @@ function LoginForm() {
       </div>
     </main>
   );
+}
+
+/** The page to open after sign in: a same-site path, or the dashboard. */
+function safeNext(raw: string | null): string {
+  if (!raw) return '/dashboard';
+  try {
+    const u = new URL(raw, window.location.origin);
+    if (u.origin === window.location.origin && !u.pathname.startsWith('//')) return u.href;
+  } catch {}
+  return '/dashboard';
 }
 
 export default function LoginPage() {

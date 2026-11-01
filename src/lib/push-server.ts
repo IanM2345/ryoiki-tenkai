@@ -26,6 +26,17 @@ export function adminClient(): SupabaseClient {
 
 export interface SubRow { id: string; user_id: string; endpoint: string; p256dh: string; auth: string }
 
+// Real push services (Apple, Google/Chrome, Mozilla, Microsoft). Anything else is never contacted.
+const PUSH_HOSTS = [/\.push\.apple\.com$/, /^fcm\.googleapis\.com$/, /^android\.googleapis\.com$/, /\.push\.services\.mozilla\.com$/, /\.notify\.windows\.com$/];
+
+/** True only for an https address on a known push service (default port). */
+export function isPushEndpoint(endpoint: string): boolean {
+  try {
+    const u = new URL(endpoint);
+    return u.protocol === 'https:' && !u.port && !u.username && !u.password && PUSH_HOSTS.some(h => h.test(u.hostname));
+  } catch { return false; }
+}
+
 /**
  * Send messages to a user's devices. Devices that no longer exist (the app was
  * removed from the Home Screen, notifications turned off) are cleaned up.
@@ -34,6 +45,7 @@ export async function sendTo(db: SupabaseClient, subs: SubRow[], messages: PushM
   setup();
   let sent = 0, failed = 0, removed = 0;
   for (const sub of subs) {
+    if (!isPushEndpoint(sub.endpoint)) { failed++; continue; }   // not a real push service: never sent to
     let ok = false;
     for (const m of messages) {
       try {

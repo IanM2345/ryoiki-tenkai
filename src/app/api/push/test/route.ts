@@ -10,12 +10,19 @@ export async function POST(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
   if (!token) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
 
-  const missing = missingEnv();
-  if (missing.length) return NextResponse.json({ error: 'Notifications are not set up on the server yet.', missing }, { status: 500 });
-
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ error: 'Notifications are not set up on the server yet.' }, { status: 500 });
+  }
   const db = adminClient();
   const { data: { user } } = await db.auth.getUser(token);
   if (!user) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
+  // yourworld has one owner: no other Supabase account may use this.
+  const owner = process.env.USER_EMAIL?.trim().toLowerCase();
+  if (!owner || user.email?.toLowerCase() !== owner) return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
+
+  // Only the owner gets to see which settings are missing.
+  const missing = missingEnv();
+  if (missing.length) return NextResponse.json({ error: 'Notifications are not set up on the server yet.', missing }, { status: 500 });
 
   const { data: subs } = await db.from('push_subscriptions').select('id, user_id, endpoint, p256dh, auth').eq('user_id', user.id);
   if (!subs?.length) return NextResponse.json({ error: 'No devices have notifications turned on yet.' }, { status: 404 });

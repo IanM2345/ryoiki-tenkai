@@ -2,7 +2,7 @@
 // Deliberately small: it makes the site installable, shows a friendly screen when
 // there's no connection, and shows push notifications (birthdays, letters).
 // It never caches her data; every page and query still comes fresh from the network.
-// Version: yw-sw-2 (bump this comment to force phones to pick up a new worker).
+// Version: yw-sw-3 (bump this comment to force phones to pick up a new worker).
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
@@ -39,7 +39,9 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || '/dashboard', self.location.origin).href;
+  let url = new URL(event.notification.data?.url || '/dashboard', self.location.origin);
+  if (url.origin !== self.location.origin) url = new URL('/dashboard', self.location.origin);   // never open another site
+  url = url.href;
   event.waitUntil((async () => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const open = all.find(c => 'focus' in c);

@@ -11,7 +11,7 @@ const BUCKET = 'yourworld';
 export const BACKUP_TABLES = [
   'journal_entries', 'journal_entry_souls', 'tasks', 'library', 'ideas', 'queue', 'places',
   'souls', 'soul_media', 'soul_links', 'ratings', 'mood_defs', 'mood_logs', 'gallery_images',
-  'time_capsules', 'route_collections', 'routes', 'route_trips', 'study_nodes', 'study_links', 'study_cards', 'study_reviews', 'study_resources', 'study_sessions', 'drawings', 'sticky_notes', 'game_sessions', 'user_settings',
+  'time_capsules', 'route_collections', 'routes', 'route_trips', 'study_nodes', 'study_links', 'study_cards', 'study_reviews', 'study_resources', 'study_sessions', 'drawings', 'sticky_notes', 'game_sessions', 'user_settings', 'avatars', 'closet_items', 'outfits',
 ] as const;
 
 export const LAST_BACKUP_KEY = 'yw-last-backup';
@@ -193,8 +193,10 @@ export async function makeBackup(opts: { photos: boolean }, onProgress: (p: Prog
     const paths = new Set<string>();
     for (const rows of Object.values(data)) {
       for (const r of rows) {
-        const p = storagePath(typeof r.image_url === 'string' ? r.image_url : null);
-        if (p) paths.add(p);
+        for (const col of ['image_url', 'image_path']) {
+          const p = storagePath(typeof r[col] === 'string' ? (r[col] as string) : null);
+          if (p) paths.add(p);
+        }
       }
     }
     const list = [...paths];
@@ -204,7 +206,9 @@ export async function makeBackup(opts: { photos: boolean }, onProgress: (p: Prog
       const { data: blob, error } = await supabase.storage.from(BUCKET).download(p);
       if (error || !blob) { missedPhotos++; continue; }
       // Drop the user-id folder so the zip reads photos/places/..., photos/souls/...
-      const rel = p.split('/').slice(1).join('/') || p;
+      // (empty, '.' and '..' parts are dropped so the zip can never write outside its folder)
+      const parts = p.split('/').filter(x => x && x !== '.' && x !== '..');
+      const rel = parts.slice(1).join('/') || parts.join('/');
       files.push({ name: `photos/${rel}`, data: new Uint8Array(await blob.arrayBuffer()) });
       photos++;
     }

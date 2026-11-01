@@ -33,11 +33,15 @@ const TYPES = Object.keys(TYPE_META) as LibType[];
 const EMPTY = { type: 'link' as LibType, title: '', meta: '', url: '', rating: 0, tags: [] as string[], notes: '' };
 type Form = typeof EMPTY;
 
+// Links open web pages or email only (never javascript:, data: and the like).
+const SAFE_LINK = /^(https?:\/\/|mailto:)/i;
 const normaliseUrl = (u: string) => {
   const t = u.trim();
   if (!t) return null;
-  return /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : `https://${t}`;
+  if (SAFE_LINK.test(t)) return t;
+  return /^[a-z][a-z0-9+.-]*:/i.test(t) ? null : `https://${t}`;
 };
+const safeHref = (u: string | null | undefined) => (u && SAFE_LINK.test(u.trim()) ? u.trim() : undefined);
 const hostOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return u; } };
 
 export default function LibraryPage() {
@@ -209,7 +213,7 @@ export default function LibraryPage() {
                   </button>
                   <div className={s.cardFoot}>
                     {e.url ? (
-                      <a href={e.url} target="_blank" rel="noopener noreferrer" className={s.openLink}>
+                      <a href={safeHref(e.url)} target="_blank" rel="noopener noreferrer" className={s.openLink}>
                         <ExternalLink size={14} strokeWidth={2} /> {hostOf(e.url)}
                       </a>
                     ) : <span />}

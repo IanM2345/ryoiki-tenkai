@@ -29,6 +29,17 @@ const nextConfig: NextConfig = {
   // The site's main address (set by Vercel; stays the same across deploys). Per-deploy links
   // like ryoiki-tenkai-abc123xyz-….vercel.app sit behind a Vercel login, so widgets use this.
   env: { NEXT_PUBLIC_SITE_HOST: process.env.NEXT_PUBLIC_SITE_HOST || process.env.VERCEL_PROJECT_PRODUCTION_URL || '' },
+  // No other website may show yourworld inside a frame (stops click-tricking her into actions).
+  // /w/ widget pages are left out: some widget apps show the page in a web view.
+  async headers() {
+    const noFrames = [
+      { key: 'X-Frame-Options', value: 'DENY' },
+      { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+    ];
+    return [{ source: '/((?!w/).*)', headers: noFrames }];
+  },
 };
 
 const config = withSentryConfig(nextConfig, {

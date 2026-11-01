@@ -1,0 +1,28 @@
+.avatar { display: block; width: 100%; height: 100%; overflow: visible; touch-action: none; }
+.cropped { overflow: hidden; }
+.shadow { fill: #000; opacity: .28; }
+
+/* A little life: a slow shift of weight, breathing, the head settling, blinking,
+   and each new piece sliding on from the top like it's being pulled on. */
+.sway { transform-origin: 200px 1050px; animation: sway 7s ease-in-out infinite; }
+@keyframes sway { 0%, 100% { transform: rotate(-0.35deg); } 50% { transform: rotate(0.35deg) translateX(1px); } }
+.breathe { transform-origin: 200px 560px; animation: breathe 4.6s ease-in-out infinite; }
+@keyframes breathe { 0%, 100% { transform: scale(1, 1); } 45% { transform: scale(1.003, 1.006); } }
+.headMove { transform-origin: 200px 214px; animation: headMove 9s ease-in-out infinite; }
+@keyframes headMove { 0%, 100% { transform: rotate(0deg); } 30% { transform: rotate(1.6deg); } 62% { transform: rotate(-1.1deg) translateY(1px); } }
+.alive :global(.yw-eye) { transform-box: fill-box; transform-origin: center; animation: blink 5.3s infinite; }
+@keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } 97.5% { transform: scaleY(1); } }
+.wearIn { animation: wearIn .55s cubic-bezier(.25, .8, .3, 1) both; }
+@keyframes wearIn {
+  from { clip-path: inset(0 0 100% 0); transform: translateY(-10px); opacity: .4; }
+  70% { opacity: 1; }
+  to { clip-path: inset(-30px -30px -30px -30px); transform: none; opacity: 1; }
+}
+
+.movable { cursor: grab; }
+.movable:active { cursor: grabbing; }
+.selBox { fill: none; stroke: var(--or); stroke-width: 3; stroke-dasharray: 8 6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sway, .breathe, .headMove, .alive :global(.yw-eye), .wearIn { animation: none; }
+}

@@ -276,8 +276,10 @@ It should list only migrations from this table, and none that already have a Rem
 | `20261004100000_study_map` | new tables for Learn: subjects and topics, cross-links, flashcards, answers, links |
 | `20261004120000_review_scores` | empty `score` column on Learn answers (how close a typed answer was) |
 | `20261004140000_study_sessions` | new table for On the Go sessions (what she studied, on which route, how it went) |
+| `20261101100000_security_tightening` | security fixes from the audit: new tables start closed to the public key, push devices must be real push services, photos capped at 15 MB (adds rules only, no data touched) |
+| `20261101110000_wardrobe` | new tables for the Wardrobe: her avatar, closet pieces and saved outfits |
 
-(If you're only adding Routes to a site that already has everything else, you'll see just `20261001100000_routes`.)
+(If you're only adding the latest update to a site that already has everything else, you'll see just `20261101100000_security_tightening` and `20261101110000_wardrobe`. Push them to **staging first**, try the Wardrobe there, then production.)
 
 **Stop if** the list includes `20260729150314`: go back to 3.3.
 **Stop if** it lists anything else you don't recognise.
