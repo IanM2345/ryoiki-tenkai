@@ -100,7 +100,7 @@ export function render(img: CutImage, ctx: CanvasRenderingContext2D) {
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x;
     let a = mask[i];
-    if (a && (x === 0 || y === 0 || x === w - 1 || y === h - 1 || !mask[i - 1] || !mask[i + 1] || !mask[i - w] || !mask[i + w])) a = 150;
+    if (a && (x === 0 || y === 0 || x === w - 1 || y === h - 1 || !mask[i - 1] || !mask[i + 1] || !mask[i - w] || !mask[i + w])) a = Math.min(a, 150);
     d[i * 4] = rgba[i * 4]; d[i * 4 + 1] = rgba[i * 4 + 1]; d[i * 4 + 2] = rgba[i * 4 + 2]; d[i * 4 + 3] = a;
   }
   ctx.putImageData(out, 0, 0);

@@ -3,7 +3,7 @@
 // and shape the avatar to look like her.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Camera, Shuffle, Shirt, Plus, Trash2, Star, Save, X, ArrowUp, ArrowDown, Sparkles, UserRound, Layers, Check } from 'lucide-react';
+import { Box, Camera, ScanFace, Shuffle, Shirt, Plus, Trash2, Star, Save, X, ArrowUp, ArrowDown, Sparkles, UserRound, Layers, Check } from 'lucide-react';
 import { Btn, Topbar, EmptyState, Modal, ModalTitle, Confirm, Toast, useToast } from '@/components/ui';
 import StoredImage from '@/components/ui/StoredImage';
 import Avatar from '@/components/wardrobe/Avatar';
@@ -12,7 +12,7 @@ import {
   getAvatarLook, saveAvatarLook, getClosetItems, addClosetItem, updateClosetItem, deleteClosetItem,
   getOutfits, addOutfit, updateOutfit, deleteOutfit, type DbClosetItem, type DbOutfit, type ClosetCategory,
 } from '@/lib/db';
-import { ensureSession } from '@/lib/supabase';
+import { ensureSession, SIGNED_OUT } from '@/lib/supabase';
 import { useLiveTables } from '@/lib/realtime';
 import { uploadImage, deleteImage, signedUrl, preloadSignedUrls } from '@/lib/upload';
 import {
@@ -22,14 +22,17 @@ import {
   CATALOGUE, SLOTS, PATTERNS, CLOTH_COLOURS, wear, putOn, cleanLayers, photoBox, randomOutfit, pieceSlot,
   type Layer, type Slot, type WornPiece, type PlacedPhoto, type PatternId,
 } from '@/lib/wardrobe/garments';
+import { shapesFor, shapeOf, layersTo3D, hairTo3D } from '@/lib/wardrobe3d/shapes3d';
 import s from './wardrobe.module.css';
 
 const CutoutEditor = dynamic(() => import('@/components/wardrobe/CutoutEditor'), { ssr: false });
 const PhotoMatchDialog = dynamic(() => import('@/components/wardrobe/PhotoMatchDialog'), { ssr: false });
+const Avatar3D = dynamic(() => import('@/components/wardrobe/Avatar3D'), { ssr: false });
 
 type Tab = 'dress' | 'closet' | 'outfits' | 'avatar';
 type Shelf = Slot | 'closet';
 const DRAFT_KEY = 'yw-wardrobe-draft';
+const VIEW_KEY = 'yw-wardrobe-view';
 const CROPS: Record<Slot, [number, number]> = {
   top: [200, 400], bottom: [410, 680], dress: [200, 880], outer: [200, 700], shoes: [960, 120], bag: [330, 560],
   hat: [66, 150], glasses: [130, 70], ears: [130, 90], neck: [190, 150], belt: [400, 130],
@@ -57,6 +60,10 @@ const imageAspect = (url: string) => new Promise<number>(res => {
 
 export default function WardrobePage() {
   const [tab, setTab] = useState<Tab>('dress');
+  // the dress-up view: the drawn avatar, or the 3D figure wearing the same outfit
+  const [view, setView] = useState<'2d' | '3d'>('2d');
+  const [closeUp, setCloseUp] = useState(false);
+  const [addingBack, setAddingBack] = useState<DbClosetItem | null>(null);
   const [look, setLook] = useState<Look>(DEFAULT_LOOK);
   const [items, setItems] = useState<DbClosetItem[]>([]);
   const [outfits, setOutfits] = useState<DbOutfit[]>([]);
@@ -99,6 +106,15 @@ export default function WardrobePage() {
     }, 0);
     return () => clearTimeout(t);
   }, []);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      let v: string | null = new URLSearchParams(window.location.search).get('view');
+      if (!v) { try { v = localStorage.getItem(VIEW_KEY); } catch { /* ignore */ } }
+      if (v === '3d') setView('3d');
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  const pickView = (v: '2d' | '3d') => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } };
   useEffect(() => {
     if (!draftRead.current) return;   // don't save the empty start over the saved draft
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify(layers)); } catch { /* ignore */ }
@@ -167,24 +183,42 @@ export default function WardrobePage() {
   const onStageUp = () => { dragging.current = null; };
 
   // ─── Closet ────────────────────────────────────────────────
+  // signed out (or the session ran out): say so, and take her to sign in, coming back here afterwards
+  const signedOut = () => {
+    showToast(SIGNED_OUT, 'var(--red)');
+    setTimeout(() => { window.location.href = '/login?next=/wardrobe'; }, 1800);
+  };
   const addPiece = async (r: CutoutResult) => {
-    const file = new File([r.blob], r.blob.type === 'image/webp' ? 'piece.webp' : 'piece.png', { type: r.blob.type });
-    const path = await uploadImage(file, 'closet');
+    if (!(await ensureSession())) { signedOut(); throw new Error(SIGNED_OUT); }
+    const asFile = (b: Blob, n: string) => new File([b], b.type === 'image/webp' ? `${n}.webp` : `${n}.png`, { type: b.type });
+    const path = await uploadImage(asFile(r.blob, 'piece'), 'closet');
+    let back: string | null = null;
     try {
-      const item = await addClosetItem({ name: r.name, category: r.category, image_path: path, color: r.color, tags: r.tags });
+      back = await uploadImage(asFile(r.back, 'piece-back'), 'closet');
+      // (sent only with a back, so adding still works before the back-photo column exists)
+      const item = await addClosetItem({ name: r.name, category: r.category, image_path: path, color: r.color, tags: r.tags, ...(back ? { back_path: back } : {}) })
+        .catch(async e => { if (/back_path/.test(String((e as Error)?.message))) return addClosetItem({ name: r.name, category: r.category, image_path: path, color: r.color, tags: r.tags }); throw e; });
       setItems(prev => [item, ...prev]);
       const url = await signedUrl(path);
       if (url) setUrls(prev => ({ ...prev, [item.id]: url }));
       setAdding(false);
       showToast('Added to your closet');
-    } catch (e) { await deleteImage(path); throw e; }
+    } catch (e) { await deleteImage(path); if (back) await deleteImage(back); throw e; }
+  };
+  // a back photo for a piece added before backs were asked for
+  const addBack = async (item: DbClosetItem, blob: Blob) => {
+    const back = await uploadImage(new File([blob], blob.type === 'image/webp' ? 'piece-back.webp' : 'piece-back.png', { type: blob.type }), 'closet');
+    try {
+      const it = await updateClosetItem(item.id, { back_path: back });
+      setItems(prev => prev.map(x => x.id === it.id ? it : x)); setEditItem(it); setAddingBack(null); showToast('Back added');
+    } catch (e) { await deleteImage(back); throw e; }
   };
   const removeItem = (item: DbClosetItem) => setConfirm({
     msg: `Remove "${item.name}" from your closet? Outfits that use it will show without it.`,
     run: async () => {
       setConfirm(null); setEditItem(null);
       try {
-        await deleteClosetItem(item.id); await deleteImage(item.image_path);
+        await deleteClosetItem(item.id); await deleteImage(item.image_path); if (item.back_path) await deleteImage(item.back_path);
         setItems(prev => prev.filter(x => x.id !== item.id));
         setLayers(prev => prev.filter(l => l.kind !== 'photo' || l.item !== item.id)); setSel(null);
       } catch { showToast("Couldn't remove it", 'var(--red)'); }
@@ -198,6 +232,7 @@ export default function WardrobePage() {
     if (!layers.length || !naming) return;
     setSaving(true);
     try {
+      if (!(await ensureSession())) { signedOut(); return; }
       const name = naming.name.trim() || 'My outfit';
       if (current && !asNew) {
         const o = await updateOutfit(current.id, { name, layers });
@@ -207,7 +242,7 @@ export default function WardrobePage() {
         setOutfits(prev => [o, ...prev]); setOutfitId(o.id);
       }
       setNaming(null); showToast('Outfit saved');
-    } catch { showToast("Couldn't save the outfit", 'var(--red)'); } finally { setSaving(false); }
+    } catch { if (!(await ensureSession())) signedOut(); else showToast("Couldn't save the outfit", 'var(--red)'); } finally { setSaving(false); }
   };
   const wearOutfit = (o: DbOutfit) => { setLayers(cleanLayers(o.layers)); setSel(null); setOutfitId(o.id); setTab('dress'); };
   const favOutfit = async (o: DbOutfit) => {
@@ -230,6 +265,8 @@ export default function WardrobePage() {
   const [closetCat, setClosetCat] = useState<ClosetCategory | 'all'>('all');
   const shownItems = closetCat === 'all' ? items : items.filter(i => i.category === closetCat);
 
+  const in3d = useMemo(() => layersTo3D(layers, pieceSlot, itemById, urls), [layers, itemById, urls]);
+
   const tabs: [Tab, string, React.ReactNode][] = [
     ['dress', 'Dress up', <Shirt key="d" size={16} />], ['closet', 'My closet', <Layers key="c" size={16} />],
     ['outfits', 'Outfits', <Star key="o" size={16} />], ['avatar', 'My avatar', <UserRound key="a" size={16} />],
@@ -249,9 +286,21 @@ export default function WardrobePage() {
         {tab === 'dress' && (
           <div className={s.dress}>
             <div className={s.stage} onPointerMove={onStageMove} onPointerUp={onStageUp} onPointerCancel={onStageUp}>
-              <Avatar look={look} layers={layers} photos={urls} animate selected={selected?.kind === 'photo' ? sel : null}
-                onPhotoDown={onPhotoDown} svgRef={svgRef} className={s.stageAvatar} label="Your avatar wearing the outfit" />
+              <div className={s.viewSwitch} role="radiogroup" aria-label="View">
+                <button type="button" role="radio" aria-checked={view === '2d'} className={view === '2d' ? s.on : ''} onClick={() => pickView('2d')}><Shirt size={14} /> 2D</button>
+                <button type="button" role="radio" aria-checked={view === '3d'} className={view === '3d' ? s.on : ''} onClick={() => pickView('3d')}><Box size={14} /> 3D</button>
+              </div>
+              {view === '2d' ? (
+                <Avatar look={look} layers={layers} photos={urls} animate selected={selected?.kind === 'photo' ? sel : null}
+                  onPhotoDown={onPhotoDown} svgRef={svgRef} className={s.stageAvatar} label="Your avatar wearing the outfit" />
+              ) : (
+                <>
+                  <div className={s.stage3d}><Avatar3D look={look} outfit={null} closet={in3d.wear} hair={hairTo3D(look.hair)} closeUp={closeUp} /></div>
+                  <p className={s.label}>Drag to turn her around.{in3d.skipped ? ` ${in3d.skipped === 1 ? 'One piece has' : 'Some pieces have'} no 3D version yet.` : ''}</p>
+                </>
+              )}
               <div className={s.stageBar}>
+                {view === '3d' && <Btn sm variant="ghost" onClick={() => setCloseUp(c => !c)}><ScanFace size={15} /> {closeUp ? 'Full length' : 'Face close-up'}</Btn>}
                 <Btn sm variant="ghost" onClick={random}><Shuffle size={15} /> Surprise me</Btn>
                 <Btn sm variant="ghost" onClick={() => { setLayers([]); setSel(null); setOutfitId(null); }} disabled={!layers.length}><X size={15} /> Take it all off</Btn>
                 <Btn sm onClick={() => setNaming({ name: current?.name ?? '' })} disabled={!layers.length}><Save size={15} /> Save outfit</Btn>
@@ -449,8 +498,9 @@ export default function WardrobePage() {
       </div>
 
       {adding && <CutoutEditor onClose={() => setAdding(false)} onSave={addPiece} />}
+      {addingBack && <CutoutEditor mode="back" onClose={() => setAddingBack(null)} onSaveBack={b => addBack(addingBack, b)} />}
       {matching && <PhotoMatchDialog look={look} onClose={() => setMatching(false)} onApply={p => { editLook(p); showToast('Avatar updated from your photo'); }} />}
-      {editItem && <ItemModal item={editItem} url={urls[editItem.id]} onClose={() => setEditItem(null)} onWear={() => { wearPhoto(editItem); setEditItem(null); }}
+      {editItem && !addingBack && <ItemModal item={editItem} url={urls[editItem.id]} onAddBack={() => setAddingBack(editItem)} onClose={() => setEditItem(null)} onWear={() => { wearPhoto(editItem); setEditItem(null); }}
         onDelete={() => removeItem(editItem)} onSave={async patch => {
           try { const it = await updateClosetItem(editItem.id, patch); setItems(prev => prev.map(x => x.id === it.id ? it : x)); setEditItem(null); }
           catch { showToast("Couldn't save", 'var(--red)'); }
@@ -503,25 +553,41 @@ function PieceEditor({ w, onChange }: { w: WornPiece; onChange: (p: Partial<Worn
   );
 }
 
-function ItemModal({ item, url, onClose, onWear, onDelete, onSave }: {
-  item: DbClosetItem; url?: string; onClose: () => void; onWear: () => void; onDelete: () => void;
-  onSave: (p: Partial<Pick<DbClosetItem, 'name' | 'category' | 'tags'>>) => Promise<void>;
+function ItemModal({ item, url, onClose, onWear, onDelete, onSave, onAddBack }: {
+  item: DbClosetItem; url?: string; onClose: () => void; onWear: () => void; onDelete: () => void; onAddBack: () => void;
+  onSave: (p: Partial<Pick<DbClosetItem, 'name' | 'category' | 'tags' | 'shape3d'>>) => Promise<void>;
 }) {
   const [name, setName] = useState(item.name);
   const [cat, setCat] = useState<ClosetCategory>(item.category);
   const [tags, setTags] = useState(item.tags.join(', '));
+  const [shape, setShape] = useState<string | null>(item.shape3d ?? null);
+  const shapes = shapesFor(cat), shown = shapeOf(cat, shape);
   return (
     <Modal onClose={onClose}>
       <ModalTitle>{item.name}</ModalTitle>
       <div className={s.saveBox}>
-        <div className={s.itemArt}>{url ? <StoredImage src={item.image_path} alt={item.name} /> : null}</div>
+        <div className={s.itemSides}>
+          <div className={s.itemArt}>{url ? <StoredImage src={item.image_path} alt={`${item.name}, front`} /> : null}</div>
+          {item.back_path
+            ? <div className={s.itemArt}><StoredImage src={item.back_path} alt={`${item.name}, back`} /></div>
+            : <button type="button" className={s.addBack} onClick={onAddBack}><Camera size={18} /> Add the back</button>}
+        </div>
+        {!item.back_path && <p className={s.label}>Add a photo of the back too, so the 3D view shows the right back.</p>}
         <label className={s.field}><span>Name</span><input value={name} onChange={e => setName(e.target.value)} maxLength={80} /></label>
         <div className={s.shelves}>{CLOSET_CATEGORIES.map(c => <button key={c.id} type="button" className={cat === c.id ? s.on : ''} onClick={() => setCat(c.id)}>{c.name}</button>)}</div>
+        {shapes.length > 0 && <>
+          <small className={s.label}>In 3D it&apos;s worn as</small>
+          <div className={s.shelves}>{shapes.map(o => <button key={o.id} type="button" className={shown === o.id ? s.on : ''} onClick={() => setShape(o.id)}>{o.name}</button>)}</div>
+        </>}
         <label className={s.field}><span>Tags</span><input value={tags} onChange={e => setTags(e.target.value)} maxLength={200} /></label>
         <div className={s.row}>
           <Btn variant="danger" onClick={onDelete}><Trash2 size={14} /> Remove</Btn>
           <Btn variant="ghost" onClick={onWear}><Shirt size={14} /> Try it on</Btn>
-          <Btn onClick={() => onSave({ name: name.trim() || item.name, category: cat, tags: tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean).slice(0, 12) })}>Save</Btn>
+          <Btn onClick={() => onSave({
+            name: name.trim() || item.name, category: cat, tags: tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean).slice(0, 12),
+            // only send the 3D shape when she picked one that fits the category (so saving works before the 3D column exists)
+            ...(shape && shapes.some(o => o.id === shape) && shape !== (item.shape3d ?? null) ? { shape3d: shape } : {}),
+          })}>Save</Btn>
         </div>
       </div>
     </Modal>

@@ -7,7 +7,7 @@
  *  - Uses snake_case column names matching the Supabase schema
  */
 
-import { supabase } from './supabase';
+import { supabase, sessionUser, SIGNED_OUT } from './supabase';
 
 // ─── HELPER ──────────────────────────────────────────────────
 // Unwrap Supabase response — throw on error, return data
@@ -64,8 +64,8 @@ export async function getSettings(): Promise<DbUserSettings | null> {
 }
 
 export async function saveSettings(settings: Partial<Omit<DbUserSettings, 'user_id'>>) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  const user = await sessionUser();
+  if (!user) throw new Error(SIGNED_OUT);
   const { data, error } = await supabase
     .from('user_settings')
     .upsert({ user_id: user.id, ...settings })
@@ -1505,6 +1505,8 @@ export type ClosetCategory = 'top' | 'bottom' | 'dress' | 'outerwear' | 'shoes' 
 export interface DbClosetItem {
   id: string; user_id: string; name: string; category: ClosetCategory; image_path: string;
   color: string | null; tags: string[]; notes: string | null; created_at: string; updated_at: string;
+  back_path?: string | null;   // a photo of its back (private bucket), if she's added one
+  shape3d?: string | null;   // how it's worn in 3D (see wardrobe3d/shapes3d); empty = guess from the category
 }
 export interface DbOutfit {
   id: string; user_id: string; name: string; layers: unknown[]; tags: string[]; favourite: boolean;
@@ -1516,8 +1518,8 @@ export async function getAvatarLook(): Promise<Record<string, unknown> | null> {
   return (unwrap(data, error) as { look: Record<string, unknown> } | null)?.look ?? null;
 }
 export async function saveAvatarLook(look: Record<string, unknown>): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in');
+  const user = await sessionUser();
+  if (!user) throw new Error(SIGNED_OUT);
   const { error } = await supabase.from('avatars').upsert({ user_id: user.id, look }, { onConflict: 'user_id' });
   if (error) throw error;
 }
@@ -1526,11 +1528,11 @@ export async function getClosetItems(): Promise<DbClosetItem[]> {
   const { data, error } = await supabase.from('closet_items').select('*').order('created_at', { ascending: false });
   return unwrap(data, error) ?? [];
 }
-export async function addClosetItem(item: Pick<DbClosetItem, 'name' | 'category' | 'image_path'> & Partial<Pick<DbClosetItem, 'color' | 'tags' | 'notes'>>): Promise<DbClosetItem> {
+export async function addClosetItem(item: Pick<DbClosetItem, 'name' | 'category' | 'image_path'> & Partial<Pick<DbClosetItem, 'color' | 'tags' | 'notes' | 'back_path'>>): Promise<DbClosetItem> {
   const { data, error } = await supabase.from('closet_items').insert(item).select('*').single();
   return unwrap(data, error);
 }
-export async function updateClosetItem(id: string, patch: Partial<Pick<DbClosetItem, 'name' | 'category' | 'color' | 'tags' | 'notes'>>): Promise<DbClosetItem> {
+export async function updateClosetItem(id: string, patch: Partial<Pick<DbClosetItem, 'name' | 'category' | 'color' | 'tags' | 'notes' | 'shape3d' | 'back_path'>>): Promise<DbClosetItem> {
   const { data, error } = await supabase.from('closet_items').update(patch).eq('id', id).select('*').single();
   return unwrap(data, error);
 }

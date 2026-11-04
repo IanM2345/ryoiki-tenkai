@@ -25,6 +25,19 @@ export async function restoreSession(accessToken: string, refreshToken: string) 
   return data.session;
 }
 
+/** Shown when a save finds no session (signed out, or the session expired and couldn't be renewed). */
+export const SIGNED_OUT = "You're signed out. Sign in again, then try once more.";
+
+/**
+ * The signed-in user from the saved session (renewed first if it has expired). It doesn't ask the auth server,
+ * so a slow or blocked connection to it can't make a signed-in person look signed out.
+ */
+export async function sessionUser() {
+  if (typeof window === 'undefined') return null;
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user ?? null;
+}
+
 /**
  * Check session is ready before making DB queries.
  */

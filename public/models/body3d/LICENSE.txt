@@ -1,0 +1,4 @@
+The 3D body (base mesh, shape morphs, skeleton, weights and eyes) and the skin-area masks
+come from MakeHuman (https://www.makehumancommunity.org, github.com/makehumancommunity),
+released under Creative Commons CC0 1.0 (public domain). Packed for the web by
+scripts/build_body3d.py. Clothes and hair are generated in code.

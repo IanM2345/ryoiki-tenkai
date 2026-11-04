@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, sessionUser, SIGNED_OUT } from './supabase';
 
 export type ImageFolder = 'library' | 'souls' | 'places' | 'gallery' | 'closet';
 
@@ -54,8 +54,8 @@ export async function preloadSignedUrls(stored: (string | null | undefined)[]): 
 export async function uploadImage(file: File, folder: ImageFolder): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('That file is not an image.');
   if (file.size > 15 * 1024 * 1024) throw new Error('That image is over 15 MB.');
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not signed in');
+  const user = await sessionUser();
+  if (!user) throw new Error(SIGNED_OUT);
 
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
   const path = `${user.id}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;

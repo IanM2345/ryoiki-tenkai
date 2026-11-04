@@ -193,7 +193,7 @@ export async function makeBackup(opts: { photos: boolean }, onProgress: (p: Prog
     const paths = new Set<string>();
     for (const rows of Object.values(data)) {
       for (const r of rows) {
-        for (const col of ['image_url', 'image_path']) {
+        for (const col of ['image_url', 'image_path', 'back_path']) {
           const p = storagePath(typeof r[col] === 'string' ? (r[col] as string) : null);
           if (p) paths.add(p);
         }

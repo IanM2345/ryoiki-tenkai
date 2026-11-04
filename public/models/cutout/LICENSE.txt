@@ -1,0 +1,5 @@
+Cut-out models (U^2-Net family, Apache License 2.0)
+  u2netp.onnx         U^2-Net small, by Xuebin Qin et al.: https://github.com/xuebinqin/U-2-Net
+  silueta.onnx.part*  "silueta" (a reduced U^2-Net), via rembg by Daniel Gatis: https://github.com/danielgatis/rembg
+                      split in two parts so each file stays small; the app joins them when it loads.
+Runtime (../ort): onnxruntime-web, MIT License, Microsoft.
